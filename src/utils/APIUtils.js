@@ -1,18 +1,26 @@
 import * as FileSystem from "expo-file-system";
-
 import {
   API_ENDPOINTS,
   API_TIMEOUT,
   APP,
   APP_ACTIVITY_ID,
   BUSOBJCAT,
+  BUSOBJCATMAP,
   INTSTATUS,
   PAGE_SIZE,
   TEST_MODE,
 } from "../constants";
-import { changeDateToAPIFormat } from "./FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 
+/**
+ * Performs an asynchronous HTTP request to the specified endpoint.
+ * @param {string} endpoint - The URL endpoint to which the request will be made.
+ * @param {string} method - The HTTP method for the request (e.g., 'GET', 'POST', 'PUT', 'DELETE').
+ * @param {Object} headers - (Optional) An object containing request headers.
+ * @param {Object} body - (Optional) The request body, typically used for 'POST' or 'PUT' requests.
+ * @returns {Promise<Object>} - A promise resolving to the JSON response from the server.
+ * @throws {Error} - Throws an error if the request fails or encounters an error.
+ */
 const fetchData = async (endpoint, method, headers = {}, body = {}) => {
   console.debug("Request url: " + endpoint);
   console.debug("Request method: " + method);
@@ -96,9 +104,38 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
           );
       }
     }
+
     const responseText = await response.text();
-    console.debug("Response text: " + responseText);
-    const jsonResponse = JSON.parse(responseText);
+    //console.debug("Response text: " + responseText);
+
+    const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
+
+    if (
+      jsonResponse.hasOwnProperty("success") &&
+      jsonResponse.success === false
+    ) {
+      let errorMessage = jsonResponse.errorMessage;
+
+      if (jsonResponse.hasOwnProperty("errorCode")) {
+        errorMessage += ` | Code: ${jsonResponse.errorCode}`;
+      }
+
+      if (jsonResponse.hasOwnProperty("errorDetail")) {
+        errorMessage += ` | Detail: ${jsonResponse.errorDetail}`;
+      }
+
+      if (
+        jsonResponse.hasOwnProperty("ui_message") &&
+        jsonResponse.ui_message.hasOwnProperty("message_id") &&
+        jsonResponse.ui_message.hasOwnProperty("message_text")
+      ) {
+        errorMessage += ` | UI Message ID: ${jsonResponse.ui_message.message_id}, Message Text: ${jsonResponse.ui_message.message_text}`;
+      }
+
+      console.error(errorMessage);
+      showToast(errorMessage);
+    }
+
     return jsonResponse;
   } catch (error) {
     console.error(error);
@@ -106,38 +143,44 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
   }
 };
 
-const fetchAndCacheImage = async (id) => {
+/**
+ * Fetches a resource with the specified ID from the API, caches it locally, and returns the cached path.
+ * @param {string} id - The ID of the resource to fetch and cache.
+ * @returns {Promise<string>} - A promise resolving to the cached path of the resource.
+ * @throws {Error} - Throws an error if the fetch or caching process fails.
+ */
+const fetchAndCacheResource = async (id) => {
   try {
-    console.debug(`Going to fetch image with id: ${id}`);
+    console.debug(`Going to fetch resource with id: ${id}`);
 
     if (!id) {
-      console.debug("Image ID is blank, skipping fetch");
+      console.debug("Resource ID is blank, skipping fetch");
       return;
     }
 
-    const cachePath = `${FileSystem.cacheDirectory}${id}.png`;
+    const cachePath = `${FileSystem.cacheDirectory}${id}`;
 
-    // Check if image is in cache
+    // Check if resource is in cache
     const fileInfo = await FileSystem.getInfoAsync(cachePath);
 
     if (fileInfo.exists) {
-      console.debug(`Image ${id} is in cache, return the cached path`);
+      console.debug(`Resource ${id} is in cache, return the cached path`);
       return cachePath;
     } else {
-      console.debug(`Image ${id} not in cache, fetch from API`);
+      console.debug(`Resource ${id} not in cache, fetch from API`);
       const apiResponse = await fetch(
         `${API_ENDPOINTS.RESOURCE}/${id}?client=${APP.LOGIN_USER_CLIENT}`
       );
 
-      console.debug(apiResponse.status);
+      console.debug(`Fetch resource response status: ${apiResponse.status}`);
 
       if (!apiResponse.ok) {
         throw new Error(
-          `Failed to fetch image ${id}. Status: ${apiResponse.status}, Status Text: ${apiResponse.statusText}`
+          `Failed to fetch resource ${id}. Status: ${apiResponse.status}, Status Text: ${apiResponse.statusText}`
         );
       }
 
-      const imageBlob = await apiResponse.blob();
+      const resourceBlob = await apiResponse.blob();
 
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -148,25 +191,31 @@ const fetchAndCacheImage = async (id) => {
             encoding: FileSystem.EncodingType.Base64,
           });
 
-          console.debug("Image saved to cache: ", cachePath);
+          console.debug("Resource saved to cache: ", cachePath);
           resolve(cachePath);
         };
 
         reader.onerror = (error) => {
-          console.error("Error reading image blob:", error);
+          console.error("Error reading resource blob:", error);
           reject(error);
         };
 
-        reader.readAsDataURL(imageBlob);
+        reader.readAsDataURL(resourceBlob);
       });
     }
   } catch (error) {
-    console.error(`Error fetching and caching image for ID ${id}: `, error);
+    console.error(`Error fetching and caching resource for ID ${id}: `, error);
     throw error;
   }
 };
 
-const getQueryFields = (busObjCat) => {
+/**
+ * Returns the query fields configuration based on the specified business object category.
+ * @param {string} busObjCat - The business object category.
+ * @param {Array} extraFields - Extra fields to be added to the fields array. It can be used in detail screen.
+ * @returns {Object} - The query fields configuration object.
+ */
+const getQueryFields = (busObjCat, extraFields = []) => {
   switch (busObjCat) {
     case BUSOBJCAT.TIMESHEET:
       return {
@@ -177,6 +226,11 @@ const getQueryFields = (busObjCat) => {
           "TimeConfirmation-totalTime",
           "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel",
           "TimeConfirmation-remark:text",
+          "TimeConfirmation-absenceTime",
+          "TimeConfirmation-billableTime",
+          "TimeConfirmation-totalTime",
+          "TimeConfirmation-totalOvertime",
+          ...extraFields,
         ],
         where: [
           {
@@ -195,6 +249,7 @@ const getQueryFields = (busObjCat) => {
           "ExpenseClaim-amountBU",
           "ExpenseClaim-date",
           "ExpenseClaim-extStatus-statusID:ProcessTemplate-steps-statusLabel",
+          ...extraFields,
         ],
         where: [
           {
@@ -228,6 +283,7 @@ const getQueryFields = (busObjCat) => {
           "Absence-remark:text",
           "Absence-plannedDays",
           "Absence-extStatus-statusID:ProcessTemplate-steps-statusLabel",
+          ...extraFields,
         ],
         where: [
           {
@@ -238,11 +294,16 @@ const getQueryFields = (busObjCat) => {
         ],
       };
     default:
-      console.error("Invalid busObjCat:", busObjCat);
+      console.debug("None of the case matched in getQueryFields:", busObjCat);
       return;
   }
 };
 
+/**
+ * Returns the application name based on the specified business object category.
+ * @param {string} busObjCat - The business object category.
+ * @returns {string} - The application name.
+ */
 const getAppName = (busObjCat) => {
   switch (busObjCat) {
     case BUSOBJCAT.TIMESHEET:
@@ -252,11 +313,16 @@ const getAppName = (busObjCat) => {
     case BUSOBJCAT.ABSENCE:
       return APP_ACTIVITY_ID.ABSENCE;
     default:
-      console.error("Invalid busObjCat:", busObjCat);
+      console.debug("None of the case matched in getAppName :", busObjCat);
       return;
   }
 };
 
+/**
+ * Returns the sort conditions based on the specified business object category.
+ * @param {string} busObjCat - The business object category.
+ * @returns {Array<Object>} - An array of sort condition objects.
+ */
 const getSortConditions = (busObjCat) => {
   switch (busObjCat) {
     case BUSOBJCAT.TIMESHEET:
@@ -266,26 +332,60 @@ const getSortConditions = (busObjCat) => {
     case BUSOBJCAT.ABSENCE:
       return [{ property: "Absence-start", direction: "DESC" }];
     default:
-      console.error("Invalid busObjCat:", busObjCat);
+      console.debug(
+        "None of the case matched in getSortConditions: " + busObjCat
+      );
       return;
   }
 };
 
+/**
+ * Fetches data for the specified business object category using a query with optional pagination, query fields, and conditions.
+ * @param {string} busObjCat - The business object category for which data is to be fetched.
+ * @param {number} [page=1] - The page number for pagination (default is 1).
+ * @param {number} [limit=PAGE_SIZE] - The limit of items per page (default is PAGE_SIZE).
+ * @param {Object} [queryFields={}] - (Optional) Query fields configuration object.
+ * @param {Array<Object>} [whereConditions=[]] - (Optional) Array of where conditions for the query.
+ * @param {Array<Object>} [orConditions=[]] - (Optional) Array of OR conditions for the query.
+ * @returns {Promise<Object>} - A promise resolving to an object containing fetched data, page number, and limit.
+ */
 const fetchBusObjCatData = async (
   busObjCat,
   page = 1,
   limit = PAGE_SIZE,
-  whereConditionsFromFilter = []
+  queryFields = {},
+  whereConditions = [],
+  orConditions = []
 ) => {
   try {
-    const queryFields = getQueryFields(busObjCat);
+    // If query fields are not provided, get them based on the business object category
+    if (!queryFields || Object.keys(queryFields).length === 0) {
+      queryFields = getQueryFields(busObjCat);
+    }
 
-    // Add where conditions from filters to the list of where conditions
-    // in business object category query
-    whereConditionsFromFilter.forEach((whereCondition) => {
-      queryFields.where.push(whereCondition);
-    });
+    // Add where conditions to the query fields if whereConditions is provided
+    if (whereConditions && whereConditions.length > 0) {
+      // Initialize queryFields.where as an array if it's undefined
+      if (!queryFields.where) {
+        queryFields.where = [];
+      }
+      whereConditions.forEach((whereCondition) => {
+        queryFields.where.push(whereCondition);
+      });
+    }
 
+    // Add OR conditions to the query fields if orConditions is provided
+    if (orConditions && orConditions.length > 0) {
+      // Initialize queryFields.where as an array if it's undefined
+      if (!queryFields.or) {
+        queryFields.or = [];
+      }
+      orConditions.forEach((orCondition) => {
+        queryFields.or.push(orCondition);
+      });
+    }
+
+    // Common query data for the API request
     const commonQueryData = {
       userID: APP.LOGIN_USER_ID,
       client: parseInt(APP.LOGIN_USER_CLIENT),
@@ -294,18 +394,29 @@ const fetchBusObjCatData = async (
       testMode: TEST_MODE,
       appName: JSON.stringify(getAppName(busObjCat)),
       intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
-      page,
-      start: (page - 1) * limit,
-      limit,
-      sort: JSON.stringify(getSortConditions(busObjCat)),
     };
+
+    // Add optional parameters if any
+    if (page !== null) {
+      commonQueryData.page = page;
+      if (limit !== null && page >= 1) {
+        commonQueryData.limit = limit;
+        commonQueryData.start = (page - 1) * limit;
+      }
+    }
+
+    if (getSortConditions(busObjCat)) {
+      commonQueryData.sort = JSON.stringify(getSortConditions(busObjCat));
+    }
 
     console.debug(
       `Query data for ${busObjCat}: ${JSON.stringify(commonQueryData)}`
     );
 
+    // Convert common query data to URLSearchParams
     const formData = new URLSearchParams(commonQueryData);
 
+    // Fetch data using the fetchData function
     const busObjCatData = await fetchData(
       API_ENDPOINTS.QUERY,
       "POST",
@@ -315,37 +426,48 @@ const fetchBusObjCatData = async (
       formData.toString()
     );
 
+    // Handle errors if present in the response
     if (!busObjCatData || busObjCatData.errorCode) {
       console.error(busObjCatData.errorMessage);
       showToast("An error occurred during fetching " + busObjCat + " data.");
       return { error: busObjCatData.errorMessage };
     }
 
+    // Return fetched data along with page number and limit
     return { data: busObjCatData.data, page, limit };
   } catch (error) {
     console.error("Error: fetching " + busObjCat + " data: ", error);
   }
 };
 
-const busObjCatMap = {
-  [BUSOBJCAT.TIMESHEET]: "TimeConfirmation",
-  [BUSOBJCAT.EXPENSE]: "ExpenseClaim",
-  [BUSOBJCAT.ABSENCE]: "Absence",
-};
-
+/**
+ * Loads more data for the specified business object category and updates the list data state.
+ * @param {string} busObjCat - The business object category for which data is being loaded.
+ * @param {number} page - The page number to load.
+ * @param {number} limit - The limit of items per page.
+ * @param {Object} queryFields - The query fields configuration.
+ * @param {Array<Object>} whereConditions - Array of where conditions for the query.
+ * @param {Array<Object>} orConditions - Array of OR conditions for the query.
+ * @param {function} setListData - Function to update the list data state.
+ * @param {function} setLoading - Function to update the loading state.
+ * @param {function} setError - Function to update the error state.
+ * @returns {void}
+ */
 const loadMoreData = async (
   busObjCat,
   page,
   limit,
-  whereConditionsFromFilter,
+  queryFields,
+  whereConditions,
+  orConditions,
   setListData,
   setLoading,
   setError
 ) => {
   try {
-    console.debug("Loading more data for busObjCat:", busObjCat);
-    console.debug("Page:", page);
-    console.debug("Limit:", limit);
+    console.debug(
+      `Loading more data for busObjCat: ${busObjCat}. Current page is ${page}. Limit is ${limit}.`
+    );
 
     // Set loading state to indicate that the load more operation is in progress
     setLoading(true);
@@ -355,7 +477,9 @@ const loadMoreData = async (
       busObjCat,
       page,
       limit,
-      whereConditionsFromFilter
+      queryFields,
+      whereConditions,
+      orConditions
     );
 
     // Check if there is an error in the fetch response
@@ -368,21 +492,35 @@ const loadMoreData = async (
         // Log keys of the new data
         console.debug(
           "New Data Keys:",
-          newData.map((item) => item[`${busObjCatMap[busObjCat]}-id`])
+          newData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
         );
 
-        // Concatenate the new data with the existing data
         setListData((prevData) => {
           // Log keys of the previous data
           console.debug(
             "Previous data keys:",
-            prevData.map((item) => item[`${busObjCatMap[busObjCat]}-id`])
+            prevData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
           );
-          return [...prevData, ...newData];
+
+          // Filter out new data items that are already present in the previous data
+          const filteredNewData = newData.filter(
+            (newItem) =>
+              !prevData.some(
+                (prevItem) =>
+                  prevItem[`${BUSOBJCATMAP[busObjCat]}-id`] ===
+                  newItem[`${BUSOBJCATMAP[busObjCat]}-id`]
+              )
+          );
+
+          // Log keys of the filtered new data
+          console.debug(
+            "Filtered New Data Keys:",
+            filteredNewData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
+          );
+
+          // Concatenate the filtered new data with the existing data
+          return [...prevData, ...filteredNewData];
         });
-      } else {
-        // Show a message if there is no more data to load
-        showToast("No more data to load");
       }
 
       // Reset error state
@@ -401,23 +539,29 @@ const loadMoreData = async (
   }
 };
 
+/**
+ * Uploads a binary resource (e.g., image) to the server.
+ * @param {string} imagePath - The local path of the image to be uploaded.
+ * @returns {Promise<Object>} - A promise resolving to an object containing uploaded photo and thumbnail IDs.
+ */
 const uploadBinaryResource = async (imagePath) => {
   try {
-    const queryStringParams = convertToQueryString({
-      count: 50,
-    });
-
+    // Obtain new object IDs from the server
+    const queryStringParams = convertToQueryString({ count: 50 });
     const objectIds = await fetchData(
       `${API_ENDPOINTS.NEW_OBJECT_ID}?${queryStringParams}`
     );
 
+    // Check if new object IDs were obtained successfully
     if (!objectIds || !(objectIds instanceof Array) || objectIds.length === 0) {
       throw new Error("Failed to obtain new object ID");
     }
 
+    // Extract photo and thumbnail IDs from the obtained object IDs
     const photoId = objectIds[objectIds.length - 1];
     const thumbId = objectIds.length > 1 ? objectIds[objectIds.length - 2] : "";
 
+    // Prepare form data for upload
     const formData = new FormData();
     formData.append("resourceFile", {
       uri: imagePath,
@@ -430,11 +574,11 @@ const uploadBinaryResource = async (imagePath) => {
     formData.append("thumbID", thumbId);
     formData.append("convertToPng", "true");
 
+    // Upload the binary resource
     const queryStringParams1 = convertToQueryString({
       client: APP.LOGIN_USER_CLIENT,
       allClient: false,
     });
-
     const uploadResourceResponse = await fetchData(
       `${API_ENDPOINTS.UPLOAD_BINARY_RESOURCE}?${queryStringParams1}`,
       "POST",
@@ -444,10 +588,12 @@ const uploadBinaryResource = async (imagePath) => {
       formData
     );
 
+    // Check if the upload was successful
     if (!uploadResourceResponse.success) {
       throw new Error("Failed to upload binary resource");
     }
 
+    // Log upload status and return uploaded photo and thumbnail IDs
     console.debug(
       "Binary Resource upload status:",
       JSON.stringify(uploadResourceResponse)
@@ -464,40 +610,11 @@ const uploadBinaryResource = async (imagePath) => {
   }
 };
 
-const updateFields = async (formData, customQueryStringParams) => {
-  try {
-    const queryStringParams = convertToQueryString({
-      changeDate: changeDateToAPIFormat(new Date()),
-      userID: APP.LOGIN_USER_ID,
-      client: parseInt(APP.LOGIN_USER_CLIENT),
-      language: APP.LOGIN_USER_LANGUAGE,
-      testMode: APP.TEST_MODE ? APP.TEST_MODE : null,
-      ...customQueryStringParams,
-    });
-
-    const updateResponse = await fetchData(
-      `${API_ENDPOINTS.UPDATE_FIELDS}?${queryStringParams}`,
-      "POST",
-      {
-        "Content-Type": "application/json",
-      },
-      JSON.stringify(formData)
-    );
-
-    if (!updateResponse.success) {
-      showToast("Failed to update");
-      throw new Error(JSON.stringify(updateResponse));
-    }
-
-    console.debug(JSON.stringify(updateResponse));
-    const messageText =
-      updateResponse?.details?.[0]?.messages?.[0]?.message_text;
-    showToast(messageText);
-  } catch (error) {
-    console.error("Error in updateFields:", error);
-  }
-};
-
+/**
+ * Converts an object to a query string.
+ * @param {Object} params - The object containing key-value pairs to be converted to a query string.
+ * @returns {string} - The generated query string.
+ */
 const convertToQueryString = (params) => {
   return Object.keys(params)
     .map(
@@ -507,10 +624,10 @@ const convertToQueryString = (params) => {
 };
 
 export {
+  convertToQueryString,
   fetchData,
-  fetchAndCacheImage,
+  fetchAndCacheResource,
   fetchBusObjCatData,
   loadMoreData,
-  updateFields,
   uploadBinaryResource,
 };

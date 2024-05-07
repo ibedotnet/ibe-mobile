@@ -21,6 +21,8 @@ const SaveCancelBar = ({
   cancelLabel,
   saveIcon,
   cancelIcon,
+  saveDisable,
+  cancelDisable,
 }) => {
   return (
     <View style={styles.container}>
@@ -28,7 +30,8 @@ const SaveCancelBar = ({
       <CustomButton
         onPress={onSave}
         label={saveLabel}
-        icon={{ name: saveIcon, library: "FontAwesome" }}
+        icon={{ name: saveIcon }}
+        disabled={saveDisable}
       />
       {/* Separator */}
       <View style={styles.separator} />
@@ -36,7 +39,8 @@ const SaveCancelBar = ({
       <CustomButton
         onPress={onCancel}
         label={cancelLabel}
-        icon={{ name: cancelIcon, library: "FontAwesome" }}
+        icon={{ name: cancelIcon }}
+        disabled={cancelDisable}
       />
     </View>
   );

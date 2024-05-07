@@ -10,19 +10,20 @@
  *
  * @returns {JSX.Element} JSX Element representing the CustomImagePicker component.
  */
-import React, { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-
+import { useTranslation } from "react-i18next";
 import CustomToast from "./CustomToast";
 import Loader from "./Loader";
 import SaveCancelBar from "./SaveCancelBar";
-
+import { APP, APP_ACTIVITY_ID } from "../constants";
 import { uploadBinaryResource } from "../utils/APIUtils";
-import { updateBusObjCat } from "../utils/UpdateUtils";
+import { changeDateToAPIFormat } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
+import { updateFields } from "../utils/UpdateUtils";
 
 /**
  * Button Component
@@ -64,6 +65,9 @@ const Button = ({ label, icon, accessibilityLabel, onPress }) => {
 const CustomImagePicker = ({ route, navigation: { goBack } }) => {
   const currentUserPhoto = route?.params?.userPhoto;
 
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   // State variables
   const [selectedImage, setSelectedImage] = useState(currentUserPhoto);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +91,7 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
     } else {
-      alert("You did not select any image.");
+      Alert.alert(t("alert_title"), t("no_image_selected"));
     }
   };
 
@@ -103,7 +107,7 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
     } else {
-      alert("You did not take any photo.");
+      Alert.alert(t("alert_title"), t("no_photo_taken"));
     }
   };
 
@@ -121,22 +125,51 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
         // Upload the selected image and get binary resource
         const binaryResource = await uploadBinaryResource(selectedImage);
 
-        // Update the bus object category with the binary resource
-        updateBusObjCat(linkBackToBusObjcat, binaryResource);
+        // Construct formData object with binary resource data
+        const formData = {
+          data: {
+            [`${linkBackToBusObjcat}-photoID`]: binaryResource.photoId,
+            [`${linkBackToBusObjcat}-thumbnailID`]: binaryResource.thumbId,
+            [`${linkBackToBusObjcat}-type`]: "employee",
+            [`${linkBackToBusObjcat}-id`]: APP.LOGIN_USER_EMPLOYEE_ID,
+          },
+        };
 
-        showToast("Photo updated successfully.");
+        // Construct query string parameters
+        const queryStringParams = {
+          userID: APP.LOGIN_USER_ID,
+          client: parseInt(APP.LOGIN_USER_CLIENT),
+          language: APP.LOGIN_USER_LANGUAGE,
+          testMode: APP.TEST_MODE ? APP.TEST_MODE : null,
+          changeDate: changeDateToAPIFormat(new Date()),
+          component: "platform",
+          doNotReplaceAnyList: true,
+          appName: APP_ACTIVITY_ID.EMPLOYEE,
+        };
 
-        // Go back to the previous screen
-        goBack();
+        // Update the linked bus object category with the binary resource
+        const updateResponse = await updateFields(formData, queryStringParams);
+
+        // Check if update was successful
+        if (updateResponse.success) {
+          showToast(t("photo_updated_success"));
+          
+          goBack(); // Go back to the previous screen
+        } else {
+          showToast(t("failed_upload_photo"));
+        }
+        
+        if (updateResponse.message) {
+          showToast(updateResponse.message);
+        }
       } catch (error) {
-        console.error("Error in onSave:", error);
-
-        showToast("Failed to upload the photo.");
+        console.error("Error in onSave method of CustomImagePicker:", error);
+        showToast(t("failed_upload_photo"));
       } finally {
         setIsLoading(false);
       }
     } else {
-      alert("No image selected to save.");
+      Alert.alert(t("alert_title"), t("no_image_selected"));
     }
   };
 
@@ -156,23 +189,23 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
       </View>
       <View style={styles.buttonContainer}>
         <Button
-          label="Open Gallery"
+          label={t("pick_image")}
           icon="picture-o"
-          accessibilityLabel="Pick photo from gallery"
+          accessibilityLabel={t("pick_photo_gallery")}
           onPress={pickImageAsync}
         />
         <Button
-          label="Open Camera"
+          label={t("open_camera")}
           icon="camera"
-          accessibilityLabel="Open Camera to take a photo"
+          accessibilityLabel={t("open_camera_photo")}
           onPress={openCameraAsync}
         />
       </View>
       <SaveCancelBar
         onSave={onSave}
         onCancel={onCancel}
-        saveLabel="Save"
-        cancelLabel="Cancel"
+        saveLabel={t("save")}
+        cancelLabel={t("cancel")}
         saveIcon="save"
         cancelIcon="times"
       />

@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: "4%",
-    backgroundColor: "#005EB8",
+    backgroundColor: "#005eb8",
     height: "10%",
     elevation: 5,
   },

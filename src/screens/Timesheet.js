@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -8,16 +7,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
+
 import { format, isValid } from "date-fns";
-import { Ionicons } from "@expo/vector-icons";
-import { APP, BUSOBJCAT, PAGE_SIZE } from "../constants";
+
+import { APP, BUSOBJCAT, DOUBLE_CLICK_DELTA, PAGE_SIZE } from "../constants";
+
 import { fetchBusObjCatData, loadMoreData } from "../utils/APIUtils";
+import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
 import {
   convertMillisecondsToUnit,
   convertToDateFNSFormat,
-  timeUnitLabels,
 } from "../utils/FormatUtils";
-import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
+import { showToast } from "../utils/MessageUtils";
+import { screenDimension } from "../utils/ScreenUtils";
+
+import CustomButton from "../components/CustomButton";
+import Loader from "../components/Loader";
+
+import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
 
 /**
  * Timesheet component displays a list of timesheets with the ability to refresh
@@ -28,10 +36,16 @@ import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
  * @returns {JSX.Element} - Rendered component.
  */
 const Timesheet = ({ route, navigation }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
+  // Destructure the forceRefresh variable and updateForceRefresh function from the useTimesheetForceRefresh hook,
+  // which is accessing the TimesheetForceRefreshContext.
+  const { forceRefresh, updateForceRefresh } = useTimesheetForceRefresh();
+
   // State variables
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [timesheets, setTimesheets] = useState([]);
   const [expandedItems, setExpandedItems] = useState({});
@@ -39,20 +53,23 @@ const Timesheet = ({ route, navigation }) => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [whereConditions, setWhereConditions] = useState([]);
+  const [orConditions, setOrConditions] = useState([]);
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
+  const [lastPress, setLastPress] = useState(0);
 
   /**
-   * Toggle the expansion state of an item and fetch additional data if expanding.
+   * Toggle the expansion state of an item and display additional data if available.
    *
    * This function toggles the expansion state of an item identified by its unique itemId.
    * If the item is being expanded (i.e., it was previously collapsed), this function
-   * fetches additional data related to the item asynchronously.
+   * retrieves additional data related to the item from the timesheets data and updates
+   * the additional data state accordingly.
    *
    * @param {string} itemId - The unique identifier of the item.
    * @returns {void}
    */
-  const toggleItemExpansion = async (itemId) => {
+  const toggleItemExpansion = (itemId) => {
     setExpandedItems((prevExpandedItems) => {
       // Toggle the item expansion state
       const newExpandedItems = {
@@ -60,73 +77,106 @@ const Timesheet = ({ route, navigation }) => {
         [itemId]: !prevExpandedItems[itemId],
       };
 
-      // Fetch additional data when expanding
+      // If expanding, update additional data state
       if (!prevExpandedItems[itemId]) {
-        // Move the try-catch block inside the async callback function
-        (async () => {
-          try {
-            // Call the function to fetch additional data
-            const response = await fetchAdditionalData(itemId);
+        // Retrieve additional data for the item from timesheets
+        const item = timesheets.find(
+          (item) => item["TimeConfirmation-id"] === itemId
+        );
 
-            // Update additional data state if the fetch is successful
-            if (!response.error) {
-              setAdditionalData((prevData) => ({
-                ...prevData,
-                [itemId]: response.data,
-              }));
-            } else {
-              console.error("Error fetching additional data:", response.error);
-            }
-          } catch (error) {
-            console.error("Error fetching additional data:", error);
-          }
-        })();
+        const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
+        const convertedTotalTime =
+          convertMillisecondsToUnit(
+            totalTime,
+            totalTime >= 3600000 ? "hours" : "minutes"
+          )?.displayTime || "";
+
+        const billableTime = item?.["TimeConfirmation-billableTime"] || 0;
+        const convertedBillableTime =
+          convertMillisecondsToUnit(
+            billableTime,
+            billableTime >= 3600000 ? "hours" : "minutes"
+          )?.displayTime || "";
+
+        const absenceTime = item?.["TimeConfirmation-absenceTime"] || 0;
+        const convertedAbsenceTime =
+          convertMillisecondsToUnit(
+            absenceTime,
+            absenceTime >= 3600000 ? "hours" : "minutes"
+          )?.displayTime || "";
+
+        const overTime = item?.["TimeConfirmation-overTime"] || 0;
+        const convertedOverTime =
+          convertMillisecondsToUnit(
+            overTime,
+            overTime >= 3600000 ? "hours" : "minutes"
+          )?.displayTime || "";
+
+        // Define the additional data for the item
+        const additionalData = {
+          totalTime: convertedTotalTime,
+          billableTime: convertedBillableTime,
+          absenceTime: convertedAbsenceTime,
+          overTime: convertedOverTime,
+        };
+        setAdditionalData((prevData) => ({
+          ...prevData,
+          [itemId]: additionalData,
+        }));
       }
 
       return newExpandedItems;
     });
   };
 
-  const fetchAdditionalData = async (itemId) => {
-    // Implement the logic to fetch additional data based on itemId
-    // For example: const response = await api.fetchAdditionalData(itemId);
-    // Return the response object with data and error properties
-    // Replace this with your actual implementation
-    return { data: { XYZ: "ABC" }, error: null };
-  };
-
-  /*
+  /**
    * Function to handle data refreshing.
+   * This function is triggered when the user performs a pull-to-refresh action or when
+   * the timesheet screen mounts for the first time. It fetches timesheet data from
+   * the first page, resets the current page to 1, and updates the timesheets state
+   * with the new data.
+   *
+   * @async
+   * @function onRefresh
+   * @returns {Promise<void>} A Promise that resolves when data refreshing is complete.
    */
   const onRefresh = useCallback(async () => {
-    console.debug(`Before refreshing ${BUSOBJCAT.TIMESHEET}, the value of `);
+    // Set refreshing state to true to indicate that data refreshing is in progress
     setRefreshing(true);
 
+    // Reset page to 1 for refreshing
+    setPage(1);
+
     try {
-      // Fetch timesheet data
+      // Fetch timesheet data for the first page
       const response = await fetchBusObjCatData(
         BUSOBJCAT.TIMESHEET,
-        page,
+        1,
         limit,
-        whereConditions
+        null,
+        whereConditions,
+        orConditions
       );
-      if (!response.error) {
-        // Update timesheets state with new data
-        setTimesheets(response.data);
-      } else {
+      if (response?.error) {
         console.error("Error refreshing data:", response.error);
+      } else {
+        // Update timesheets state with new data if response is not null
+        setTimesheets(response?.data ?? []);
       }
     } catch (error) {
       console.error("Error refreshing data:", error);
     } finally {
+      // Set refreshing state back to false after data refreshing is complete
       setRefreshing(false);
     }
-  }, [setTimesheets, whereConditions]);
+  }, [setTimesheets, whereConditions, orConditions, limit]);
 
   useEffect(() => {
     // Update whereConditions when route params change
     setWhereConditions(route?.params?.whereConditions ?? []);
-  }, [route?.params?.whereConditions]);
+    // Update orConditions when route params change
+    setOrConditions(route?.params?.orConditions ?? []);
+  }, [route?.params?.whereConditions, route?.params?.orConditions]);
 
   useEffect(() => {
     // Update applied filters when route params change
@@ -140,60 +190,71 @@ const Timesheet = ({ route, navigation }) => {
     setPage(1);
     // Trigger refresh when the component mounts
     onRefresh();
-  }, [whereConditions]);
+  }, [whereConditions, orConditions]);
 
   /**
-   * Function to handle loading more data.
+   * Effect to ensure that the Timesheet component's data is refreshed whenever changes occur in other parts of the application
+   * that affect the timesheet list. These changes may include updates to timesheet details, deletions of timesheets, or any other relevant modifications.
+   * This effect resets the page to 1 and triggers a refresh when the 'forceRefresh' state is updated.
+   */
+  useEffect(() => {
+    setPage(1);
+    if (forceRefresh) {
+      onRefresh();
+      updateForceRefresh(false); // Resetting forceRefresh to false after triggering the refresh
+    }
+  }, [forceRefresh]);
+
+  /**
+   * Function to handle loading more data when the end of the list is reached.
+   * This function is triggered to load additional data when the end of the list is reached during scrolling.
+   * It calls a utility function to fetch more data and updates the list state accordingly.
+   * @returns {void}
    */
   const handleLoadMoreData = useCallback(() => {
-    if (!error && !isLoadingMore) {
-      // Set the flag to indicate that the load more operation is in progress
-      setIsLoadingMore(true);
+    // Check if the current data already contains all the items for the current page
+    if (timesheets.length < page * limit) {
+      showToast(t("no_more_data"));
+      return;
+    }
 
+    // Proceed to load more data only if there are no errors
+    if (!error) {
       // Call utility function to load more data
       loadMoreData(
         BUSOBJCAT.TIMESHEET,
         page + 1, // Increment page for the next set of data
         limit,
+        null,
         whereConditions,
+        orConditions,
         setTimesheets,
         setIsLoading,
         setError
       ).finally(() => {
-        // Reset the flag when the load more operation is complete (successful or not)
-        setIsLoadingMore(false);
         // Update page for the next load
         setPage(page + 1);
       });
     }
-  }, [page, limit, setTimesheets, setError, error, isLoadingMore]);
+  }, [
+    page,
+    limit,
+    setTimesheets,
+    timesheets.length,
+    setError,
+    error,
+    whereConditions,
+    orConditions,
+  ]);
 
   /**
    * Navigate to the filters screen with initial filter settings.
-   *
-   * The function prepares initial filter settings based on the applied filters and navigates
-   * to the "Filters" screen, passing necessary parameters such as filter options, business object category,
-   * and initial filter settings.
-   *
-   * @returns {void}
    */
   const navigateToFilters = () => {
     const initialFilters = convertToFilterScreenFormat(
       appliedFilters,
       filtersMap[BUSOBJCAT.TIMESHEET],
       BUSOBJCAT.TIMESHEET
-    );
-
-    console.debug(
-      `Before navigating from ${
-        BUSOBJCAT.TIMESHEET
-      } screen to filters screen, the list of applied filters is ${JSON.stringify(
-        appliedFilters
-      )} and corresponding list of where conditions is ${JSON.stringify(
-        whereConditions
-      )}. Also, the list of initial filters (or formatted filters) is ${JSON.stringify(
-        initialFilters
-      )}`
     );
 
     navigation.navigate("Filters", {
@@ -204,20 +265,23 @@ const Timesheet = ({ route, navigation }) => {
   };
 
   /**
+   * Navigate to the timesheet creation screen.
+   */
+  const navigateToTimesheetDetail = () => {
+    // Navigate to the new screen
+    navigation.navigate("TimesheetDetail");
+  };
+
+  /**
    * Rendered component for the left side of the header.
-   *
-   * This component displays the count of timesheets on the left side of the header.
-   * If there are timesheets available, it shows the count; otherwise, it displays "No records".
-   *
-   * @returns {JSX.Element} - Rendered component for the left side of the header.
    */
   const headerLeft = () => {
     let timesheetCount = timesheets.length;
     return (
       <View>
         <Text style={styles.recordCountText}>
-          {`Timesheet${timesheetCount !== 1 ? "s" : ""}: ${
-            timesheetCount > 0 ? timesheetCount : "No records"
+          {`${t("timesheets")}${timesheetCount !== 1 ? t("s") : ""}: ${
+            timesheetCount > 0 ? timesheetCount : t("no_records")
           }`}
         </Text>
       </View>
@@ -226,24 +290,37 @@ const Timesheet = ({ route, navigation }) => {
 
   /**
    * Rendered component for the right side of the header.
-   *
-   * This component displays a filter icon on the right side of the header,
-   * allowing users to navigate to the filters screen.
-   * If there are applied filters, it also shows the count of applied filters.
-   *
-   * @returns {JSX.Element} - Rendered component for the right side of the header.
    */
   const headerRight = () => {
     return (
-      <View style={styles.filterIconContainer}>
-        <TouchableOpacity onPress={navigateToFilters}>
-          <Ionicons name="filter" size={30} color="white" />
-        </TouchableOpacity>
-        {appliedFiltersCount > 0 && (
-          <View style={styles.filterCountContainer}>
-            <Text style={styles.filterCountText}>{appliedFiltersCount}</Text>
-          </View>
-        )}
+      <View style={styles.headerRightContainer}>
+        <CustomButton
+          onPress={navigateToTimesheetDetail}
+          label=""
+          icon={{
+            name: "add-circle-sharp",
+            library: "Ionicons",
+            size: 30,
+            color: "white",
+          }}
+        />
+        <View style={styles.filterIconContainer}>
+          <CustomButton
+            onPress={navigateToFilters}
+            label=""
+            icon={{
+              name: "filter",
+              library: "FontAwesome",
+              size: 30,
+              color: "white",
+            }}
+          />
+          {appliedFiltersCount > 0 && (
+            <View style={styles.filterCountContainer}>
+              <Text style={styles.filterCountText}>{appliedFiltersCount}</Text>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -261,7 +338,6 @@ const Timesheet = ({ route, navigation }) => {
       <FlatList
         data={timesheets}
         keyExtractor={(item) => item["TimeConfirmation-id"]}
-        // Render each timesheet item
         renderItem={({ item, index }) => {
           try {
             // Extracting and formatting data for each timesheet item
@@ -291,7 +367,7 @@ const Timesheet = ({ route, navigation }) => {
             let remark = item?.["TimeConfirmation-remark:text"] || "";
 
             const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
-            const convertedTime =
+            const convertedTotalTime =
               convertMillisecondsToUnit(
                 totalTime,
                 totalTime >= 3600000 ? "hours" : "minutes"
@@ -306,66 +382,160 @@ const Timesheet = ({ route, navigation }) => {
                   : "white",
             };
 
+            const handlePress = () => {
+              const currentTime = new Date().getTime();
+              const delta = currentTime - lastPress;
+
+              if (delta < DOUBLE_CLICK_DELTA) {
+                // Double click threshold
+                // Double click detected, navigate to add timesheet screen
+                navigation.navigate("TimesheetDetail", {
+                  timesheetId,
+                });
+              }
+
+              // Update last press timestamp and timesheet ID pressed
+              setLastPress(currentTime);
+            };
+
             return (
-              <View style={[styles.row, itemStyle]}>
-                <View style={styles.firstColumn}>
-                  <Text
-                    style={styles.firstColumnText}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {statusLabel}
-                  </Text>
-                </View>
-                <View style={styles.secondColumn}>
-                  <Text style={styles.secondColumnFirstRowText}>
-                    {formattedStartDate}
-                    {" - "}
-                    {formattedEndDate}
-                  </Text>
-                  <Text
-                    style={styles.secondColumnSecondRowText}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {remark}
-                  </Text>
-                  {item && (
-                    <TouchableOpacity
-                      onPress={() => toggleItemExpansion(timesheetId)}
+              <TouchableOpacity onPress={handlePress}>
+                <View style={[styles.row, itemStyle]}>
+                  <View style={styles.firstColumn}>
+                    <Text
+                      style={styles.firstColumnText}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
                     >
-                      <Text style={styles.showMoreButtonText}>
-                        {expandedItems[timesheetId] ? "Show Less" : "Show More"}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {expandedItems[timesheetId] && (
-                    <>
-                      {additionalData[timesheetId] ? (
-                        <>
-                          {/* Render additional data components here */}
-                          <Text>{additionalData[timesheetId]["XYZ"]}</Text>
-                        </>
-                      ) : (
-                        // Loading indicator while fetching additional data
-                        <ActivityIndicator size="small" color="#0000ff" />
-                      )}
-                    </>
-                  )}
+                      {statusLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.secondColumn}>
+                    <Text style={styles.secondColumnFirstRowText}>
+                      {formattedStartDate}
+                      {" - "}
+                      {formattedEndDate}
+                    </Text>
+                    <Text
+                      style={styles.secondColumnSecondRowText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {remark}
+                    </Text>
+                    {item && (
+                      <View style={styles.showMoreButtonContainer}>
+                        <TouchableOpacity
+                          onPress={() => toggleItemExpansion(timesheetId)}
+                        >
+                          <Text style={styles.showMoreButtonText}>
+                            {expandedItems[timesheetId]
+                              ? t("timesheets_show_less")
+                              : t("timesheets_show_more")}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {expandedItems[timesheetId] && (
+                      <>
+                        {additionalData[timesheetId] ? (
+                          <>
+                            {/* Render additional data components here */}
+                            <View style={styles.additionalDataContainer}>
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_total_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {additionalData[timesheetId]["totalTime"]}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_billable_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {
+                                      additionalData[timesheetId][
+                                        "billableTime"
+                                      ]
+                                    }
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_absence_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {additionalData[timesheetId]["absenceTime"]}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_over_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {additionalData[timesheetId]["overTime"]}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </>
+                        ) : (
+                          // Loading indicator while fetching additional data
+                          <Loader size={"small"} />
+                        )}
+                      </>
+                    )}
+                  </View>
+                  <View style={styles.thirdColumn}>
+                    <Text
+                      style={[
+                        styles.thirdColumnText,
+                        {
+                          color: totalTime === 0 ? "red" : "green",
+                        },
+                      ]}
+                    >
+                      {convertedTotalTime}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.thirdColumn}>
-                  <Text
-                    style={[
-                      styles.thirdColumnText,
-                      {
-                        color: totalTime === 0 ? "red" : "green",
-                      },
-                    ]}
-                  >
-                    {convertedTime}
-                  </Text>
-                </View>
-              </View>
+              </TouchableOpacity>
             );
           } catch (error) {
             console.error("Error rendering item:", error);
@@ -376,13 +546,11 @@ const Timesheet = ({ route, navigation }) => {
             );
           }
         }}
-        //onEndReached={handleLoadMoreData}
-        onEndReachedThreshold={0.1}
+        onEndReached={handleLoadMoreData}
+        onEndReachedThreshold={1}
         refreshing={isLoading}
         ListFooterComponent={() => {
-          return isLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
-          ) : null;
+          return isLoading ? <Loader /> : null;
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -422,7 +590,6 @@ const styles = StyleSheet.create({
   secondColumnSecondRowText: {
     paddingRight: 8,
   },
-  secondColumnThirdRowText: {},
   thirdColumn: {
     flex: 1,
     alignItems: "flex-end",
@@ -431,8 +598,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  showMoreButtonContainer: {
+    width: "50%",
+  },
   showMoreButtonText: {
     color: "blue",
+    fontSize: 16,
+  },
+  headerRightContainer: {
+    width: screenDimension.width / 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
   },
   filterIconContainer: {
     position: "relative",
@@ -455,6 +632,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
+  additionalDataContainer: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: "2%",
+  },
+  additionalDataItem: {
+    width: "50%",
+    height: "50%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  additionalDataLabelContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  additionalDataValueContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  additionalDataLabel: {
+    fontWeight: "bold",
+  },
+  additionalDataValue: {},
 });
 
 export default Timesheet;

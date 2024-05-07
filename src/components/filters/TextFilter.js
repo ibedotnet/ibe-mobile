@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
+import { useTranslation } from "react-i18next";
 
 /**
  * TextFilter component renders a text input field for filtering purposes.
@@ -21,6 +22,9 @@ const TextFilter = ({
   onFilter,
   clearValue,
 }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   // State variable to store the current value of the input field
   const [value, setValue] = useState(initialValue || "");
 
@@ -51,7 +55,7 @@ const TextFilter = ({
         style={styles.input}
         value={value}
         onChangeText={handleFilterChange}
-        placeholder={placeholder || `Type to filter ${label}...`}
+        placeholder={placeholder || `${t("type_to_filter")} ${label}...`}
         placeholderTextColor="darkgrey"
       />
     </View>

@@ -9,17 +9,19 @@ import {
   MaterialIcons,
 } from "@expo/vector-icons";
 
-import Loader from "../components/Loader";
+import { useTranslation } from "react-i18next";
 
-import { fetchAndCacheImage } from "../utils/APIUtils";
+import { fetchAndCacheResource } from "../utils/APIUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 
-import common from "../styles/common";
+import { common } from "../styles/common";
 
 const Home = ({ route, navigation }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   const logoDimension = screenDimension.width / 2;
 
-  const [isLoading, setIsLoading] = useState(false);
   const [clientPaths, setClientPaths] = useState({
     clientLogoPath: null,
     userPhotoPath: null,
@@ -30,7 +32,7 @@ const Home = ({ route, navigation }) => {
 
   const userName =
     authenticationResult?.User?.[0]?.["Resource-core-name-knownAs"] ??
-    "Hello User!";
+    t("home_hello_user");
 
   const navigateToUploadPhoto = () => {
     navigation.navigate("CustomImagePicker", {
@@ -41,7 +43,9 @@ const Home = ({ route, navigation }) => {
   };
 
   const navigateToUserScreen = () => {
-    navigation.navigate("User");
+    navigation.navigate("User", {
+      user: authenticationResult?.User?.[0] ?? {},
+    });
   };
 
   const fetchClientDataConcurrently = async (authenticationResult) => {
@@ -61,9 +65,9 @@ const Home = ({ route, navigation }) => {
         fetchedUserPhotoPath,
         fetchedUserThumbnailPath,
       ] = await Promise.all([
-        fetchAndCacheImage(clientLogoId),
-        fetchAndCacheImage(userPhotoId),
-        fetchAndCacheImage(userThumbnailId),
+        fetchAndCacheResource(clientLogoId),
+        fetchAndCacheResource(userPhotoId),
+        fetchAndCacheResource(userThumbnailId),
       ]);
 
       console.debug("Fetched client logo path:", fetchedClientLogoPath);
@@ -126,9 +130,7 @@ const Home = ({ route, navigation }) => {
   const onPressTimesheets = () => navigation.navigate("Timesheet");
   const onPressExpenses = () => navigation.navigate("Expense");
   const onPressAbsences = () => navigation.navigate("Absence");
-  const onPressApprovals = () => {
-    // TODO
-  };
+  const onPressApprovals = () => navigation.navigate("Inbox");
 
   return (
     <SafeAreaView style={common.container}>
@@ -140,7 +142,6 @@ const Home = ({ route, navigation }) => {
             maxHeight: screenDimension.width / 3,
             maxWidth: screenDimension.width / 3,
             borderWidth: 1,
-            borderColor: "#ffd33d",
             borderRadius: 8,
           }}
           source={
@@ -159,13 +160,25 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity onPress={onPressTimesheets}>
             <View style={styles.card}>
               <Ionicons name="timer" size={24} color="black" />
-              <Text style={styles.cardText}>Timesheets</Text>
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("timesheets")}
+              </Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={onPressExpenses}>
             <View style={styles.card}>
               <FontAwesome name="credit-card" size={24} color="black" />
-              <Text style={styles.cardText}>Expenses</Text>
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("expenses")}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -177,18 +190,29 @@ const Home = ({ route, navigation }) => {
                 size={24}
                 color="black"
               />
-              <Text style={styles.cardText}>Absences</Text>
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("absences")}
+              </Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={onPressApprovals}>
             <View style={styles.card}>
               <MaterialIcons name="approval" size={24} color="black" />
-              <Text style={styles.cardText}>Approvals</Text>
+              <Text
+                style={styles.cardText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("approvals")}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
       </View>
-      {isLoading && <Loader />}
     </SafeAreaView>
   );
 };
@@ -212,6 +236,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+    textDecorationLine: "underline",
   },
   logoContainer: {
     flex: 1,
@@ -231,23 +256,23 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     aspectRatio: 1,
-    maxWidth: screenDimension.width / 2,
-    backgroundColor: "#ffffff",
+    maxWidth: screenDimension.width,
+    backgroundColor: "#fff",
     padding: "16%",
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: "#005eb8",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     elevation: 5,
-    shadowColor: "#000000",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.8,
     shadowRadius: 2,
   },
   cardText: {
     fontWeight: "bold",
-    color: "#000000",
+    color: "#000",
   },
 });
 

@@ -15,22 +15,28 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ibe2023.ibemobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/icons/ibe-adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.ibe2023.ibemobile"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "bb0df582-2438-44a1-82a2-5a4a7ec2de5c"
+        "projectId": "bb0df582-2438-44a1-82a2-5a4a7ec2de5c",
+        "EAS_NO_VCS=1": 1
       }
     },
-    "owner": "ibe-2023"
+    "owner": "ibe-2023",
+    "plugins": [
+      "expo-localization"
+    ]
   }
 }

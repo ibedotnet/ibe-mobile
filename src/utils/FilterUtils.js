@@ -1,51 +1,60 @@
-import { BUSOBJCAT } from "../constants";
+import { BUSOBJCAT, BUSOBJCATMAP } from "../constants";
 import {
   convertDurationToMilliseconds,
   convertMillisecondsToDuration,
+  isEqual,
   timeUnitAbbreviations,
   timeUnitLabels,
 } from "./FormatUtils";
 
 /**
  * Represents the filters available for timesheets.
- * Each filter object contains an id, label, type, and fieldName.
+ * Each filter object contains an id, label, type, fieldName, and fieldValue.
  * - id: Unique identifier for the filter.
  * - label: Display label for the filter.
  * - type: Type of the filter (e.g., text, number, date).
  * - fieldName: Field name corresponding to the filter in the data.
  * - fieldValue: Field value to filter with.
+ * - units (optional): Array of units for duration type filter (e.g., hours, minutes).
+ * - convertToMillisecondsEnabled (optional): Boolean indicating whether duration should be converted to milliseconds.
  */
-
 const timesheetFilters = [
   {
     id: "fromDate",
-    label: "Start",
+    label: "start",
     type: "date",
     fieldName: "TimeConfirmation-start",
     fieldValue: "",
   },
   {
     id: "toDate",
-    label: "End",
+    label: "end",
     type: "date",
     fieldName: "TimeConfirmation-end",
     fieldValue: "",
   },
   {
     id: "remark",
-    label: "Remark",
+    label: "remark",
     type: "text",
     fieldName: "TimeConfirmation-remark-text",
     fieldValue: "",
   },
   {
     id: "duration",
-    label: "Duration",
+    label: "duration",
     type: "duration",
     fieldName: "TimeConfirmation-totalTime",
     fieldValue: "",
     units: [timeUnitAbbreviations.hours, timeUnitAbbreviations.minutes],
     convertToMillisecondsEnabled: true,
+  },
+  {
+    id: "workflowStatus",
+    label: "status",
+    type: "status",
+    fieldName: "TimeConfirmation-extStatus-processTemplateID",
+    fieldValue: "",
   },
   // Add other filters as needed
 ];
@@ -58,17 +67,86 @@ const filtersMap = {
 };
 
 /**
+ * Converts applied filters into OR conditions for building query filters.
+ *
+ * @param {Object} appliedFilters - The applied filters object.
+ * @param {Array} busObjCatFilter - Array of filter objects specific to the business object category.
+ * @param {string} busObjCat - The business object category.
+ * @returns {Array} - An array of OR conditions for query filters.
+ */
+const convertFiltersToOrConditions = (
+  appliedFilters,
+  busObjCatFilter,
+  busObjCat
+) => {
+  const orConditions = [];
+
+  // Iterate over each applied filter
+  Object.keys(appliedFilters).forEach((filterId) => {
+    const filter = busObjCatFilter.find((item) => item.id === filterId);
+    if (filter) {
+      switch (filter.type) {
+        case "text":
+          // Implement text filter handling if needed
+          break;
+        case "duration":
+          // Implement duration filter handling if needed
+          break;
+        case "date":
+          // Implement date filter handling if needed
+          break;
+        case "status":
+          // Handle status filter
+          if (appliedFilters[filterId] instanceof Array) {
+            appliedFilters[filterId].forEach((item) => {
+              // Check if item.stepExtId exists before pushing the condition
+              if (item.processTemplateExtId && item.stepExtId) {
+                orConditions.push({
+                  fieldName: filter.fieldName,
+                  operator: "=",
+                  value: item.processTemplateExtId,
+                  or: false,
+                  nestedConditions: [
+                    {
+                      fieldName: `${BUSOBJCATMAP[busObjCat]}-extStatus-statusID`,
+                      operator: "in",
+                      value: [item.stepExtId],
+                    },
+                  ],
+                });
+              } else {
+                console.error(
+                  "Missing processTemplateExtId or stepExtId:",
+                  item
+                );
+              }
+            });
+          }
+          break;
+        // Add cases for other types of filters if needed
+
+        default:
+          break;
+      }
+    }
+  });
+
+  return orConditions;
+};
+
+/**
  * Converts applied filters into a where condition suitable for fetching data.
  * @param {Object} appliedFilters - The applied filters object containing key-value pairs of filter ids and values.
  * @param {Array} busObjCatFilter - The array of filter objects defining the filters available for the bus object category.
  * @returns {Array} - The where condition array based on the applied filters.
  */
-const convertFiltersToWhereCondition = (
+const convertFiltersToWhereConditions = (
   appliedFilters,
   busObjCatFilter,
   busObjCat
 ) => {
   let whereConditions = [];
+  let orConditions = [];
   // Iterate over each applied filter
   Object.keys(appliedFilters).forEach((filterId) => {
     // Find the corresponding filter object in busObjCatFilter
@@ -198,6 +276,10 @@ const convertToFilterScreenFormat = (
                 appliedFilterValue.lessThanDate;
             }
             break;
+          case "status":
+            // For status filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
           default:
             break;
         }
@@ -273,6 +355,10 @@ const convertToBusObjCatFormat = (
                 appliedFilterValue.lessThanDate;
             }
             break;
+          case "status":
+            // For status filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
           default:
             break;
         }
@@ -304,7 +390,7 @@ const handleTextFilter = (
   const filterChanged = initialFilters[filterId] !== value;
 
   console.debug(
-    `Upon navigating to the filter screen, the initial set of filters has been recorded as follows: ${JSON.stringify(
+    `Inside handleTextFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the text filter hold the values: ${JSON.stringify({
       value,
@@ -347,7 +433,7 @@ const handleDurationFilter = (
     (initialFilters[filterId]?.unit ?? "h") !== unit;
 
   console.debug(
-    `Upon navigating to the filter screen, the initial set of filters has been recorded as follows: ${JSON.stringify(
+    `Inside handleDurationFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the duration filter hold the values: ${JSON.stringify({
       greaterThanValue,
@@ -389,12 +475,60 @@ const handleDateFilter = (
     (initialFilters[filterId]?.lessThanValue ?? null) !== lessThanDate;
 
   console.debug(
-    `Upon navigating to the filter screen, the initial set of filters has been recorded as follows: ${JSON.stringify(
+    `Inside handleDateFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the date filter hold the values: ${JSON.stringify({
       greaterThanDate,
       lessThanDate,
     })}. Consequently, has the date filter status been updated?: ${filterChanged}.`
+  );
+
+  setUnsavedChanges((prevUnsavedChanges) => ({
+    ...prevUnsavedChanges,
+    [filterId]: filterChanged,
+  }));
+};
+
+/**
+ * Handles changes to the status filter.
+ *
+ * @param {string} filterId - The identifier for the filter.
+ * @param {string|null} value - The selected value for the filter.
+ * @param {Object} initialFilters - The initial set of filters.
+ * @param {Object} appliedFilters - The currently applied filters.
+ * @param {Function} setAppliedFilters - Function to update the applied filters.
+ * @param {Function} setUnsavedChanges - Function to update the unsaved changes state.
+ */
+const handleStatusFilter = (
+  filterId,
+  value,
+  initialFilters,
+  appliedFilters,
+  setAppliedFilters,
+  setUnsavedChanges
+) => {
+  if (value !== null) {
+    // Check if value is not null, if not null, update the appliedFilters object
+    setAppliedFilters((prevAppliedFilters) => {
+      return {
+        ...prevAppliedFilters,
+        [filterId]: value,
+      };
+    });
+  } else {
+    // If the value is invalid (null), remove the filter with the label from appliedFilters
+    const { [filterId]: omit, ...remainingFilters } = appliedFilters;
+    setAppliedFilters(remainingFilters);
+  }
+
+  const filterChanged = !isEqual(initialFilters[filterId], value);
+
+  console.debug(
+    `Inside handleStatusFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
+      initialFilters
+    )}. Currently, the status filter hold the value: ${JSON.stringify({
+      value,
+    })}. Consequently, has status filter status been updated?: ${filterChanged}.`
   );
 
   setUnsavedChanges((prevUnsavedChanges) => ({
@@ -453,12 +587,14 @@ const validateAppliedFilters = (appliedFilters, busObjCatFilters) => {
 };
 
 export {
-  convertFiltersToWhereCondition,
+  convertFiltersToOrConditions,
+  convertFiltersToWhereConditions,
   convertToBusObjCatFormat,
   convertToFilterScreenFormat,
   filtersMap,
   handleDateFilter,
   handleDurationFilter,
+  handleStatusFilter,
   handleTextFilter,
   validateAppliedFilters,
 };

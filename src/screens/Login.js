@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 
+import { useTranslation } from "react-i18next";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Checkbox from "expo-checkbox";
@@ -26,7 +28,7 @@ import { fetchData } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 
-import common from "../styles/common";
+import { common } from "../styles/common";
 
 /**
  * Login component for user authentication.
@@ -35,9 +37,12 @@ import common from "../styles/common";
  * @returns {JSX.Element} JSX element representing the Login component.
  */
 const Login = ({ navigation }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   // State variables
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("Client!1331");
   const [showPassword, setShowPassword] = useState(false);
   const [clientId, setClientId] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -80,15 +85,15 @@ const Login = ({ navigation }) => {
    */
   const validateInputs = () => {
     if (!username) {
-      showToast("Username is required.");
+      showToast(t("login_username_required"));
       return false;
     }
     if (!password) {
-      showToast("Password is required.");
+      showToast(t("login_password_required"));
       return false;
     }
     if (!clientId) {
-      showToast("Client Id is required.");
+      showToast(t("login_clientId_required"));
       return false;
     }
     return true;
@@ -183,7 +188,7 @@ const Login = ({ navigation }) => {
           showToast(
             authenticationResult && authenticationResult.param_msgText
               ? authenticationResult.param_msgText
-              : "An error occurred during login."
+              : t("login_error_message")
           );
           return;
         }
@@ -202,12 +207,19 @@ const Login = ({ navigation }) => {
 
         navigation.replace("Home", { authenticationResult });
       } catch (error) {
-        showToast("An exception occurred during login.");
+        showToast(t("login_exception_message"));
+        throw error;
       } finally {
         setIsLoading(false);
       }
     };
-    authenticate();
+
+    try {
+      await authenticate();
+    } catch (error) {
+      console.error("Error in authenticate:", error);
+      setIsLoading(false);
+    }
   };
 
   // Login component rendering
@@ -227,7 +239,7 @@ const Login = ({ navigation }) => {
       <View style={styles.main}>
         <TextInput
           style={styles.input}
-          placeholder="Username"
+          placeholder={t("login_username_placeholder")}
           placeholderTextColor="darkgrey"
           maxLength={LOGIN_INPUTS_MAXLENGTH.USERNAME}
           value={username}
@@ -236,7 +248,7 @@ const Login = ({ navigation }) => {
         <View style={styles.passwordContainer}>
           <TextInput
             style={styles.password}
-            placeholder="Password"
+            placeholder={t("login_password_placeholder")}
             placeholderTextColor="darkgrey"
             secureTextEntry={!showPassword}
             maxLength={LOGIN_INPUTS_MAXLENGTH.PASSWORD}
@@ -254,7 +266,7 @@ const Login = ({ navigation }) => {
         </View>
         <TextInput
           style={styles.input}
-          placeholder="Client ID"
+          placeholder={t("login_clientId_placeholder")}
           placeholderTextColor="darkgrey"
           keyboardType="numeric"
           maxLength={LOGIN_INPUTS_MAXLENGTH.CLIENTID}
@@ -268,16 +280,18 @@ const Login = ({ navigation }) => {
             color={rememberMe ? "#005eb8" : undefined}
             onValueChange={() => setRememberMe(!rememberMe)}
           />
-          <Text style={styles.checkboxText}>Remember Me</Text>
+          <Text style={styles.checkboxText}>{t("login_rememberMe_text")}</Text>
         </View>
         <Pressable style={styles.loginButton} onPress={onPress}>
-          <Text style={styles.loginButtonText}>Login</Text>
+          <Text style={styles.loginButtonText}>{t("login_button_text")}</Text>
         </Pressable>
         {isLoading && <Loader />}
         <CustomToast />
       </View>
       <View style={styles.footer}>
-        <Text>Version {APP.VERSION}</Text>
+        <Text>
+          {t("login_version_text")} {APP.VERSION}
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );

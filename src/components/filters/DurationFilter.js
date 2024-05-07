@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
-
 import { Picker } from "@react-native-picker/picker";
-
+import { useTranslation } from "react-i18next";
 import { timeUnitLabels } from "../../utils/FormatUtils";
 
 /**
@@ -26,6 +25,9 @@ const DurationFilter = ({
   clearValue,
   units,
 }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+  
   const [greaterThanValue, setGreaterThanValue] = useState(
     initialValue?.greaterThanValue?.toString() ?? ""
   );
@@ -97,7 +99,7 @@ const DurationFilter = ({
           style={styles.input}
           value={greaterThanValue}
           onChangeText={handleGreaterThanChange}
-          placeholder={placeholder || `Greater than...`}
+          placeholder={placeholder || `${t("greater_than")}...`}
           placeholderTextColor="darkgrey"
           keyboardType="numeric"
         />
@@ -105,7 +107,7 @@ const DurationFilter = ({
           style={styles.input}
           value={lessThanValue}
           onChangeText={handleLessThanChange}
-          placeholder={placeholder || `Less than...`}
+          placeholder={placeholder || `${t("less_than")}...`}
           placeholderTextColor="darkgrey"
           keyboardType="numeric"
         />
@@ -117,7 +119,6 @@ const DurationFilter = ({
           >
             {units.map((unit, index) => (
               <Picker.Item
-                itemStyle={{ color: "blue", fontSize: 20 }}
                 key={index}
                 label={timeUnitLabels[unit]}
                 value={unit}

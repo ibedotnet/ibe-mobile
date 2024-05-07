@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
-
 import { APP } from "../constants";
 import CustomButton from "./CustomButton";
-
 import { convertToDateFNSFormat } from "../utils/FormatUtils";
 
 const CustomDateTimePicker = ({
@@ -16,6 +14,9 @@ const CustomDateTimePicker = ({
   isTimePickerVisible = false,
   onFilter,
 }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   // State variables to manage the selected date, date picker mode, and visibility
   const [date, setDate] = useState(initialValue || null);
   const [mode, setMode] = useState(initialMode);
@@ -100,14 +101,13 @@ const CustomDateTimePicker = ({
               date,
               convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
             )}${isTimePickerVisible ? " " + date.toLocaleTimeString() : ""}`
-          : `${placeholder}: No date selected`}
+          : `${placeholder}: ${t("no_date_selected")}`}
       </Text>
       {/* Clear button to clear the selected date */}
-      {date && <CustomButton onPress={clearDate} label="Clear" icon={{}} />}
+      {date && <CustomButton onPress={clearDate} label={t("clear")} icon={{}} />}
       {/* Date picker component, rendered conditionally based on show state */}
       {show && (
         <DateTimePicker
-          testID="dateTimePicker"
           value={date || new Date()}
           mode={mode}
           is24Hour={true}
@@ -131,7 +131,6 @@ const styles = StyleSheet.create({
   },
   selectedDate: {
     flex: 2,
-    fontWeight: "bold",
     textAlign: "right",
     paddingRight: "4%",
   },

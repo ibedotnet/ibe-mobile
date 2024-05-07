@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,13 +12,15 @@ import { format, isValid } from "date-fns";
 
 import { Ionicons } from "@expo/vector-icons";
 
-import { APP, BUSOBJCAT, PAGE_SIZE } from "../constants";
-
+import { fetchBusObjCatData, loadMoreData } from "../utils/APIUtils";
 import {
   convertToDateFNSFormat,
   formatLeaveDuration,
 } from "../utils/FormatUtils";
-import { fetchBusObjCatData, loadMoreData } from "../utils/APIUtils";
+
+import { APP, BUSOBJCAT, PAGE_SIZE } from "../constants";
+
+import Loader from "../components/Loader";
 
 /**
  * Absence component displays a list of absences with the ability to refresh
@@ -236,9 +237,7 @@ const Absence = ({ navigation }) => {
         onEndReachedThreshold={0.1}
         refreshing={isLoading}
         ListFooterComponent={() => {
-          return isLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
-          ) : null;
+          return isLoading ? <Loader /> : null;
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

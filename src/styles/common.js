@@ -1,12 +1,14 @@
 import { StyleSheet } from "react-native";
 
+const disableOpacity = 80;
+
 const common = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    padding: "5%",
+    backgroundColor: "#fff",
+    padding: "4%",
   },
   header: {
     headerStyle: {
@@ -17,6 +19,10 @@ const common = StyleSheet.create({
       fontWeight: "bold",
     },
   },
+  loadingText: {
+    color: "#005eb8",
+    fontWeight: "bold",
+  },
 });
 
-export default common;
+export { common, disableOpacity };

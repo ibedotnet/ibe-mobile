@@ -6,26 +6,33 @@ import {
   ScrollView,
   View,
 } from "react-native";
-
+import { useTranslation } from "react-i18next";
+import { BUSOBJCATMAP } from "../../constants";
 import DateFilter from "./DateFilter";
 import DurationFilter from "./DurationFilter";
+import StatusFilter from "./StatusFilter";
 import TextFilter from "./TextFilter";
 
 import {
-  convertFiltersToWhereCondition,
+  convertFiltersToOrConditions,
+  convertFiltersToWhereConditions,
   convertToBusObjCatFormat,
   filtersMap,
   handleDateFilter,
   handleDurationFilter,
+  handleStatusFilter,
   handleTextFilter,
   validateAppliedFilters,
 } from "../../utils/FilterUtils";
+import { showToast } from "../../utils/MessageUtils";
 
 import SaveCancelBar from "../SaveCancelBar";
-import { showToast } from "../../utils/MessageUtils";
 
 const Filters = ({ route, navigation }) => {
   const { busObjCatFilters, busObjCat, initialFilters } = route.params;
+
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
 
   const [appliedFilters, setAppliedFilters] = useState(initialFilters || {});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
@@ -50,7 +57,13 @@ const Filters = ({ route, navigation }) => {
       busObjCat
     );
 
-    const whereConditions = convertFiltersToWhereCondition(
+    const whereConditions = convertFiltersToWhereConditions(
+      convertedAppliedFilters,
+      filtersMap[busObjCat],
+      busObjCat
+    );
+
+    const orConditions = convertFiltersToOrConditions(
       convertedAppliedFilters,
       filtersMap[busObjCat],
       busObjCat
@@ -59,8 +72,13 @@ const Filters = ({ route, navigation }) => {
     console.debug(
       `On click of "Apply" in filters screen the list of filters going to be applied in ${busObjCat} is ${JSON.stringify(
         convertedAppliedFilters
-      )} and the list of where conditions is ${JSON.stringify(
+      )}. The applied filters is ${JSON.stringify(appliedFilters)}.
+      The converted applied filters is ${JSON.stringify(
+        convertedAppliedFilters
+      )}. The list of where conditions is ${JSON.stringify(
         whereConditions
+      )}. The list of or conditions is ${JSON.stringify(
+        orConditions
       )}. Also, the object maintaining unsaved changes (if any) is ${JSON.stringify(
         unsavedChanges
       )}`
@@ -72,6 +90,7 @@ const Filters = ({ route, navigation }) => {
     setTimeout(() => {
       navigation.navigate(busObjCat, {
         whereConditions,
+        orConditions,
         convertedAppliedFilters,
         appliedFiltersCount,
       });
@@ -95,16 +114,19 @@ const Filters = ({ route, navigation }) => {
     // the navigation, ensuring a smooth user experience without unnecessary discard dialogs.
     setTimeout(() => {
       navigation.navigate(busObjCat, []);
-    }, 200);
+    }, 500);
   };
 
   const renderFilter = (filter) => {
+    // Translate the filter label using t()
+    const translatedLabel = t(filter.label);
+
     switch (filter.type) {
       case "text":
         return (
           <TextFilter
             key={filter.id}
-            label={filter.label}
+            label={translatedLabel}
             initialValue={appliedFilters[filter.id]} // Pass initial value to pre-populate the filter
             onFilter={(value) =>
               handleTextFilter(
@@ -123,7 +145,7 @@ const Filters = ({ route, navigation }) => {
         return (
           <DurationFilter
             key={filter.id}
-            label={filter.label}
+            label={translatedLabel}
             initialValue={appliedFilters[filter.id]} // Pass initial value to pre-populate the filter
             onFilter={({ greaterThanValue, lessThanValue, unit }) =>
               handleDurationFilter(
@@ -144,7 +166,7 @@ const Filters = ({ route, navigation }) => {
         return (
           <DateFilter
             key={filter.id}
-            label={filter.label}
+            label={translatedLabel}
             initialValue={appliedFilters[filter.id]} // Pass initial value to pre-populate the filter
             onFilter={({ greaterThanDate, lessThanDate }) =>
               handleDateFilter(
@@ -161,6 +183,26 @@ const Filters = ({ route, navigation }) => {
             isTimePickerVisible={filter.isTimePickerVisible}
           />
         );
+      case "status":
+        return (
+          <StatusFilter
+            key={filter.id}
+            label={translatedLabel}
+            initialValue={appliedFilters[filter.id]} // Pass initial value to pre-populate the filter
+            onFilter={(value) =>
+              handleStatusFilter(
+                filter.id,
+                value,
+                initialFilters,
+                appliedFilters,
+                setAppliedFilters,
+                setUnsavedChanges
+              )
+            }
+            clearValue={clearFilterValue}
+            busObjCat={BUSOBJCATMAP[busObjCat]}
+          />
+        );
       default:
         return null;
     }
@@ -168,23 +210,24 @@ const Filters = ({ route, navigation }) => {
 
   /**
    * Update the count of applied filters whenever the appliedFilters state changes.
-   *
    * This effect updates the count of applied filters based on the changes in the appliedFilters state.
    * It sets the appliedFiltersCount state to the length of the applied filters array.
-   */
-  useEffect(() => {
-    setAppliedFiltersCount(Object.keys(appliedFilters).length);
-  }, [appliedFilters]);
-
-  /**
-   * Update the header title to reflect the count of applied filters.
    *
-   * This effect updates the header title of the screen to include the count of applied filters.
+   * Update the header title to reflect the count of applied filters.
+   * This effect also updates the header title of the screen to include the count of applied filters.
    * It sets the header title to "Filters (count)" where count represents the number of applied filters.
+   *
+   * Dependencies:
+   * - appliedFilters: The state containing the applied filters.
    */
   useEffect(() => {
+    // Update the count of applied filters
+    const appliedFiltersCount = Object.keys(appliedFilters).length;
+    setAppliedFiltersCount(appliedFiltersCount);
+
+    // Update the header title
     navigation.setOptions({
-      headerTitle: `Filters (${Object.keys(appliedFilters).length})`,
+      headerTitle: `${t("filters")} (${appliedFiltersCount})`,
     });
   }, [appliedFilters]);
 
@@ -204,9 +247,8 @@ const Filters = ({ route, navigation }) => {
     () =>
       navigation.addListener("beforeRemove", (e) => {
         console.debug(
-          `Before navigating from filters screen to ${busObjCat} screen, object maintaing unsaved changes (if any) is ${JSON.stringify(
-            unsavedChanges
-          )}`
+          `Before navigating from filters screen to ${busObjCat} screen, object maintaining unsaved changes (if any)
+           is ${JSON.stringify(unsavedChanges)}`
         );
 
         const unsavedChangesExist = Object.values(unsavedChanges).some(
@@ -223,12 +265,16 @@ const Filters = ({ route, navigation }) => {
 
         // Prompt the user before leaving the screen
         Alert.alert(
-          "Discard ?",
-          "You have unapplied changes. Are you sure to discard them and leave the screen?",
+          t("discard_changes_alert_title"),
+          t("discard_changes_alert_message"),
           [
-            { text: "Don't leave", style: "cancel", onPress: () => {} },
             {
-              text: "Discard",
+              text: t("discard_changes_alert_button_leave"),
+              style: "cancel",
+              onPress: () => {},
+            },
+            {
+              text: t("discard_changes_alert_button_discard"),
               style: "destructive",
               // If the user confirmed, then we dispatch the action we blocked earlier
               // This will continue the action that had triggered the removal of the screen
@@ -250,8 +296,8 @@ const Filters = ({ route, navigation }) => {
       <SaveCancelBar
         onSave={applyFilters}
         onCancel={resetFilters}
-        saveLabel="Apply"
-        cancelLabel="Reset"
+        saveLabel={t("apply")}
+        cancelLabel={t("reset")}
         saveIcon="check"
         cancelIcon="times"
       />

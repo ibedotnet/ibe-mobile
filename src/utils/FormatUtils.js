@@ -40,6 +40,16 @@ const convertAmountToDisplayFormat = (amountObj) => {
 };
 
 /**
+ * Converts bytes to megabytes and returns a string representation with two decimal places.
+ * @param {number} bytes - The size in bytes to convert to megabytes.
+ * @returns {string} A string representation of the size in megabytes with two decimal places followed by "MB".
+ */
+const convertBytesToMegaBytes = (bytes) => {
+  const megabytes = bytes / (1024 * 1024);
+  return `${megabytes.toFixed(2)} MB`;
+};
+
+/**
  * Converts a duration value to milliseconds if the conversion is enabled.
  * @param {number} duration - The duration value to be converted.
  * @param {string} unit - The unit of time for the duration value.
@@ -52,7 +62,6 @@ const convertDurationToMilliseconds = (
   convertToMillisecondsEnabled
 ) => {
   try {
-    console.log("duration" + duration)
     // Ensure duration is a valid number
     if ((!duration && duration !== 0) || isNaN(duration) || duration < 0) {
       console.debug(`Invalid duration value ${duration}. Returning null.`);
@@ -322,6 +331,60 @@ const formatLeaveDuration = (
 };
 
 /**
+ * Recursively compares two values for equality, handling arrays, objects, and primitive types.
+ * @param {*} value1 - The first value to compare.
+ * @param {*} value2 - The second value to compare.
+ * @returns {boolean} True if the values are equal, false otherwise.
+ */
+const isEqual = (value1, value2) => {
+  // If both values are arrays
+  if (Array.isArray(value1) && Array.isArray(value2)) {
+    // Check if arrays have the same length
+    if (value1.length !== value2.length) {
+      return false;
+    }
+    // Sort both arrays to ensure consistent comparison
+    const sortedValue1 = [...value1].sort();
+    const sortedValue2 = [...value2].sort();
+    // Compare each element of the arrays recursively
+    return sortedValue1.every((element, index) =>
+      isEqual(element, sortedValue2[index])
+    );
+  }
+  // If both values are objects
+  else if (typeof value1 === "object" && typeof value2 === "object") {
+    // Get the keys of both objects
+    const keys1 = Object.keys(value1);
+    const keys2 = Object.keys(value2);
+    // Check if objects have the same keys
+    if (
+      keys1.length !== keys2.length ||
+      !keys1.every((key) => keys2.includes(key))
+    ) {
+      return false;
+    }
+    // Compare each key-value pair of the objects recursively
+    return keys1.every((key) => isEqual(value1[key], value2[key]));
+  }
+  // If both values are primitive types, perform a simple comparison
+  else {
+    return value1 === value2;
+  }
+};
+
+/**
+ * Convert the first letter of a string to lowercase.
+ * @param {string} str - The input string.
+ * @returns {string} - The modified string with the first letter converted to lowercase.
+ */
+const makeFirstLetterLowercase = (str) => {
+  if (typeof str !== "string" || str.length === 0) {
+    return str;
+  }
+  return str.charAt(0).toLowerCase() + str.slice(1);
+};
+
+/**
  * Map of time units to their abbreviated forms.
  * Used for displaying abbreviated units in various contexts.
  */
@@ -349,6 +412,7 @@ const timeUnitLabels = {
 export {
   changeDateToAPIFormat,
   convertAmountToDisplayFormat,
+  convertBytesToMegaBytes,
   convertDurationToMilliseconds,
   convertMillisecondsToDuration,
   convertMillisecondsToUnit,
@@ -356,6 +420,8 @@ export {
   convertToDateObject,
   convertToMilliseconds,
   formatLeaveDuration,
+  isEqual,
+  makeFirstLetterLowercase,
   timeUnitAbbreviations,
   timeUnitLabels,
 };
