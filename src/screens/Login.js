@@ -19,7 +19,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Checkbox from "expo-checkbox";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-import CustomToast from "../components/CustomToast";
 import Loader from "../components/Loader";
 
 import { API_ENDPOINTS, APP, LOGIN_INPUTS_MAXLENGTH } from "../constants";
@@ -85,15 +84,15 @@ const Login = ({ navigation }) => {
    */
   const validateInputs = () => {
     if (!username) {
-      showToast(t("login_username_required"));
+      showToast(t("login_username_required"), "error");
       return false;
     }
     if (!password) {
-      showToast(t("login_password_required"));
+      showToast(t("login_password_required"), "error");
       return false;
     }
     if (!clientId) {
-      showToast(t("login_clientId_required"));
+      showToast(t("login_clientId_required"), "error");
       return false;
     }
     return true;
@@ -103,22 +102,23 @@ const Login = ({ navigation }) => {
    * Updates global app user data after a successful login.
    * @function
    * @name updateAppUserData
-   * @param {Object} userData - User data received from the authenticate API.
+   * @param {Object} data - response data received from the authenticate API.
    * @returns {void}
    */
-  const updateAppUserData = (userData) => {
+  const updateAppUserData = (data) => {
     APP.LOGIN_USER_CLIENT =
-      userData && userData["User"] && userData["clientid"]
-        ? userData["clientid"]
-        : "m/d/y";
+      data && data["User"] && data["clientid"] ? data["clientid"] : "m/d/y";
     APP.LOGIN_USER_DATE_FORMAT =
-      userData && userData["User"] && userData["UserDateFormat"]
-        ? userData["UserDateFormat"]
+      data && data["User"] && data["UserDateFormat"]
+        ? data["UserDateFormat"]
         : "m/d/y";
-    APP.LOGIN_USER_EMPLOYEE_ID = userData?.User?.[0]?.["Resource-id"] ?? "";
-    APP.LOGIN_USER_ID = userData?.User?.[0]?.["User-id"] ?? "";
+    APP.LOGIN_USER_EMPLOYEE_ID = data?.User?.[0]?.["Resource-id"] ?? "";
+    APP.LOGIN_USER_ID = data?.User?.[0]?.["User-id"] ?? "";
     APP.LOGIN_USER_LANGUAGE =
-      userData?.User?.[0]?.["User-preferences"]?.language ?? "en";
+      data?.User?.[0]?.["User-preferences"]?.language ?? "en";
+    APP.LOGIN_USER_WORK_SCHEDULE_NAME = data?.empWorkSchedue?.name ?? "";
+    APP.LOGIN_USER_WORK_SCHEDULE_TIMESHEET_TYPE =
+      data?.empWorkSchedue?.timeConfirmationType ?? "";
 
     console.debug(
       `Logged in details
@@ -126,7 +126,9 @@ const Login = ({ navigation }) => {
         language: ${APP.LOGIN_USER_LANGUAGE},
         client id: ${APP.LOGIN_USER_CLIENT},
         employee id: ${APP.LOGIN_USER_EMPLOYEE_ID},
-        preferred date format: ${APP.LOGIN_USER_DATE_FORMAT}`
+        preferred date format: ${APP.LOGIN_USER_DATE_FORMAT}
+        works schedule name: ${APP.LOGIN_USER_WORK_SCHEDULE_NAME}
+        timesheet type: ${APP.LOGIN_USER_WORK_SCHEDULE_TIMESHEET_TYPE}`
     );
   };
 
@@ -188,7 +190,8 @@ const Login = ({ navigation }) => {
           showToast(
             authenticationResult && authenticationResult.param_msgText
               ? authenticationResult.param_msgText
-              : t("login_error_message")
+              : t("login_error_message"),
+            "error"
           );
           return;
         }
@@ -207,7 +210,7 @@ const Login = ({ navigation }) => {
 
         navigation.replace("Home", { authenticationResult });
       } catch (error) {
-        showToast(t("login_exception_message"));
+        showToast(t("login_exception_message"), "error");
         throw error;
       } finally {
         setIsLoading(false);
@@ -258,7 +261,7 @@ const Login = ({ navigation }) => {
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             <Ionicons
-              name={showPassword ? "ios-eye-off" : "ios-eye"}
+              name={showPassword ? "eye-off" : "eye"}
               size={24}
               color="black"
             />
@@ -286,7 +289,6 @@ const Login = ({ navigation }) => {
           <Text style={styles.loginButtonText}>{t("login_button_text")}</Text>
         </Pressable>
         {isLoading && <Loader />}
-        <CustomToast />
       </View>
       <View style={styles.footer}>
         <Text>
@@ -348,7 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "#005eb8",
     elevation: 5,
-    shadowColor: "#000000",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.8,
     shadowRadius: 2,

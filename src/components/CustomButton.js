@@ -28,25 +28,19 @@ import { disableOpacity } from "../styles/common";
 const CustomButton = ({
   onPress,
   label,
-  icon,
+  icon = {}, // Default value to ensure it's always an object
   backgroundColor = true,
   disabled = false,
-  style,
+  style = {}, // Default value to ensure it's always an object
   labelStyle,
 }) => {
   const [pressed, setPressed] = useState(false);
 
   /**
-   * Callback function invoked when the button is pressed.
-   * Sets the pressed state to true, invokes the onPress callback, and resets the pressed state after a delay.
+   * Callback function invoked when the button is pressed, invokes the onPress callback.
    */
   const handlePress = () => {
-    setPressed(true);
     onPress();
-
-    setTimeout(() => {
-      setPressed(false);
-    }, 100);
   };
 
   // Define the icon component based on the library provided in the icon prop
@@ -86,29 +80,39 @@ const CustomButton = ({
       style={[
         styles.button,
         backgroundColor && {
-          backgroundColor: pressed ? "#004080" : "#005eb8",
-          opacity: disabled ? 0.5 : 1,
+          opacity: pressed || disabled ? 0.5 : 1,
         },
         style, // Merge additional styles passed via props
       ]}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       onPress={handlePress}
       disabled={disabled}
     >
       {/* Icon component */}
-      <IconComponent
-        name={icon.name}
-        size={icon.size || 18}
-        color={iconColor}
-        style={[styles.buttonIcon, style && style.icon]} // Merge icon styles
-        accessibilityLabel={`${label} button`}
-      />
+      {icon.name && (
+        <IconComponent
+          name={icon.name}
+          size={icon.size || 18}
+          color={iconColor}
+          style={[
+            styles.buttonIcon,
+            style && style.icon,
+            { opacity: pressed || disabled ? 0.5 : 1 },
+          ]} // Merge icon styles
+          accessibilityLabel={`${label} button`}
+        />
+      )}
       {/* Text label */}
       <Text
         style={[
           styles.buttonLabel,
-          !backgroundColor && styles.blackLabel,
+          !backgroundColor && { color: "black" },
           labelStyle,
+          { opacity: pressed || disabled ? 0.5 : 1 },
         ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
       >
         {label}
       </Text>
@@ -122,18 +126,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: "5%",
-    flex: 1,
+    paddingHorizontal: "2%",
   },
   buttonIcon: {
-    paddingRight: 8,
+    marginRight: 5,
   },
   buttonLabel: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
-  },
-  blackLabel: {
-    color: "black",
   },
 });
 

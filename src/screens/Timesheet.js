@@ -214,7 +214,7 @@ const Timesheet = ({ route, navigation }) => {
   const handleLoadMoreData = useCallback(() => {
     // Check if the current data already contains all the items for the current page
     if (timesheets.length < page * limit) {
-      showToast(t("no_more_data"));
+      showToast(t("no_more_data"), "warning");
       return;
     }
 
@@ -279,9 +279,13 @@ const Timesheet = ({ route, navigation }) => {
     let timesheetCount = timesheets.length;
     return (
       <View>
-        <Text style={styles.recordCountText}>
+        <Text
+          style={styles.recordCountText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {`${t("timesheets")}${timesheetCount !== 1 ? t("s") : ""}: ${
-            timesheetCount > 0 ? timesheetCount : t("no_records")
+            timesheetCount > 0 ? timesheetCount : 0
           }`}
         </Text>
       </View>
@@ -362,7 +366,7 @@ const Timesheet = ({ route, navigation }) => {
             const statusLabel =
               item?.[
                 "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel"
-              ] || "Invalid status";
+              ] || "";
 
             let remark = item?.["TimeConfirmation-remark:text"] || "";
 
@@ -572,7 +576,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderColor: "#85929e",
+    borderColor: "#ccc",
     padding: 12,
   },
   firstColumn: {

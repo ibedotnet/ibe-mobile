@@ -1,42 +1,54 @@
-import React, { useEffect, useState } from "react";
-import { Modal, TextInput, View, StyleSheet, Text, Button } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Button, Modal, Text, TextInput, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import CustomButton from "../CustomButton";
+import {
+  RichEditor,
+  RichToolbar,
+  actions,
+} from "react-native-pell-rich-editor";
 
 /**
- * Edit dialog component for displaying a modal with an input field.
+ * EditDialog component
+ *
+ * This component displays a modal dialog with an input field. It can be used for both simple text input and rich text input.
  *
  * @param {boolean} isVisible - Controls the visibility of the dialog.
  * @param {function} onClose - Function to handle dialog close action.
  * @param {function} onConfirm - Function to handle confirm action.
- * @param {function} validateInput - Function to validate the input value.
+ * @param {function} validateInput - Function to validate the input value. Default validation checks if input is not empty.
  * @param {string} title - Title of the dialog.
  * @param {string} initialValue - Initial value for the input field.
+ * @param {boolean} isRichText - Flag to determine if the input should be a rich text editor.
  */
+
 const EditDialog = ({
   isVisible,
   onClose,
   onConfirm,
-  validateInput,
+  validateInput = (value) =>
+    value.trim() === "" ? "Input cannot be empty" : null, // Default Validation
   title,
   initialValue,
+  isRichText = false,
 }) => {
-  // Initialize useTranslation hook
   const { t } = useTranslation();
 
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState(null);
 
+  const richText = useRef(null);
+
   /**
    * Function to handle confirm action.
-   * Invokes the onConfirm function with the current value and closes the dialog.
+   * Validates the input value, invokes the onConfirm function with the current value, and closes the dialog.
    */
   const handleConfirm = () => {
     const validationError = validateInput(value);
     if (validationError) {
       setError(validationError);
     } else {
+      console.debug("Dialog input value on confirm: " + value);
       onConfirm(value);
       setError(null);
       onClose();
@@ -48,15 +60,16 @@ const EditDialog = ({
    * Clears the error and closes the dialog.
    */
   const handleClose = () => {
-    console.log(error);
     setError(null);
     onClose();
   };
 
-  // Update value state when initialValue prop changes
+  // Update value state when initialValue prop changes or when the component becomes visible
   useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
+    if (isVisible) {
+      setValue(initialValue);
+    }
+  }, [isVisible, initialValue]);
 
   return (
     <Modal
@@ -67,25 +80,50 @@ const EditDialog = ({
     >
       <View style={styles.container}>
         <View style={styles.dialogBox}>
-          {/* Dialog Title */}
           <Text style={styles.title}>{title}</Text>
-          {/* Input Field */}
-          <TextInput
-            value={value}
-            onChangeText={(text) => {
-              setValue(text);
-              setError(null); // Clear error when input changes
-            }}
-            autoFocus
-            style={[styles.input, error && styles.inputError]}
-          />
+          {isRichText ? (
+            <View style={[styles.richTextContainer, { minHeight: 150 }]}>
+              <RichToolbar
+                editor={richText}
+                selectedIconTint="black"
+                actions={[
+                  actions.setBold,
+                  actions.setItalic,
+                  actions.setUnderline,
+                  actions.insertBulletsList,
+                  actions.insertOrderedList,
+                  actions.insertLink,
+                  actions.undo,
+                  actions.redo,
+                ]}
+              />
+              <RichEditor
+                ref={richText}
+                initialContentHTML={value}
+                style={styles.richEditor}
+                placeholder={t("write_your_comment_here")}
+                pasteAsPlainText={true}
+                initialFocus={true}
+                onChange={(html) => {
+                  setValue(html);
+                  setError(null);
+                }}
+              />
+            </View>
+          ) : (
+            <TextInput
+              value={value}
+              onChangeText={(text) => {
+                setValue(text);
+                setError(null);
+              }}
+              autoFocus={true}
+              style={[styles.input, error && styles.inputError]}
+            />
+          )}
           {error && <Text style={styles.errorText}>{error}</Text>}
-          {/* Buttons Container */}
           <View style={styles.buttonsContainer}>
-            {/* Cancel Button */}
-            <Button onPress={onClose} title={t("cancel")} />
-
-            {/* Confirm Button */}
+            <Button onPress={handleClose} title={t("cancel")} />
             <Button onPress={handleConfirm} title={t("confirm")} />
           </View>
         </View>
@@ -105,7 +143,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     padding: "5%",
     borderRadius: 5,
-    width: "80%",
+    width: "90%",
   },
   title: {
     fontSize: 16,
@@ -130,6 +168,15 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
+  },
+  richTextContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+    marginBottom: "4%",
+  },
+  richEditor: {
+    padding: "2%",
   },
 });
 

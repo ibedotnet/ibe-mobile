@@ -9,11 +9,17 @@ import { Ionicons } from "@expo/vector-icons";
  * @param {string} props.title - The title of the panel.
  * @param {JSX.Element} props.children - The content of the panel.
  * @param {boolean} [props.disabled] - Whether the panel is disabled or not.
+ * @param {boolean} [props.initiallyCollapsed=true] - Whether the panel is initially collapsed or expanded.
  * @returns {JSX.Element} - Rendered component.
  */
-const CollapsiblePanel = ({ title, children, disabled }) => {
+const CollapsiblePanel = ({
+  title,
+  children,
+  disabled,
+  initiallyCollapsed = true,
+}) => {
   // State to manage the collapsed state of the panel
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(initiallyCollapsed);
 
   /**
    * Toggles the collapsed state of the panel.
@@ -50,8 +56,7 @@ const styles = StyleSheet.create({
     width: "100%",
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
-    padding: "4%",
-    marginBottom: "4%",
+    padding: "2%",
     backgroundColor: "#fff",
   },
   panelHeader: {

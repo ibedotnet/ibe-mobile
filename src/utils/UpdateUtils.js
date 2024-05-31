@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "../constants";
+
 import { convertToQueryString, fetchData } from "./APIUtils";
 import { showToast } from "./MessageUtils";
 
@@ -44,8 +45,8 @@ const updateFields = async (formData, queryStringParams) => {
   } catch (error) {
     // Log and display error message
     console.error("Error in updateFields:", error);
-    showToast("An unexpected error occurred. Please try again later.");
+    showToast("An unexpected error occurred. Please try again later.", "error");
   }
 };
 
-export { updateFields };
+export default updateFields;

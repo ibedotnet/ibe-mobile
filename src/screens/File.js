@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
-
 import { useTranslation } from "react-i18next";
+import * as DocumentPicker from "expo-document-picker";
 
 import { format, isValid } from "date-fns";
 
@@ -18,6 +17,7 @@ import {
   convertToDateFNSFormat,
 } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
+import { screenDimension } from "../utils/ScreenUtils";
 
 import {
   API_ENDPOINTS,
@@ -39,9 +39,10 @@ const File = ({
   // Initialize useTranslation hook
   const { t } = useTranslation();
 
-  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const [files, setFiles] = useState([]);
 
   // State variables for modal
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -107,12 +108,13 @@ const File = ({
         });
 
         // Map the filtered files to the appropriate format
-        const pickedFiles = newFiles.map(({ name, mimeType, size }) => ({
+        const pickedFiles = newFiles.map(({ name, mimeType, size, uri }) => ({
           id: name, // Initially, assigning the name as the id
           name,
           mimeType: mimeType,
           size,
           isNewlyAdded: true,
+          newlyAddedFileLocalUri: uri,
         }));
 
         // Log the picked files
@@ -128,7 +130,8 @@ const File = ({
               skippedExistingFiles.length === 1 ? "" : "s"
             } skipped as ${
               skippedExistingFiles.length === 1 ? "it is" : "they are"
-            } already added.`
+            } already added.`,
+            "warning"
           );
         }
 
@@ -142,7 +145,8 @@ const File = ({
               skippedLargeFiles.length === 1 ? "it exceeds" : "they exceed"
             } the maximum size limit of ${convertBytesToMegaBytes(
               maxUploadFileSizeInBytes
-            )}.`
+            )}.`,
+            "warning"
           );
         }
       } else {
@@ -212,15 +216,15 @@ const File = ({
 
   // Function to confirm file deletion
   const confirmDelete = () => {
-    // Delete logic...
-    const updatedFiles = files.filter((file) => file.id !== fileToDelete.id);
-    setFiles(updatedFiles);
-    // Set the file as updated
-    setFiles((prevFiles) =>
-      prevFiles.map((file) =>
+    // Mark the file to be deleted as 'isDeleted: true' and filter it out
+    const updatedFiles = files
+      .map((file) =>
         file.id === fileToDelete.id ? { ...file, isDeleted: true } : file
       )
-    );
+      .filter((file) => file.id !== fileToDelete.id);
+
+    setFiles(updatedFiles);
+
     setIsDeleteConfirmationVisible(false);
   };
 
@@ -244,12 +248,18 @@ const File = ({
     setIsPreviewModalVisible(false);
   };
 
+  /**
+   * Fetches initial files based on the provided list of file IDs.
+   * Retrieves file metadata from the server and updates the state accordingly.
+   * @returns {void}
+   */
   const fetchInitialFiles = async () => {
     try {
       setLoading(true);
 
       // Iterate over each file ID in the initialFilesIdList
       for (const fileId of initialFilesIdList) {
+        // Define query fields to fetch file metadata
         const queryFields = {
           fields: [
             "Attachment-id",
@@ -274,6 +284,7 @@ const File = ({
           ],
         };
 
+        // Define common query parameters
         const commonQueryParams = {
           testMode: TEST_MODE,
           client: parseInt(APP.LOGIN_USER_CLIENT),
@@ -283,11 +294,13 @@ const File = ({
           intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
         };
 
+        // Construct form data for the request
         const formData = {
           query: JSON.stringify(queryFields),
           ...commonQueryParams,
         };
 
+        // Fetch data from the server
         const response = await fetchData(
           API_ENDPOINTS.QUERY,
           "POST",
@@ -297,12 +310,14 @@ const File = ({
           new URLSearchParams(formData).toString()
         );
 
+        // Process the response if successful and data is available
         if (
           response.success === true &&
           response.data &&
           response.data instanceof Array &&
           response.data.length > 0
         ) {
+          // Map fetched files metadata to desired format
           const fetchedFiles = response.data.map((file) => {
             const id = file["Attachment-id"];
             const type = file["Attachment-type"];
@@ -335,7 +350,6 @@ const File = ({
             };
           });
 
-          // Add the fetched files to the files array
           setFiles((prevFiles) => [...prevFiles, ...fetchedFiles]);
         }
       }
@@ -446,7 +460,7 @@ const File = ({
             }}
             label=""
             backgroundColor={false}
-            disabled={loading || item.isDownloading || item.isNewlyAdded} // Disable if downloading or newly added
+            disabled={loading || item.isDownloading || item.isNewlyAdded}
           />
         </View>
         {/* Progress bar for download */}
@@ -511,10 +525,15 @@ const File = ({
             }}
             backgroundColor={false}
             labelStyle={{
-              color: loading ? `#b0c4de${disableOpacity}` : "#005eb8",
-              textDecorationLine: loading ? "none" : "underline",
+              color:
+                loading || isParentLocked
+                  ? `#b0c4de${disableOpacity}`
+                  : "#005eb8",
+              textDecorationLine:
+                loading || isParentLocked ? "none" : "underline",
             }}
-            disabled={loading}
+            disabled={loading || isParentLocked}
+            style={{ icon: { marginRight: 2 } }}
           />
         </View>
       </View>
@@ -528,7 +547,7 @@ const File = ({
         data={files}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        style={styles.flatList}
+        contentContainerStyle={styles.flatList}
       />
     </View>
   );
@@ -536,8 +555,8 @@ const File = ({
 
 const styles = StyleSheet.create({
   tabContainer: {
-    flex: 1,
     justifyContent: "flex-start",
+    backgroundColor: "#e5eef7",
   },
   loaderErrorContainer: {
     paddingVertical: "4%",
@@ -551,6 +570,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
+    backgroundColor: "#fff",
   },
   countText: {
     flex: 1,
@@ -561,8 +581,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   flatList: {
-    flex: 1,
-    width: "100%",
+    paddingBottom: screenDimension.height / 2,
   },
   fileItem: {
     padding: "2%",

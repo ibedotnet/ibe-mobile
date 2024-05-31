@@ -1,6 +1,5 @@
-import React, { createRef, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Animated,
   Button,
   Modal,
   View,
@@ -8,26 +7,43 @@ import {
   StyleSheet,
   Text,
 } from "react-native";
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  PinchGestureHandler,
-  State,
-} from "react-native-gesture-handler";
-
-import Pdf from "react-native-pdf";
-
 import { useTranslation } from "react-i18next";
+
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+
+import { Video, ResizeMode } from "expo-av";
+import Constants from "expo-constants";
 
 import { screenDimension } from "../../utils/ScreenUtils";
 
+// Check if running in Expo Go
+const isRunningInExpoGo = Constants.appOwnership === "expo";
+
+// Conditionally import react-native-pdf if not in Expo Go
+let Pdf;
+if (!isRunningInExpoGo) {
+  // The react-native-pdf package is a native module, which means it requires native code to work.
+  // Expo Go does not support installing native modules yet. This is why the react-native-pdf package won’t work in the Expo Go app.
+  // We will conditionally run in development build method. If not in Expo Go, conditionally import react-native-pdf.
+  Pdf = require("react-native-pdf").default;
+}
+
 /**
- * A modal component for previewing images or PDF files.
+ * A modal component for previewing images, PDF files, or videos.
  * @param {Object} props - Component props.
  * @param {boolean} props.isVisible - Flag indicating whether the modal is visible.
  * @param {string} props.fileUri - The URI of the file to preview.
- * @param {string} props.fileType - The type of the file ("image" or "pdf").
- * @param {string} props.fileTitle - Title to display at the top.
+ * @param {string} props.fileType - The type of the file ("image","pdf", "video" etc.).
+ * @param {string} props.fileTitle - Title to display at the top of the modal.
  * @param {Function} props.onClose - Callback function to close the modal.
  * @returns {JSX.Element} - The preview dialog component.
  */
@@ -41,82 +57,98 @@ const PreviewDialog = ({
   // Initialize useTranslation hook
   const { t } = useTranslation();
 
+  // State to manage loading state
   const [isLoading, setIsLoading] = useState(true);
-  const [panEnabled, setPanEnabled] = useState(false);
 
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
+  // Shared values for animated transformations
+  const offset = useSharedValue({ x: 0, y: 0 });
+  const start = useSharedValue({ x: 0, y: 0 });
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const rotation = useSharedValue(0);
+  const savedRotation = useSharedValue(0);
 
-  const pinchRef = createRef();
-  const panRef = createRef();
-
-  const scale = useRef(new Animated.Value(1)).current; // Initialize scale as an Animated Value
-
-  const onPinchGestureEvent = Animated.event([{ nativeEvent: { scale } }], {
-    useNativeDriver: true,
+  // Animated styles based on shared values
+  const animatedStyles = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: offset.value.x },
+        { translateY: offset.value.y },
+        { scale: scale.value },
+        { rotateZ: `${rotation.value}rad` },
+      ],
+    };
   });
 
-  const onPanGestureEvent = Animated.event(
-    [
-      {
-        nativeEvent: {
-          translationX: translateX,
-          translationY: translateY,
-        },
-      },
-    ],
-    {
-      useNativeDriver: true,
-    }
-  );
+  // State to manage video playback status
+  const [videoPlaybackStatus, setVideoPlaybackStatus] = useState({});
 
-  const handlePinchStateChange = ({ nativeEvent }) => {
-    // Enabled pan only after pinch-zoom
-    if (nativeEvent.state === State.ACTIVE) {
-      setPanEnabled(true);
-    }
-
-    // When scale < 1, reset scale back to original (1)
-    const nScale = nativeEvent.scale;
-    if (nativeEvent.state === State.END) {
-      if (nScale < 1) {
-        Animated.spring(scale, {
-          toValue: 1,
-          useNativeDriver: true,
-        }).start();
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-
-        setPanEnabled(false);
-      }
-    }
+  // Function to reset shared values
+  const resetSharedValues = () => {
+    // Reset all shared values
+    offset.value = { x: 0, y: 0 };
+    start.value = { x: 0, y: 0 };
+    scale.value = 1;
+    savedScale.value = 1;
+    rotation.value = 0;
+    savedRotation.value = 0;
   };
+
+  // Gesture handlers for drag, zoom, and rotate
+  const dragGesture = Gesture.Pan()
+    .averageTouches(true)
+    .onUpdate((e) => {
+      offset.value = {
+        x: e.translationX + start.value.x,
+        y: e.translationY + start.value.y,
+      };
+    })
+    .onEnd(() => {
+      start.value = {
+        x: offset.value.x,
+        y: offset.value.y,
+      };
+    });
+
+  const zoomGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      scale.value = savedScale.value * event.scale;
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value < 1) {
+        scale.value = withSpring(1);
+      }
+    });
+
+  const rotateGesture = Gesture.Rotation()
+    .onUpdate((event) => {
+      rotation.value = savedRotation.value + event.rotation;
+    })
+    .onEnd(() => {
+      savedRotation.value = rotation.value;
+    });
+
+  // Compose gestures for simultaneous handling
+  const composed = Gesture.Simultaneous(
+    dragGesture,
+    Gesture.Simultaneous(zoomGesture, rotateGesture)
+  );
 
   useEffect(() => {
     // If fileUri exists, set loading to false (resource is loaded)
     if (fileUri) {
       setIsLoading(false);
     }
+
+    // Cleanup function
+    return () => {
+      resetSharedValues();
+    };
   }, [fileUri]);
 
-  useEffect(() => {
-    if (!isVisible) {
-      // Reset scale when the modal is closed
-      scale.setValue(1);
-      // Reset translateX and translateY values when modal is closed
-      translateX.setValue(0);
-      translateY.setValue(0);
-    }
-  }, [isVisible]);
-
+  // Render content based on file type
   let content;
-
   let contentStyle = {
     width: screenDimension.width - 20,
     height: "100%",
@@ -128,39 +160,20 @@ const PreviewDialog = ({
   } else if (fileType === "image") {
     content = (
       <View>
-        <PanGestureHandler
-          ref={panRef}
-          onGestureEvent={onPanGestureEvent}
-          simultaneousHandlers={[pinchRef]}
-          enabled={panEnabled}
-          shouldCancelWhenOutside
-        >
-          <Animated.View>
-            <PinchGestureHandler
-              ref={pinchRef}
-              onGestureEvent={onPinchGestureEvent}
-              simultaneousHandlers={[panRef]}
-              onHandlerStateChange={handlePinchStateChange}
-            >
-              <Animated.Image
-                source={{ uri: fileUri }}
-                style={[
-                  contentStyle,
-                  {
-                    transform: [{ scale }, { translateX }, { translateY }],
-                  },
-                ]}
-                resizeMode="contain"
-              />
-            </PinchGestureHandler>
-          </Animated.View>
-        </PanGestureHandler>
+        <GestureDetector gesture={composed}>
+          <Animated.Image
+            source={{ uri: fileUri }}
+            style={[contentStyle, animatedStyles]}
+            resizeMode="contain"
+          />
+        </GestureDetector>
       </View>
     );
-  } else if (fileType === "pdf") {
+  } else if (fileType === "pdf" && !isRunningInExpoGo) {
     content = (
       <Pdf
         source={{ uri: fileUri }}
+        style={contentStyle}
         onLoadComplete={(numberOfPages, filePath) => {
           console.debug(`Number of pages: ${numberOfPages}`);
         }}
@@ -168,9 +181,19 @@ const PreviewDialog = ({
           console.debug(`Current page: ${page}`);
         }}
         onError={(error) => {
-          console.error("PDF viewer error:", error);
+          console.debug(error);
         }}
-        style={styles.pdf}
+      />
+    );
+  } else if (fileType === "video") {
+    // Video preview component
+    content = (
+      <Video
+        source={{ uri: fileUri }}
+        style={contentStyle}
+        resizeMode={ResizeMode.CONTAIN}
+        useNativeControls
+        isLooping
       />
     );
   } else {
@@ -206,6 +229,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "red",
+    fontSize: 18,
     fontWeight: "bold",
   },
   previewDialogContainer: {
@@ -225,10 +249,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 10,
-  },
-  pdf: {
-    flex: 1,
-    width: "100%",
   },
 });
 

@@ -1,4 +1,4 @@
-package com.ibemobile
+package com.ibe2023.ibemobile
 
 import android.os.Build
 import android.os.Bundle

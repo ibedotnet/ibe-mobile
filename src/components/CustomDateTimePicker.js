@@ -6,13 +6,26 @@ import { format } from "date-fns";
 import { APP } from "../constants";
 import CustomButton from "./CustomButton";
 import { convertToDateFNSFormat } from "../utils/FormatUtils";
+import { BorderlessButton } from "react-native-gesture-handler";
 
+/**
+ * CustomDateTimePicker component for selecting date and time.
+ * @param {Object} props - Component props.
+ * @param {string} props.placeholder - Placeholder text for the picker.
+ * @param {Date} props.initialValue - Initial value of the picker.
+ * @param {string} props.initialMode - Initial mode of the picker ("date" or "time").
+ * @param {boolean} props.isTimePickerVisible - Whether the time picker is visible.
+ * @param {Function} props.onFilter - Callback function triggered when the date or time changes.
+ * @param {boolean} props.isDisabled - Whether the picker is disabled.
+ * @returns {JSX.Element} - CustomDateTimePicker component.
+ */
 const CustomDateTimePicker = ({
   placeholder,
   initialValue,
   initialMode = "date",
   isTimePickerVisible = false,
   onFilter,
+  isDisabled = false,
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -24,9 +37,9 @@ const CustomDateTimePicker = ({
 
   // Function to handle changes in the date picker
   const onChange = (event, selectedDate) => {
-    const currentDate = selectedDate || date; // If no date is selected, use the current date
-    setShow(false); // Hide the picker
-    setDate(currentDate); // Update the selected date state
+    const currentDate = selectedDate || date;
+    setShow(false);
+    setDate(currentDate);
     // Call onFilter with the selected date
     if (onFilter) {
       onFilter(currentDate);
@@ -35,8 +48,8 @@ const CustomDateTimePicker = ({
 
   // Function to show the date or time picker based on the mode
   const showMode = (currentMode) => {
-    setShow(true); // Show the date picker
-    setMode(currentMode); // Set the date picker mode
+    setShow(true);
+    setMode(currentMode);
   };
 
   // Function to show the date picker
@@ -55,7 +68,7 @@ const CustomDateTimePicker = ({
   const clearDate = () => {
     setDate(null);
     if (onFilter) {
-      onFilter(null); // Optionally trigger the filter callback with null value
+      onFilter(null);
     }
   };
 
@@ -65,33 +78,40 @@ const CustomDateTimePicker = ({
   }, [initialValue]);
 
   return (
-    <View style={styles.pickerContainer}>
+    <View
+      style={[
+        styles.pickerContainer,
+        { borderColor: isDisabled ? "rgba(0, 0, 0, 0.5)" : "black" },
+      ]}
+    >
       {/* Button to show the date picker */}
       <CustomButton
         style={styles.picker}
-        onPress={showDatepicker}
+        onPress={isDisabled ? null : showDatepicker}
         label=""
         icon={{
           name: "calendar",
           library: "FontAwesome",
           size: 24,
-          color: "black",
+          color: isDisabled ? "rgba(0, 0, 0, 0.5)" : "black",
         }}
         backgroundColor={false}
+        disabled={isDisabled}
       />
       {/* Button to show the time picker, conditionally rendered based on visibility */}
       {isTimePickerVisible && (
         <CustomButton
           style={styles.picker}
-          onPress={showTimepicker}
+          onPress={isDisabled ? null : showTimepicker}
           label=""
           icon={{
             name: "time",
             library: "Ionicons",
             size: 24,
-            color: "black",
+            color: isDisabled ? "rgba(0, 0, 0, 0.5)" : "black",
           }}
           backgroundColor={false}
+          disabled={isDisabled}
         />
       )}
       {/* Text displaying the selected date */}
@@ -104,7 +124,20 @@ const CustomDateTimePicker = ({
           : `${placeholder}: ${t("no_date_selected")}`}
       </Text>
       {/* Clear button to clear the selected date */}
-      {date && <CustomButton onPress={clearDate} label={t("clear")} icon={{}} />}
+      {date && (
+        <CustomButton
+          onPress={clearDate}
+          label={t("clear")}
+          icon={{
+            name: "clear",
+            library: "MaterialIcons",
+            color: "#005eb8",
+          }}
+          backgroundColor={false}
+          style={{ icon: { marginRight: 0 }, borderLeftWidth: 2 }}
+          labelStyle={styles.clearButtonText}
+        />
+      )}
       {/* Date picker component, rendered conditionally based on show state */}
       {show && (
         <DateTimePicker
@@ -133,6 +166,9 @@ const styles = StyleSheet.create({
     flex: 2,
     textAlign: "right",
     paddingRight: "4%",
+  },
+  clearButtonText: {
+    color: "#005eb8",
   },
 });
 

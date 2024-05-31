@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+
 import { useTranslation } from "react-i18next";
+
+import { RichEditor } from "react-native-pell-rich-editor";
+
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants";
 
@@ -9,8 +14,10 @@ import { fetchData } from "../utils/APIUtils";
 import {
   convertToDateFNSFormat,
   makeFirstLetterLowercase,
+  stripHTMLTags,
 } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
+import { screenDimension } from "../utils/ScreenUtils";
 
 import CollapsiblePanel from "../components/CollapsiblePanel";
 import CustomPicker from "../components/CustomPicker";
@@ -47,13 +54,49 @@ const History = ({ busObjCat, busObjID }) => {
   const [userPickerData, setUserPickerData] = useState([]);
   const [fetchingFilterData, setFetchingFilterData] = useState(true);
 
+  /**
+   * Handles the scroll event of the timeline ScrollView.
+   * Checks if the end of the timeline content is reached and triggers loading more data if so.
+   * @param {Object} event - The scroll event object containing information about the scroll position.
+   * @returns {void}
+   */
   const handleScroll = ({ nativeEvent }) => {
+    // Extracting relevant properties from the scroll event
     const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+
+    // Calculating whether the end of the timeline content is reached
     const isEndReached =
       layoutMeasurement.height + contentOffset.y >= contentSize.height;
+
+    // If the end is reached, trigger loading more data
     if (isEndReached) {
-      // Load more data
-      fetchMoreTimelineData();
+      fetchMoreTimelineData(); // Call the function to load more timeline data
+    }
+  };
+
+  /**
+   * Function to get the icon component based on the event type.
+   * @param {string} evtType - The event type.
+   * @returns {JSX.Element} The icon component.
+   */
+  const getIconForEventType = (evtType) => {
+    switch (evtType) {
+      case "comment":
+        return <MaterialCommunityIcons name="comment-processing" size={20} />;
+      case "file":
+        return <MaterialCommunityIcons name="file-sync" size={20} />;
+      case "link":
+        return <MaterialCommunityIcons name="link" size={20} />;
+      case "watch":
+        return <MaterialCommunityIcons name="bullseye" size={20} />;
+      case "tag":
+        return <MaterialCommunityIcons name="tag" size={20} />;
+      case "update":
+        return <MaterialCommunityIcons name="database-sync" size={20} />;
+      case "status":
+        return <MaterialCommunityIcons name="state-machine" size={20} />;
+      default:
+        return <MaterialCommunityIcons name="help-circle" size={20} />; // Default icon
     }
   };
 
@@ -105,7 +148,7 @@ const History = ({ busObjCat, busObjID }) => {
       );
 
       if (response.success !== true) {
-        showToast(t("unexpected_error"));
+        showToast(t("unexpected_error"), "error");
       } else {
         setTimelineData(response.retVal);
       }
@@ -128,7 +171,7 @@ const History = ({ busObjCat, busObjID }) => {
     const { timelineEvents } = timelineData;
     // Check if the current data already contains all the items for the current page
     if (timelineEvents.length < pageParam * timeLineSize) {
-      showToast(t("no_more_data"));
+      showToast(t("no_more_data"), "warning");
       return;
     }
 
@@ -147,7 +190,7 @@ const History = ({ busObjCat, busObjID }) => {
         );
 
         if (response.success !== true) {
-          showToast(t("unexpected_error"));
+          showToast(t("unexpected_error"), "error");
         } else {
           // Concatenate new timeline events with existing events
           setTimelineData((prevData) => ({
@@ -166,18 +209,25 @@ const History = ({ busObjCat, busObjID }) => {
     }
   };
 
+  /**
+   * Renders the timeline events.
+   * If timeline data is available, it maps through each event to display them in a ScrollView.
+   * Depending on the event type, it renders a RichEditor or a Text component.
+   * @returns {JSX.Element|null} JSX elements representing the timeline events, or null if timeline data is not available.
+   */
   const renderTimelineEvents = () => {
+    // If timeline data is not available, return null
     if (!timelineData) return null;
 
     const { createdOn, createdBy, timelineEvents } = timelineData;
 
+    // Format created date and time
     const formattedCreatedOn = createdOn
       ? format(
           new Date(createdOn),
           convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
         )
       : "";
-
     const formattedCreatedBy = createdBy ? createdBy : "";
     const numTimelineEvents = timelineEvents.length;
 
@@ -188,31 +238,65 @@ const History = ({ busObjCat, busObjID }) => {
         onScroll={handleScroll}
         scrollEventThrottle={400}
       >
+        {/* Display header with creation information */}
         <Text numberOfLines={1} ellipsizeMode="tail" style={styles.header}>
           {t("created_on")} {formattedCreatedOn} {t("by")} {formattedCreatedBy}
           {numTimelineEvents > 0 &&
             ` (${numTimelineEvents} ${t("timeline_events")})`}{" "}
         </Text>
+        {/* Map through each timeline event and render */}
         {timelineEvents.map((event, index) => (
           <View key={index} style={styles.cardContainer}>
             <View style={styles.cardHeader}>
-              <Text style={styles.changedBy}>{event.changedBy}</Text>
-              <Text style={styles.changedOn}>
-                {t("changed_on")}{" "}
-                {format(
-                  new Date(event.changedOn),
-                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                )}
-              </Text>
+              {/* Display information about the event */}
+              <View style={styles.changedInfo}>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={styles.changedOn}
+                >
+                  {t("changed_on")}{" "}
+                  {format(
+                    new Date(event.changedOn),
+                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT, true)
+                  )}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={styles.changedBy}
+                >
+                  {event.changedBy}
+                </Text>
+              </View>
+              {/* Render icon based on event type */}
+              {getIconForEventType(event.evtType)}
             </View>
+            {/* Display separator */}
             <View style={styles.separator} />
-            <Text style={styles.evtText}>{event.evtText}</Text>
+            {/* Render event text or RichEditor */}
+            {event.evtType && event.evtType === "comment" ? (
+              <RichEditor
+                initialContentHTML={stripHTMLTags(
+                  event.evtText,
+                  "<p>&nbsp;</p>"
+                )}
+                disabled={true}
+              />
+            ) : (
+              <Text style={styles.evtText}>{event.evtText}</Text>
+            )}
           </View>
         ))}
       </ScrollView>
     );
   };
 
+  /**
+   * Fetches filter data from the API for type and user pickers.
+   * Sets the fetched data to the corresponding state variables.
+   * @returns {void}
+   */
   const fetchFilterData = async () => {
     try {
       const endpoint = API_ENDPOINTS.QUERY;
@@ -220,6 +304,7 @@ const History = ({ busObjCat, busObjID }) => {
       const headers = {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       };
+      // Common query parameters for API requests
       const commonQueryParams = {
         testMode: TEST_MODE,
         client: parseInt(APP.LOGIN_USER_CLIENT),
@@ -229,6 +314,7 @@ const History = ({ busObjCat, busObjID }) => {
         intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
       };
 
+      // Query for fetching type picker data
       const typeQuery = {
         fields: [
           "Lists-id",
@@ -252,6 +338,7 @@ const History = ({ busObjCat, busObjID }) => {
 
       const encodedTypeFormData = new URLSearchParams(typeFormData);
 
+      // Fetch type picker data
       const typeResponse = await fetchData(
         endpoint,
         method,
@@ -265,17 +352,29 @@ const History = ({ busObjCat, busObjID }) => {
         typeResponse.data instanceof Array &&
         typeResponse.data.length > 0
       ) {
-        // Transforming list entries into label-value pairs
-        const typePickerData = typeResponse.data[0]["Lists-listEntries"].map(
-          (entry) => ({
+        // Transform list entries into label-value pairs for type picker and sort by label
+        const typePickerData = typeResponse.data[0]["Lists-listEntries"]
+          .map((entry) => ({
             label: entry.entryName,
             value: entry.entryID,
-          })
-        );
+          }))
+          .sort((a, b) => {
+            const nameA = a.label.toUpperCase(); // Convert label to uppercase for case-insensitive sorting
+            const nameB = b.label.toUpperCase(); // Convert label to uppercase for case-insensitive sorting
+            if (nameA < nameB) {
+              return -1;
+            }
+            if (nameA > nameB) {
+              return 1;
+            }
+            // names must be equal
+            return 0;
+          });
 
         setTypePickerData(typePickerData);
       }
 
+      // Query for fetching user picker data
       const userQuery = {
         fields: [
           "User-id",
@@ -291,6 +390,7 @@ const History = ({ busObjCat, busObjID }) => {
 
       const encodedUserFormData = new URLSearchParams(userFormData);
 
+      // Fetch user picker data
       const userResponse = await fetchData(
         endpoint,
         method,
@@ -304,6 +404,7 @@ const History = ({ busObjCat, busObjID }) => {
         userResponse.data instanceof Array &&
         userResponse.data.length > 0
       ) {
+        // Extract and sort user picker data
         const userPickerData = userResponse.data
           .reduce((acc, user) => {
             const knownAs = user["User-employeeID:Resource-core-name-knownAs"];
@@ -326,23 +427,30 @@ const History = ({ busObjCat, busObjID }) => {
     }
   };
 
+  /**
+   * Renders the filter components for filtering history events by type and changed by user.
+   * It consists of two CustomPicker components: one for selecting event type and the other for selecting the user who made the change.
+   * @returns {JSX.Element} JSX elements representing the filter components.
+   */
   const historyFilters = (
     <>
+      {/* CustomPicker for selecting event type */}
       <CustomPicker
         placeholder={t("select") + " " + makeFirstLetterLowercase(t("type"))}
-        items={typePickerData}
-        initialValue={typeFilterValue}
-        onFilter={(value) => setTypeFilterValue(value)}
-        disabled={loading || fetchingFilterData}
+        items={typePickerData} // Array of items for the picker
+        initialValue={typeFilterValue} // Initial selected value
+        onFilter={(value) => setTypeFilterValue(value)} // Callback function to handle selection change
+        disabled={loading || fetchingFilterData} // Disable the picker if loading or fetching filter data
       />
+      {/* CustomPicker for selecting changed by user */}
       <CustomPicker
         placeholder={
           t("select") + " " + makeFirstLetterLowercase(t("changed_by"))
         }
-        items={userPickerData}
-        initialValue={userFilterValue}
-        onFilter={(value) => setUserFilterValue(value)}
-        disabled={loading || fetchingFilterData}
+        items={userPickerData} // Array of items for the picker
+        initialValue={userFilterValue} // Initial selected value
+        onFilter={(value) => setUserFilterValue(value)} // Callback function to handle selection change
+        disabled={loading || fetchingFilterData} // Disable the picker if loading or fetching filter data
       />
     </>
   );
@@ -371,10 +479,12 @@ const History = ({ busObjCat, busObjID }) => {
         children={historyFilters}
         disabled={fetchingFilterData}
       ></CollapsiblePanel>
-      <View style={styles.loaderErrorContainer}>
-        {loading && <Text style={common.loadingText}>{t("loading")}...</Text>}
-        {error && <Text>Error: {error.message}</Text>}
-      </View>
+      {(loading || error) && (
+        <View style={styles.loaderErrorContainer}>
+          {loading && <Text style={common.loadingText}>{t("loading")}...</Text>}
+          {error && <Text>Error: {error.message}</Text>}
+        </View>
+      )}
       {renderTimelineEvents()}
     </View>
   );
@@ -383,6 +493,7 @@ const History = ({ busObjCat, busObjID }) => {
 const styles = StyleSheet.create({
   tabContainer: {
     flex: 1,
+    backgroundColor: "#e5eef7",
   },
   loaderErrorContainer: {
     paddingVertical: "2%",
@@ -392,10 +503,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     paddingHorizontal: "2%",
+    paddingBottom: screenDimension.height / 2,
   },
   header: {
     textAlign: "center",
-    marginBottom: "4%",
+    marginVertical: "2%",
     color: "#666",
     fontWeight: "bold",
   },
@@ -416,16 +528,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: "4%",
+    alignItems: "center",
   },
-  changedBy: {
-    fontWeight: "bold",
-    flexShrink: 1,
-    maxWidth: "50%",
+  changedInfo: {
+    flexDirection: "column",
+    flex: 4,
   },
   changedOn: {
-    flexShrink: 1,
-    maxWidth: "50%",
     fontWeight: "bold",
+  },
+  changedBy: {
+    fontSize: 12,
   },
   separator: {
     borderBottomColor: "#ccc",

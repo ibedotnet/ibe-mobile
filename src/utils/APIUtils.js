@@ -3,13 +3,14 @@ import {
   API_ENDPOINTS,
   API_TIMEOUT,
   APP,
-  APP_ACTIVITY_ID,
+  APP_NAME,
   BUSOBJCAT,
   BUSOBJCATMAP,
   INTSTATUS,
   PAGE_SIZE,
   TEST_MODE,
 } from "../constants";
+
 import { showToast } from "../utils/MessageUtils";
 
 /**
@@ -133,7 +134,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
       }
 
       console.error(errorMessage);
-      showToast(errorMessage);
+      //showToast(errorMessage, "error");
     }
 
     return jsonResponse;
@@ -300,25 +301,6 @@ const getQueryFields = (busObjCat, extraFields = []) => {
 };
 
 /**
- * Returns the application name based on the specified business object category.
- * @param {string} busObjCat - The business object category.
- * @returns {string} - The application name.
- */
-const getAppName = (busObjCat) => {
-  switch (busObjCat) {
-    case BUSOBJCAT.TIMESHEET:
-      return APP_ACTIVITY_ID.TIMESHEET;
-    case BUSOBJCAT.EXPENSE:
-      return APP_ACTIVITY_ID.EXPENSE;
-    case BUSOBJCAT.ABSENCE:
-      return APP_ACTIVITY_ID.ABSENCE;
-    default:
-      console.debug("None of the case matched in getAppName :", busObjCat);
-      return;
-  }
-};
-
-/**
  * Returns the sort conditions based on the specified business object category.
  * @param {string} busObjCat - The business object category.
  * @returns {Array<Object>} - An array of sort condition objects.
@@ -429,7 +411,10 @@ const fetchBusObjCatData = async (
     // Handle errors if present in the response
     if (!busObjCatData || busObjCatData.errorCode) {
       console.error(busObjCatData.errorMessage);
-      showToast("An error occurred during fetching " + busObjCat + " data.");
+      showToast(
+        "An error occurred during fetching " + busObjCat + " data.",
+        "error"
+      );
       return { error: busObjCatData.errorMessage };
     }
 
@@ -437,6 +422,47 @@ const fetchBusObjCatData = async (
     return { data: busObjCatData.data, page, limit };
   } catch (error) {
     console.error("Error: fetching " + busObjCat + " data: ", error);
+  }
+};
+
+/**
+ * Returns the application app path name based on the specified business object category.
+ * @param {string} busObjCat - The business object category.
+ * @returns {string} - The application path name.
+ */
+const getAppName = (busObjCat) => {
+  switch (busObjCat) {
+    case BUSOBJCAT.TIMESHEET:
+      return APP_NAME.TIMESHEET;
+    case BUSOBJCAT.EXPENSE:
+      return APP_NAME.EXPENSE;
+    case BUSOBJCAT.ABSENCE:
+      return APP_NAME.ABSENCE;
+    default:
+      console.debug("None of the case matched in getAppName :", busObjCat);
+      return;
+  }
+};
+
+/**
+ * Determines whether any list should not be replaced based on the specified business object category.
+ * @param {string} busObjCat - The business object category.
+ * @returns {boolean} - Returns true if the list should not be replaced; otherwise, false.
+ */
+const isDoNotReplaceAnyList = (busObjCat) => {
+  switch (busObjCat) {
+    case BUSOBJCAT.TIMESHEET:
+      return true;
+    case BUSOBJCAT.EXPENSE:
+      return false;
+    case BUSOBJCAT.ABSENCE:
+      return true;
+    default:
+      console.debug(
+        "None of the case matched in doNotReplaceAnyList :",
+        busObjCat
+      );
+      return;
   }
 };
 
@@ -628,6 +654,8 @@ export {
   fetchData,
   fetchAndCacheResource,
   fetchBusObjCatData,
+  getAppName,
+  isDoNotReplaceAnyList,
   loadMoreData,
   uploadBinaryResource,
 };

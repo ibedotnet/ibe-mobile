@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 
+import { useTranslation } from "react-i18next";
+
 import CustomDateTimePicker from "../CustomDateTimePicker";
 import { showToast } from "../../utils/MessageUtils";
 import { convertToDateObject } from "../../utils/FormatUtils";
@@ -31,6 +33,9 @@ const DateFilter = ({
   initialMode = "date",
   isTimePickerVisible = false,
 }) => {
+  // Initialize useTranslation hook
+  const { t } = useTranslation();
+
   // State to manage the selected start and end dates
   const [greaterThanDate, setGreaterThanDate] = useState(
     convertToDateObject(initialValue?.greaterThanDate)
@@ -93,7 +98,7 @@ const DateFilter = ({
         parsedLessThanDate !== null &&
         parsedLessThanDate < parsedGreaterThanDate
       ) {
-        showToast("From date cannot be later than To date.");
+        showToast(t("from_date_cannot_be_later_than_to_date"), "error");
         setGreaterThanDate(null);
         setLessThanDate(null);
         return;
@@ -131,7 +136,7 @@ const DateFilter = ({
       <View style={styles.filtersContainer}>
         {/* Start date picker */}
         <CustomDateTimePicker
-          placeholder={"From"}
+          placeholder={t("from")}
           initialValue={greaterThanDate}
           isTimePickerVisible={isTimePickerVisible}
           initialMode={initialMode}
@@ -139,7 +144,7 @@ const DateFilter = ({
         />
         {/* End date picker */}
         <CustomDateTimePicker
-          placeholder={"To"}
+          placeholder={t("to")}
           initialValue={lessThanDate}
           isTimePickerVisible={isTimePickerVisible}
           initialMode={initialMode}

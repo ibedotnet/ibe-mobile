@@ -44,10 +44,12 @@ const Filters = ({ route, navigation }) => {
 
     const validationResult = validateAppliedFilters(
       appliedFilters,
-      filtersMap[busObjCat]
+      filtersMap[busObjCat],
+      t
     );
+
     if (validationResult?.isValid === false) {
-      showToast(validationResult.message);
+      showToast(validationResult.message, "error");
       return;
     }
 

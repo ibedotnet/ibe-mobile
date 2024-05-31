@@ -194,40 +194,55 @@ const convertMillisecondsToUnit = (
 /**
  * Convert user preference date format to the corresponding date-fns format.
  * @param {string} userPreferenceFormat - The user preference date format.
- * @returns {string} - The corresponding date-fns format.
+ * @param {boolean} [showTime=false] - Indicates whether to include time in the format.
+ * @returns {string} - The corresponding date-fns format, optionally including time.
  */
-const convertToDateFNSFormat = (userPreferenceFormat) => {
-  if (userPreferenceFormat === "d/m/y") {
-    return "d/MM/y";
-  } else if (userPreferenceFormat === "d/mm/y") {
-    return "d/MM/y";
-  } else if (userPreferenceFormat === "dd/mm/y") {
-    return "dd/MM/y";
-  } else if (userPreferenceFormat === "dd/mm/yy") {
-    return "dd/MM/yyyy";
-  } else if (userPreferenceFormat === "dd-mm-y") {
-    return "dd-MM-y";
-  } else if (userPreferenceFormat === "d.m.y") {
-    return "d.M.y";
-  } else if (userPreferenceFormat === "dd.mm.y") {
-    return "dd.MM.y";
-  } else if (userPreferenceFormat === "m/d/y") {
-    return "M/d/y";
-  } else if (userPreferenceFormat === "y/m/d") {
-    return "yyyy/M/d";
-  } else if (userPreferenceFormat === "yy/m/d") {
-    return "yy/M/d";
-  } else if (userPreferenceFormat === "yy/mm/dd") {
-    return "yy/MM/dd";
-  } else if (userPreferenceFormat === "y-m-d") {
-    return "yyyy-MM-dd";
-  } else if (userPreferenceFormat === "y-mm-dd") {
-    return "yyyy-MM-dd";
-  } else if (userPreferenceFormat === "y.mm.dd") {
-    return "yyyy.MM.dd";
-  } else {
-    return userPreferenceFormat;
+const convertToDateFNSFormat = (userPreferenceFormat, showTime = false) => {
+  let dateFormat;
+  switch (userPreferenceFormat) {
+    case "d/m/y":
+    case "d/mm/y":
+      dateFormat = "d/MM/y";
+      break;
+    case "dd/mm/y":
+      dateFormat = "dd/MM/y";
+      break;
+    case "dd/mm/yy":
+      dateFormat = "dd/MM/yyyy";
+      break;
+    case "dd-mm-y":
+      dateFormat = "dd-MM-y";
+      break;
+    case "d.m.y":
+      dateFormat = "d.M.y";
+      break;
+    case "dd.mm.y":
+      dateFormat = "dd.MM.y";
+      break;
+    case "m/d/y":
+      dateFormat = "M/d/y";
+      break;
+    case "y/m/d":
+      dateFormat = "yyyy/M/d";
+      break;
+    case "yy/m/d":
+      dateFormat = "yy/M/d";
+      break;
+    case "yy/mm/dd":
+      dateFormat = "yy/MM/dd";
+      break;
+    case "y-m-d":
+    case "y-mm-dd":
+      dateFormat = "yyyy-MM-dd";
+      break;
+    case "y.mm.dd":
+      dateFormat = "yyyy.MM.dd";
+      break;
+    default:
+      dateFormat = userPreferenceFormat;
   }
+
+  return showTime ? `${dateFormat} HH:mm:ss` : dateFormat;
 };
 
 /**
@@ -385,6 +400,26 @@ const makeFirstLetterLowercase = (str) => {
 };
 
 /**
+ * Strips specified HTML tags from the given content.
+ *
+ * @param {string} content - The content from which to strip the HTML tags.
+ * @param {string} htmlToReplace - The HTML tag to replace.
+ *                                 This should be a valid regex string for the tag to be replaced.
+ * @param {string} replaceWith - The string to replace the specified HTML tag with. Defaults to an empty string.
+ * @returns {string} - The content with the specified HTML tags replaced.
+ * If the tag is not found, or if an error occurs, the original content is returned unchanged.
+ */
+const stripHTMLTags = (content, htmlToReplace, replaceWith = "") => {
+  try {
+    const regex = new RegExp(htmlToReplace, "g");
+    return content.replace(regex, replaceWith);
+  } catch (error) {
+    console.error("Error stripping HTML tags:", error);
+    return content;
+  }
+};
+
+/**
  * Map of time units to their abbreviated forms.
  * Used for displaying abbreviated units in various contexts.
  */
@@ -422,6 +457,7 @@ export {
   formatLeaveDuration,
   isEqual,
   makeFirstLetterLowercase,
+  stripHTMLTags,
   timeUnitAbbreviations,
   timeUnitLabels,
 };

@@ -1,4 +1,4 @@
-package com.ibemobile
+package com.ibe2023.ibemobile
 
 import android.app.Application
 import android.content.res.Configuration

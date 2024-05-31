@@ -548,7 +548,11 @@ const handleStatusFilter = (
  * @param {Array} busObjCatFilters - The filters defined for the business object category.
  * @returns {Object} An object indicating whether the applied filters are valid along with an optional message.
  */
-const validateAppliedFilters = (appliedFilters, busObjCatFilters) => {
+const validateAppliedFilters = (
+  appliedFilters,
+  busObjCatFilters,
+  translation
+) => {
   // Initialize an object to store validation results
   const validationResult = { isValid: true, message: "" };
 
@@ -574,8 +578,9 @@ const validateAppliedFilters = (appliedFilters, busObjCatFilters) => {
           ) {
             // Set validation result indicating invalid filter
             validationResult.isValid = false;
-            validationResult.message =
-              "The 'Less than' duration value cannot be greater than the 'Greater than' duration value.";
+            validationResult.message = translation(
+              "less_than_greater_than_duration_error"
+            );
           }
         }
       }

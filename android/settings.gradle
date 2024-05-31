@@ -1,4 +1,4 @@
-rootProject.name = 'ibemobile'
+rootProject.name = 'ibe-mobile'
 
 dependencyResolutionManagement {
   versionCatalogs {

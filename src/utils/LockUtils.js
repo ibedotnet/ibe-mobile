@@ -122,7 +122,7 @@ const setOrClearLock = async (
   resourceCategory,
   resourceId,
   setIsLocked,
-  setLoading,
+  setLoading
 ) => {
   setLoading(true); // Set loading to true indicating an ongoing operation
   try {
@@ -151,7 +151,7 @@ const setOrClearLock = async (
     setLoading(false); // Set loading to false as the operation is complete
     if (success === false) {
       // If the operation was not successful, show a toast with the message
-      showToast(msg);
+      showToast(msg, "error");
     }
     console.debug(
       `${

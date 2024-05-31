@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
@@ -68,7 +69,8 @@ const handleDownload = async (
       } else {
         // Show error message
         showToast(
-          `${item.name}\n${translation("file_download_error_media_access")}`
+          `${item.name}\n${translation("file_download_error_media_access")}`,
+          "error"
         );
       }
     } else {
@@ -85,17 +87,21 @@ const handleDownload = async (
         showToast(
           `${item.name}\n${translation(
             "file_download_success"
-          )}\nor\n${translation("sharing_failed")}`
+          )}\nor\n${translation("sharing_failed")}`,
+          "warning"
         );
       } else {
         // Show error message
-        showToast(`${item.name}\n${translation("file_download_error")}`);
+        showToast(
+          `${item.name}\n${translation("file_download_error")}`,
+          "error"
+        );
       }
     }
   } catch (error) {
     // Handle any errors that occur during the download process
     console.error("Error in downloading file: ", error);
-    showToast(`${item.name}\n${translation("file_download_error")}`);
+    showToast(`${item.name}\n${translation("file_download_error")}`, "error");
   } finally {
     // Whether the download succeeds or fails, reset the isDownloading flag to false
     item.isDownloading = false;
@@ -217,12 +223,23 @@ const handleMediaLibraryAccess = async (downloadPath) => {
       }
     }
 
+    // Encode the download path to handle spaces
+    const encodedPath = encodeURI(downloadPath);
+
+    // Check if the file exists at the specified path
+    const fileInfo = await FileSystem.getInfoAsync(encodedPath);
+    if (!fileInfo.exists) {
+      throw new Error("File does not exist at the specified path.");
+    }
+
     // Add the downloaded file to the media library
-    const asset = await MediaLibrary.createAssetAsync(downloadPath);
+    const asset = await MediaLibrary.createAssetAsync(encodedPath);
+
+    console.debug("Asset created successfully:", JSON.stringify(asset));
 
     return asset.uri; // Return the media path
   } catch (error) {
-    console.error("Error in accessing media library: ", error);
+    console.error("Error in creating asset in media library: ", error);
     return null; // Return null if there's an error
   }
 };
@@ -324,10 +341,11 @@ const resetDownloadProgress = (setDownloadProgressMap, fileId) => {
 /**
  * Handles the preview process for a file item.
  * @param {Object} item - The file item to be previewed.
+ * @param {Function} setIsPreviewModalVisible - A function to set the visibility of the preview modal.
  * @param {Function} setPreviewFileType - A function to set the type of the file for preview.
  * @param {Function} setPreviewFileUri - A function to set the URI of the file for preview.
- * @param {Function} setIsPreviewModalVisible - A function to set the visibility of the preview modal.
- * @param {Function} translation - A function for translating strings.
+ * @param {Function} setPreviewFileTitle - A function to set the title of the file for preview.
+ * @param {Function} translation - A function for translating strings (languages).
  */
 const handlePreview = async (
   item,
@@ -345,10 +363,13 @@ const handlePreview = async (
       setPreviewFileType("image");
     } else if (item.mimeType === "application/pdf") {
       setPreviewFileType("pdf");
+    } else if (item.mimeType.startsWith("video/")) {
+      setPreviewFileType("video");
     } else {
       // Handle other types of files (e.g., documents, videos)
       showToast(
-        translation("preview_not_supported", { fileType: item.mimeType })
+        translation("preview_not_supported", { fileType: item.mimeType }),
+        "error"
       );
       return;
     }
@@ -356,6 +377,12 @@ const handlePreview = async (
     // Set the modal visible initially
     setIsPreviewModalVisible(true);
     setPreviewFileTitle(item.name);
+
+    if (item["isNewlyAdded"] && item["newlyAddedFileLocalUri"]) {
+      // Set the new file URI for preview
+      setPreviewFileUri(item["newlyAddedFileLocalUri"]);
+      return;
+    }
 
     const cachedPath = await fetchAndCacheResource(item.original);
     console.debug(`Preview file path: ${cachedPath}`);
@@ -365,7 +392,7 @@ const handlePreview = async (
   } catch (error) {
     // Handle any errors that occur during the preview process
     console.error("Error in previewing file: ", error);
-    showToast(`${item.name}\n${translation("preview_error")}`);
+    showToast(`${item.name}\n${translation("preview_error")}`, "error");
   }
 };
 

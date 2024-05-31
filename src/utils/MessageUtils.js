@@ -4,7 +4,15 @@ import Toast from "react-native-root-toast";
 let toastQueue = [];
 let isToastVisible = false;
 
-const showToast = (message, props) => {
+/**
+ * Displays a toast message using the React Native Root Toast library.
+ * Toast messages are queued to ensure they are displayed sequentially.
+ *
+ * @param {string} message - The message to be displayed in the toast.
+ * @param {string} type - The type of the toast message. Possible values are 'information', 'warning', or 'error'. Default is 'information'.
+ * @param {object} props - Additional props to be passed to the Toast component.
+ */
+const showToast = (message, type = "information", props) => {
   if (!Toast) {
     console.warn("Toast library not properly initialized.");
     return;
@@ -16,7 +24,7 @@ const showToast = (message, props) => {
   }
 
   // Add the new message to the queue
-  toastQueue.push({ message, props });
+  toastQueue.push({ message, type, props });
 
   // If no toast is currently visible, display the first message in the queue
   if (!isToastVisible) {
@@ -24,12 +32,35 @@ const showToast = (message, props) => {
   }
 };
 
+/**
+ * Displays the next toast message in the queue.
+ * Toast messages are displayed sequentially and removed from the queue after being shown.
+ */
 const displayNextToast = () => {
   if (toastQueue.length > 0) {
-    const { message, props } = toastQueue[0];
+    const { message, type, props } = toastQueue[0];
+    let duration = Toast.durations.SHORT; // Default duration
+
+    // Determine background color and text color based on the type of message
+    let backgroundColor, textColor;
+    if (type === "information") {
+      backgroundColor = "#007bff"; // Bootstrap blue
+      textColor = "#fff";
+    } else if (type === "warning") {
+      backgroundColor = "#ffc107"; // Bootstrap yellow
+      textColor = "#000";
+      duration = Toast.durations.LONG; // Longer duration for warnings
+    } else if (type === "error") {
+      backgroundColor = "#dc3545"; // Bootstrap red
+      textColor = "#fff";
+      duration = Toast.durations.LONG; // Longer duration for errors
+    }
 
     // Display the toast
     Toast.show(message, {
+      backgroundColor,
+      textColor,
+      duration,
       ...props,
       onHidden: () => {
         // Remove the displayed message from the queue

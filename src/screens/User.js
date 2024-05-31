@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,7 +16,7 @@ import { fetchData } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 import { parseUserComms } from "../utils/UserUtils";
-import { API_ENDPOINTS } from "../constants";
+import { API_ENDPOINTS, APP } from "../constants";
 import { useRequestQueueContext } from "../../context/RequestQueueContext";
 
 const User = ({ route, navigation }) => {
@@ -105,12 +104,12 @@ const User = ({ route, navigation }) => {
   // Check if none of the 'changed' values are true
   const saveDisabled = !changes.some((change) => change.changed);
 
-  const handleInfoButtonPress = () => {
-    Alert.alert(
-      t("user_info"),
-      `${t("email")}: ${userEmail}\n${t("phone")}: ${userPhone}`,
-      [{ text: "OK" }]
-    );
+  const onClickPreferenceInfo1 = () => {
+    Alert.alert(t("info"), t("user_preference_info_1"), [{ text: t("OK") }]);
+  };
+
+  const onClickPreferenceInfo2 = () => {
+    Alert.alert(t("info"), t("user_preference_info_2"), [{ text: t("OK") }]);
   };
 
   const clearAllAsyncStorage = async () => {
@@ -252,22 +251,20 @@ const User = ({ route, navigation }) => {
       headerTitle: t("user_preference"),
       headerRight: () => (
         <View style={styles.headerRightContainer}>
-          {/* Info button */}
+          {/* Logout button */}
           <CustomButton
-            onPress={handleInfoButtonPress}
-            label=""
+            onPress={onPressLogout}
+            label={t("user_logout")}
             icon={{
-              name: "info-circle",
-              library: "FontAwesome",
+              name: "logout",
+              library: "MaterialCommunityIcons",
               size: 24,
               color: "white",
             }}
             backgroundColor={false}
+            style={{ icon: { marginRight: 0 } }}
+            labelStyle={styles.logoutButtonText}
           />
-          {/* Logout button */}
-          <Pressable onPress={onPressLogout}>
-            <Text style={styles.logoutButtonText}>{t("user_logout")}</Text>
-          </Pressable>
         </View>
       ),
     });
@@ -276,21 +273,80 @@ const User = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.preferenceContainer}>
-        <CustomPicker
-          placeholder={t("user_select_language")}
-          items={languages}
-          initialValue={selectedLanguage}
-          onFilter={handleLanguageChange}
-        />
-        {/* Toggle switch for enabling/disabling request queue */}
-        <View style={styles.toggleContainer}>
-          <Text style={styles.toggleLabel}>{t("enable_request_queue")}</Text>
-          <Switch
-            trackColor={{ false: "#767577", true: "#005eb8" }}
-            thumbColor={isRequestQueueEnabled ? "#f5dd4b" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={handleToggleChange}
-            value={isRequestQueueEnabled}
+        {/* Container for content before the toggle switch */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.infoButtonContainer}>
+            <CustomButton
+              onPress={onClickPreferenceInfo1}
+              label=""
+              icon={{
+                name: "info-circle",
+                library: "FontAwesome",
+                color: "black",
+              }}
+              backgroundColor={false}
+            />
+          </View>
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.userInfoLabel}>{t("email")}:</Text>
+            <Text
+              style={[styles.userInfo, { flex: 1 }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {userEmail}
+            </Text>
+          </View>
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.userInfoLabel}>{t("phone")}:</Text>
+            <Text
+              style={[styles.userInfo, { flex: 1 }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {userPhone}
+            </Text>
+          </View>
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.userInfoLabel}>{t("work_schedule")}:</Text>
+            <Text
+              style={[styles.userInfo, { flex: 1 }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {APP.LOGIN_USER_WORK_SCHEDULE_NAME}
+            </Text>
+          </View>
+        </View>
+        {/* Container for the toggle switch */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.infoButtonContainer}>
+            <CustomButton
+              onPress={onClickPreferenceInfo2}
+              label=""
+              icon={{
+                name: "info-circle",
+                library: "FontAwesome",
+                color: "black",
+              }}
+              backgroundColor={false}
+            />
+          </View>
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>{t("enable_request_queue")}</Text>
+            <Switch
+              trackColor={{ false: "#767577", true: "#005eb8" }}
+              thumbColor={isRequestQueueEnabled ? "#f5dd4b" : "#f4f3f4"}
+              ios_backgroundColor="#3e3e3e"
+              onValueChange={handleToggleChange}
+              value={isRequestQueueEnabled}
+            />
+          </View>
+          <CustomPicker
+            placeholder={t("user_select_language")}
+            items={languages}
+            initialValue={selectedLanguage}
+            onFilter={handleLanguageChange}
           />
         </View>
       </ScrollView>
@@ -312,13 +368,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerRightContainer: {
-    width: screenDimension.width / 2,
+    width: screenDimension.width / 3,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "flex-end",
   },
   preferenceContainer: {
-    padding: "4%",
+    padding: "2%",
   },
   logoutButtonText: {
     textDecorationLine: "underline",
@@ -327,16 +383,38 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     letterSpacing: 0.5,
     color: "white",
-    marginLeft: 10,
+  },
+  sectionContainer: {
+    marginVertical: "2%",
+    paddingHorizontal: "2%",
+    backgroundColor: "white",
+    borderRadius: 5,
+  },
+  infoButtonContainer: {
+    alignItems: "flex-end",
   },
   toggleContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginVertical: 10,
+    marginBottom: "2%",
   },
   toggleLabel: {
     fontSize: 16,
+  },
+  userInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontSize: 16,
+    marginBottom: "2%",
+  },
+  userInfoLabel: {
+    marginRight: 5,
+    fontSize: 16,
+  },
+  userInfo: {
+    fontWeight: "bold",
   },
 });
 

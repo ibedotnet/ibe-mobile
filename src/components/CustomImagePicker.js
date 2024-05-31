@@ -16,10 +16,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
-import CustomToast from "./CustomToast";
 import Loader from "./Loader";
 import SaveCancelBar from "./SaveCancelBar";
-import { APP, APP_ACTIVITY_ID } from "../constants";
+import { APP, APP_NAME } from "../constants";
 import { uploadBinaryResource } from "../utils/APIUtils";
 import { changeDateToAPIFormat } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
@@ -144,7 +143,7 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
           changeDate: changeDateToAPIFormat(new Date()),
           component: "platform",
           doNotReplaceAnyList: true,
-          appName: APP_ACTIVITY_ID.EMPLOYEE,
+          appName: APP_NAME.EMPLOYEE,
         };
 
         // Update the linked bus object category with the binary resource
@@ -153,32 +152,37 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
         // Check if update was successful
         if (updateResponse.success) {
           showToast(t("photo_updated_success"));
-          
+
           goBack(); // Go back to the previous screen
         } else {
-          showToast(t("failed_upload_photo"));
+          showToast(t("failed_upload_photo"), "error");
         }
-        
+
         if (updateResponse.message) {
           showToast(updateResponse.message);
         }
       } catch (error) {
         console.error("Error in onSave method of CustomImagePicker:", error);
-        showToast(t("failed_upload_photo"));
+        showToast(t("failed_upload_photo"), "error");
       } finally {
         setIsLoading(false);
       }
     } else {
-      Alert.alert(t("alert_title"), t("no_image_selected"));
+      Alert.alert(`${t("alert_title")}!`, t("no_image_selected"));
     }
   };
 
   /**
    * Function to handle cancel action.
-   * It resets the selected image.
+   * If an image is selected, it resets the selected image.
+   * If no image is selected, it shows an alert informing the user.
    */
-  const onCancel = () => {
-    setSelectedImage(null);
+  const onReset = () => {
+    if (selectedImage) {
+      setSelectedImage(null);
+    } else {
+      Alert.alert(`${t("alert_title")}!`, t("no_image_to_reset"));
+    }
   };
 
   // Render JSX
@@ -203,14 +207,13 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
       </View>
       <SaveCancelBar
         onSave={onSave}
-        onCancel={onCancel}
+        onCancel={onReset}
         saveLabel={t("save")}
-        cancelLabel={t("cancel")}
+        cancelLabel={t("reset")}
         saveIcon="save"
         cancelIcon="times"
       />
       {isLoading && <Loader />}
-      <CustomToast />
     </SafeAreaView>
   );
 };

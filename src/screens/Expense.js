@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderColor: "#85929e",
+    borderColor: "#ccc",
     padding: 12,
   },
   firstColumn: {
