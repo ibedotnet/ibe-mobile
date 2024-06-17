@@ -106,10 +106,6 @@ const APP = {
   LOGIN_USER_ID: "",
   /** Language preference of the logged-in user. Default is English. */
   LOGIN_USER_LANGUAGE: "en",
-  /** Work schedule external name of the logged-in user.*/
-  LOGIN_USER_WORKSCHEDULE_NAME: "",
-  /** Timesheet type of the logged-in user work schedule.*/
-  LOGIN_USER_WORK_SCHEDULE_TIMESHEET_TYPE: "",
 };
 
 /**

@@ -473,7 +473,7 @@ const History = ({ busObjCat, busObjID }) => {
   ]);
 
   return (
-    <View style={styles.tabContainer}>
+    <View style={styles.container}>
       <CollapsiblePanel
         title={t("filters") + " (" + appliedFiltersCount + ")"}
         children={historyFilters}
@@ -491,8 +491,9 @@ const History = ({ busObjCat, busObjID }) => {
 };
 
 const styles = StyleSheet.create({
-  tabContainer: {
+  container: {
     flex: 1,
+    justifyContent: "flex-start",
     backgroundColor: "#e5eef7",
   },
   loaderErrorContainer: {

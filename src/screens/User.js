@@ -366,6 +366,7 @@ const User = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#e5eef7",
   },
   headerRightContainer: {
     width: screenDimension.width / 3,
@@ -385,10 +386,15 @@ const styles = StyleSheet.create({
     color: "white",
   },
   sectionContainer: {
-    marginVertical: "2%",
+    marginVertical: "4%",
     paddingHorizontal: "2%",
     backgroundColor: "white",
-    borderRadius: 5,
+    borderRadius: 8,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   infoButtonContainer: {
     alignItems: "flex-end",

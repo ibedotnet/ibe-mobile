@@ -12,6 +12,7 @@ import MainNavigator from "./src/navigation/MainNavigator";
 
 import OfflineView from "./src/components/offline/OfflineView";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
+import { LoggedInUserInfoProvider } from "./context/LoggedInUserInfoContext";
 import {
   AbsenceForceRefreshProvider,
   ExpenseForceRefreshProvider,
@@ -77,22 +78,25 @@ const App = () => {
     <RootSiblingParent>
       {/* SafeAreaProvider ensures that content doesn't overlap system insets (e.g., status bar, notch) */}
       <SafeAreaProvider>
-        {/* ConnectivityProvider and RequestQueueProvider wrap the MainNavigator to provide access to their respective contexts */}
-        <ConnectivityProvider>
-          <RequestQueueProvider>
-            {/* TimesheetForceRefreshProvider, ExpenseForceRefreshProvider, and AbsenceForceRefreshProvider are context providers wrapping MainNavigator */}
-            <TimesheetForceRefreshProvider>
-              <ExpenseForceRefreshProvider>
-                <AbsenceForceRefreshProvider>
-                  {/* MainNavigator is the main navigation component */}
-                  <MainNavigator />
-                </AbsenceForceRefreshProvider>
-              </ExpenseForceRefreshProvider>
-            </TimesheetForceRefreshProvider>
-          </RequestQueueProvider>
-          {/* Render OfflineView component */}
-          {<OfflineView />}
-        </ConnectivityProvider>
+        {/* LoggedInUserInfoProvider wraps the entire application to provide logged-in user information context */}
+        <LoggedInUserInfoProvider>
+          {/* ConnectivityProvider and RequestQueueProvider wrap the MainNavigator to provide access to their respective contexts */}
+          <ConnectivityProvider>
+            <RequestQueueProvider>
+              {/* TimesheetForceRefreshProvider, ExpenseForceRefreshProvider, and AbsenceForceRefreshProvider are context providers wrapping MainNavigator */}
+              <TimesheetForceRefreshProvider>
+                <ExpenseForceRefreshProvider>
+                  <AbsenceForceRefreshProvider>
+                    {/* MainNavigator is the main navigation component */}
+                    <MainNavigator />
+                  </AbsenceForceRefreshProvider>
+                </ExpenseForceRefreshProvider>
+              </TimesheetForceRefreshProvider>
+            </RequestQueueProvider>
+            {/* Render OfflineView component */}
+            {<OfflineView />}
+          </ConnectivityProvider>
+        </LoggedInUserInfoProvider>
       </SafeAreaProvider>
     </RootSiblingParent>
   );

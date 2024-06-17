@@ -6,7 +6,6 @@ import { format } from "date-fns";
 import { APP } from "../constants";
 import CustomButton from "./CustomButton";
 import { convertToDateFNSFormat } from "../utils/FormatUtils";
-import { BorderlessButton } from "react-native-gesture-handler";
 
 /**
  * CustomDateTimePicker component for selecting date and time.
@@ -117,14 +116,14 @@ const CustomDateTimePicker = ({
       {/* Text displaying the selected date */}
       <Text style={styles.selectedDate}>
         {date
-          ? `${placeholder}: ${format(
+          ? `${placeholder ? placeholder + ": " : ""}${format(
               date,
               convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
             )}${isTimePickerVisible ? " " + date.toLocaleTimeString() : ""}`
           : `${placeholder}: ${t("no_date_selected")}`}
       </Text>
-      {/* Clear button to clear the selected date */}
-      {date && (
+      {/* Clear button to clear the selected date, conditionally rendered based on isDisabled prop */}
+      {date && !isDisabled && (
         <CustomButton
           onPress={clearDate}
           label={t("clear")}
@@ -134,7 +133,7 @@ const CustomDateTimePicker = ({
             color: "#005eb8",
           }}
           backgroundColor={false}
-          style={{ icon: { marginRight: 0 }, borderLeftWidth: 2 }}
+          style={{ icon: { marginRight: 0 }, borderLeftWidth: 0.5 }}
           labelStyle={styles.clearButtonText}
         />
       )}
@@ -156,7 +155,7 @@ const styles = StyleSheet.create({
   pickerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 8,
   },
   picker: {

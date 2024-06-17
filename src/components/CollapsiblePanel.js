@@ -1,6 +1,13 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { screenDimension } from "../utils/ScreenUtils";
 
 /**
  * CollapsiblePanel renders a collapsible panel with a toggle button.
@@ -46,7 +53,11 @@ const CollapsiblePanel = ({
         </TouchableOpacity>
       )}
       {/* Render the content of the panel only if it's not collapsed */}
-      {!collapsed && <View style={styles.panelContent}>{children}</View>}
+      {!collapsed && (
+        <View style={styles.panelContent}>
+          <ScrollView>{children}</ScrollView>
+        </View>
+      )}
     </View>
   );
 };
@@ -58,6 +69,12 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ccc",
     padding: "2%",
     backgroundColor: "#fff",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    marginBottom: 10,
   },
   panelHeader: {
     flexDirection: "row",
@@ -70,6 +87,7 @@ const styles = StyleSheet.create({
   },
   panelContent: {
     marginTop: "4%",
+    maxHeight: screenDimension.height / 2,
   },
 });
 

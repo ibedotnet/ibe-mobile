@@ -257,6 +257,8 @@ const File = ({
     try {
       setLoading(true);
 
+      const fetchedFiles = []; // Initialize an array to store all fetched files
+
       // Iterate over each file ID in the initialFilesIdList
       for (const fileId of initialFilesIdList) {
         // Define query fields to fetch file metadata
@@ -318,7 +320,7 @@ const File = ({
           response.data.length > 0
         ) {
           // Map fetched files metadata to desired format
-          const fetchedFiles = response.data.map((file) => {
+          const fetchedFile = response.data.map((file) => {
             const id = file["Attachment-id"];
             const type = file["Attachment-type"];
             const mimeType =
@@ -350,9 +352,13 @@ const File = ({
             };
           });
 
-          setFiles((prevFiles) => [...prevFiles, ...fetchedFiles]);
+          // Append fetched files to the array
+          fetchedFiles.push(...fetchedFile);
         }
       }
+
+      // Update the state once with all fetched files
+      setFiles(fetchedFiles);
     } catch (error) {
       console.error("Error fetching initial files: ", error);
       setError(error);
@@ -555,6 +561,7 @@ const File = ({
 
 const styles = StyleSheet.create({
   tabContainer: {
+    flex: 1,
     justifyContent: "flex-start",
     backgroundColor: "#e5eef7",
   },
@@ -571,6 +578,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
     backgroundColor: "#fff",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    marginBottom: 10,
   },
   countText: {
     flex: 1,

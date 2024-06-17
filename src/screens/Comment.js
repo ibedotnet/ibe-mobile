@@ -30,7 +30,7 @@ const Comment = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [comments, setComments] = useState(initialComments);
+  const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
 
   const [selectedComment, setSelectedComment] = useState(null);
@@ -100,13 +100,15 @@ const Comment = ({
   };
 
   /**
-   * Fetches initial comments based on the provided list of comment IDs.
+   * Fetches already existing comments based on the provided list of initial comment IDs.
    * Retrieves comments from the server and updates the state accordingly.
    * @returns {void}
    */
   const fetchInitialComments = async () => {
     try {
       setLoading(true);
+
+      const fetchedComments = []; // Initialize an array to store all fetched comments
 
       // Iterate over each comment ID in the initialComments
       for (const commentId of initialComments) {
@@ -162,7 +164,7 @@ const Comment = ({
           response.data.length > 0
         ) {
           // Map fetched comments to desired format
-          const fetchedComments = response.data.map((comment) => {
+          const fetchedComment = response.data.map((comment) => {
             const id = comment["MessageLog-id"];
             // This paragraph ("<p>&nbsp;</p>") is added in the web application,
             // so we have to strip it; otherwise, it adds unwanted space.
@@ -192,9 +194,13 @@ const Comment = ({
             };
           });
 
-          setComments((prevComments) => [...prevComments, ...fetchedComments]);
+          // Append fetched comments to the array
+          fetchedComments.push(...fetchedComment);
         }
       }
+
+      // Update the state once with all fetched comments
+      setComments(fetchedComments);
     } catch (error) {
       console.error("Error fetching initial comments: ", error);
       setError(error);
@@ -348,6 +354,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
     backgroundColor: "#fff",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2,
+    marginBottom: 10,
   },
   countText: {
     flex: 1,

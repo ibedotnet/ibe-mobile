@@ -132,13 +132,13 @@ const CustomPicker = ({
 // Styles for the component
 const styles = StyleSheet.create({
   container: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 8,
     borderColor: "black",
     marginBottom: "4%",
   },
   input: {
-    borderTopWidth: 2,
+    borderTopWidth: 1,
     borderColor: "black",
     paddingVertical: 12,
     paddingHorizontal: 16,

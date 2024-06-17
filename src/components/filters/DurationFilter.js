@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     width: "30%",
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 8,
     borderColor: "black",
     marginBottom: "4%",

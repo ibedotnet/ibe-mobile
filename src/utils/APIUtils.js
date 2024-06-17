@@ -134,7 +134,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
       }
 
       console.error(errorMessage);
-      //showToast(errorMessage, "error");
+      showToast(errorMessage, "error");
     }
 
     return jsonResponse;

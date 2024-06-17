@@ -85,11 +85,7 @@ const convertDurationToMilliseconds = (
  * @param {string} unit - The unit to which the duration should be converted. Should be one of: "d" (days), "h" (hours), "m" (minutes), "s" (seconds).
  * @returns {string} - The duration string in the format corresponding to the specified unit.
  */
-const convertMillisecondsToDuration = (
-  milliseconds,
-  unit = "hours",
-  convertToMillisecondsEnabled
-) => {
+const convertMillisecondsToDuration = (milliseconds, unit = "hours") => {
   try {
     // Ensure milliseconds is a valid number
     if (
@@ -101,10 +97,6 @@ const convertMillisecondsToDuration = (
         `Invalid milliseconds value ${milliseconds}. Returning null.`
       );
       return null;
-    }
-
-    if (!convertToMillisecondsEnabled) {
-      return milliseconds;
     }
 
     // Convert milliseconds to the specified unit

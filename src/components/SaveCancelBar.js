@@ -29,11 +29,11 @@ const SaveCancelBar = ({
   isFloating = false,
 }) => {
   const saveIconProps = isFloating
-    ? { name: saveIcon, size: 24 }
+    ? { name: saveIcon, size: 32 }
     : { name: saveIcon };
 
   const cancelIconProps = isFloating
-    ? { name: cancelIcon, size: 24 }
+    ? { name: cancelIcon, size: 32 }
     : { name: cancelIcon };
 
   return (
@@ -74,20 +74,18 @@ const styles = StyleSheet.create({
     bottom: 20,
     right: 20,
     alignItems: "center",
-    borderColor: "#005eb8",
-    marginTop: 20,
   },
   barButton: {
     flex: 1,
   },
   floatingButton: {
     marginBottom: 10,
-    width: 56,
-    height: 56,
+    width: 50,
+    height: 50,
     borderRadius: 5,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 94, 184, 0.9)",
+    backgroundColor: "#005eb8",
     elevation: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

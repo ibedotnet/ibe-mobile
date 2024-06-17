@@ -22,7 +22,7 @@ import { APP, APP_NAME } from "../constants";
 import { uploadBinaryResource } from "../utils/APIUtils";
 import { changeDateToAPIFormat } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
-import { updateFields } from "../utils/UpdateUtils";
+import updateFields from "../utils/UpdateUtils";
 
 /**
  * Button Component

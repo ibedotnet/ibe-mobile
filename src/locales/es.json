@@ -1,6 +1,8 @@
 {
   "s": "s",
   "by": "por",
+  "yes": "Sí",
+  "no": "No",
   "from": "Desde",
   "to": "A",
   "type": "Tipo",
@@ -92,7 +94,9 @@
   "timesheet_absence_time": "Tiempo de Ausencia",
   "timesheet_over_time": "Tiempo Extra",
   "timesheet_edit": "Editar hoja de tiempo",
+  "timesheet_edit_item": "Editar elemento de la hoja de horas",
   "timesheet_create": "Crear hoja de tiempo",
+  "timesheet_create_item": "Crear elemento de hoja de horas",
   "created_on": "Creado el",
   "created_by": "Creado by",
   "changed_on": "Cambiado el",
@@ -129,5 +133,16 @@
   "hours": "Horas",
   "billable": "Facturable",
   "placeholder_remark": "Escribe tu observación aquí",
-  "placeholder_time": "Ingrese el tiempo aquí"
+  "placeholder_time": "Ingrese el tiempo aquí",
+  "summary": "Resumen",
+  "no_workschedule_assigned": "No hay horario de trabajo asignado",
+  "weekend": "Fin de semana",
+  "selected": "Seleccionado",
+  "holiday": "Día festivo",
+  "no_entry_found_selected_date": "No se encontraron entradas para la fecha seleccionada.",
+  "quantity": "Cantidad",
+  "holiday_message": "¡Es un día festivo!",
+  "absence": "Ausencia",
+  "absence_message": "¡Es una ausencia!",
+  "non_working_day": "Día no laborable"
 }

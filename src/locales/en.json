@@ -1,6 +1,8 @@
 {
   "s": "s",
   "by": "by",
+  "yes": "Yes",
+  "no": "No",
   "from": "From",
   "to": "To",
   "type": "Type",
@@ -92,7 +94,9 @@
   "timesheet_absence_time": "Absence Time",
   "timesheet_over_time": "Over Time",
   "timesheet_edit": "Edit Timesheet",
+  "timesheet_edit_item": "Edit timesheet item",
   "timesheet_create": "Create Timesheet",
+  "timesheet_create_item": "Create timesheet item",
   "created_on": "Created on",
   "created_by": "Created by",
   "changed_on": "Changed on",
@@ -129,5 +133,16 @@
   "hours": "Hours",
   "billable": "Billable",
   "placeholder_remark": "Type your remark here",
-  "placeholder_time": "Enter time here"
+  "placeholder_time": "Enter time here",
+  "summary": "Summary",
+  "no_workschedule_assigned": "No work schedule assigned",
+  "weekend": "Weekend",
+  "selected": "Selected",
+  "holiday": "Holiday",
+  "no_entry_found_selected_date": "No entry found for the selected date.",
+  "quantity": "Quantity",
+  "holiday_message": "It's a holiday!",
+  "absence": "Absence",
+  "absence_message": "It's an absence!",
+  "non_working_day": "Non-working Day"
 }

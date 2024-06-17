@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   Image,
   Keyboard,
@@ -28,6 +28,7 @@ import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 
 import { common } from "../styles/common";
+import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 /**
  * Login component for user authentication.
@@ -38,6 +39,8 @@ import { common } from "../styles/common";
 const Login = ({ navigation }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
+
+  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
 
   // State variables
   const [username, setUsername] = useState("");
@@ -116,9 +119,15 @@ const Login = ({ navigation }) => {
     APP.LOGIN_USER_ID = data?.User?.[0]?.["User-id"] ?? "";
     APP.LOGIN_USER_LANGUAGE =
       data?.User?.[0]?.["User-preferences"]?.language ?? "en";
-    APP.LOGIN_USER_WORK_SCHEDULE_NAME = data?.empWorkSchedue?.name ?? "";
-    APP.LOGIN_USER_WORK_SCHEDULE_TIMESHEET_TYPE =
+    loggedInUserInfo.timeConfirmationType =
       data?.empWorkSchedue?.timeConfirmationType ?? "";
+    loggedInUserInfo.workScheduleExtId = data?.empWorkSchedue?.extID ?? "";
+    loggedInUserInfo.calendarExtId = data?.empWorkCalendar?.extID ?? "";
+    loggedInUserInfo.nonWorkingDates =
+      data?.empWorkCalendar?.nonWorkingDates ?? [];
+    loggedInUserInfo.nonWorkingDays =
+      data?.empWorkCalendar?.nonWorkingDays ?? [];
+    loggedInUserInfo.startOfWeek = data?.empWorkCalendar?.startOfWeek ?? 0;
 
     console.debug(
       `Logged in details
@@ -127,8 +136,8 @@ const Login = ({ navigation }) => {
         client id: ${APP.LOGIN_USER_CLIENT},
         employee id: ${APP.LOGIN_USER_EMPLOYEE_ID},
         preferred date format: ${APP.LOGIN_USER_DATE_FORMAT}
-        works schedule name: ${APP.LOGIN_USER_WORK_SCHEDULE_NAME}
-        timesheet type: ${APP.LOGIN_USER_WORK_SCHEDULE_TIMESHEET_TYPE}`
+        works schedule extid: ${loggedInUserInfo.workScheduleExtId}
+        timesheet type: ${loggedInUserInfo.timeConfirmationType}`
     );
   };
 
