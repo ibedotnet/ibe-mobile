@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -80,9 +81,6 @@ const PreviewDialog = ({
     };
   });
 
-  // State to manage video playback status
-  const [videoPlaybackStatus, setVideoPlaybackStatus] = useState({});
-
   // Function to reset shared values
   const resetSharedValues = () => {
     // Reset all shared values
@@ -154,10 +152,7 @@ const PreviewDialog = ({
     height: "100%",
   };
 
-  if (isLoading) {
-    // Display loader until resource is loaded
-    content = <Text style={styles.loadingText}>{t("loading")}...</Text>;
-  } else if (fileType === "image") {
+  if (fileType === "image") {
     content = (
       <View>
         <GestureDetector gesture={composed}>
@@ -214,7 +209,11 @@ const PreviewDialog = ({
           {fileTitle}
         </Text>
         <ScrollView contentContainerStyle={styles.scrollView} centerContent>
-          <GestureHandlerRootView>{content}</GestureHandlerRootView>
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#fff" />
+          ) : (
+            <GestureHandlerRootView>{content}</GestureHandlerRootView>
+          )}
         </ScrollView>
         <Button title={t("close")} onPress={onClose} />
       </View>
@@ -223,10 +222,6 @@ const PreviewDialog = ({
 };
 
 const styles = StyleSheet.create({
-  loadingText: {
-    color: "white",
-    fontWeight: "bold",
-  },
   errorText: {
     color: "red",
     fontSize: 18,

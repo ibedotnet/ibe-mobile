@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
+import CustomTextInput from "../CustomTextInput";
 
 /**
  * TextFilter component renders a text input field for filtering purposes.
@@ -51,12 +52,11 @@ const TextFilter = ({
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
+      <CustomTextInput
+        containerStyle={styles.input}
         value={value}
         onChangeText={handleFilterChange}
         placeholder={placeholder || `${t("type_to_filter")} ${label}...`}
-        placeholderTextColor="darkgrey"
       />
     </View>
   );
@@ -67,15 +67,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    marginBottom: "4%",
+    marginBottom: "2%",
     fontSize: 16,
     fontWeight: "bold",
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
     marginBottom: "4%",
   },
 });

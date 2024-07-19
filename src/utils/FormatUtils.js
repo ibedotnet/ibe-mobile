@@ -338,6 +338,64 @@ const formatLeaveDuration = (
 };
 
 /**
+ * Retrieves the text of a remark for a specific language from an array of remarks.
+ * If the remark for the specified language is not found, it falls back to the preferred languages.
+ *
+ * @param {Array} remarks - Array of remark objects.
+ * @param {string} language - Primary language code of the remark to retrieve.
+ * @param {Array} preferredLanguages - Array of fallback language codes.
+ * @returns {string} The text of the remark in the specified language, or an empty string if not found.
+ */
+const getRemarkText = (remarks, language, preferredLanguages = []) => {
+  // Combine primary language and preferred languages for search
+  const searchLanguages = [language, ...preferredLanguages];
+
+  // Find the remark object with the matching language code from search languages
+  const remark = searchLanguages
+    .map((lang) => remarks.find((remark) => remark.language === lang))
+    .find((remark) => remark !== undefined);
+
+  // Return the text of the found remark or an empty string if not found
+  return remark ? remark.text : "";
+};
+
+/**
+ * Sets the text of a remark for a specific language in an array of remarks.
+ * If a remark for the specified language is found, updates its text with the new text;
+ * otherwise, creates a new remark object for the language.
+ * If the remark for the specified language is not found, it falls back to the preferred languages.
+ *
+ * @param {Array} remarks - Array of remark objects containing language and text properties.
+ * @param {string} language - Primary language code of the remark to update.
+ * @param {string} newText - New text to set for the remark in the specified language.
+ * @returns {Array} Updated array of remarks with the remark text updated or added.
+ */
+const setRemarkText = (remarks = [], language = "en", newText) => {
+  // If newText is empty, return the original remarks array
+  if (!newText) {
+    return remarks;
+  }
+
+  // Clone the remarks array to avoid mutating the original state directly
+  const updatedRemarks = [...remarks];
+
+  // Find the index of the remark with the matching language code
+  const index = updatedRemarks.findIndex(
+    (remark) => remark.language === language
+  );
+
+  if (index !== -1) {
+    // Update the existing remark if found
+    updatedRemarks[index] = { ...updatedRemarks[index], text: newText };
+  } else {
+    // If remark for the language doesn't exist, create a new one
+    updatedRemarks.push({ language, text: newText });
+  }
+
+  return updatedRemarks;
+};
+
+/**
  * Recursively compares two values for equality, handling arrays, objects, and primitive types.
  * @param {*} value1 - The first value to compare.
  * @param {*} value2 - The second value to compare.
@@ -447,6 +505,8 @@ export {
   convertToDateObject,
   convertToMilliseconds,
   formatLeaveDuration,
+  getRemarkText,
+  setRemarkText,
   isEqual,
   makeFirstLetterLowercase,
   stripHTMLTags,

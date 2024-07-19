@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useTranslation } from "react-i18next";
 import { timeUnitLabels } from "../../utils/FormatUtils";
+import CustomTextInput from "../CustomTextInput";
 
 /**
  * DurationFilter component renders a filter for duration range.
@@ -27,7 +28,7 @@ const DurationFilter = ({
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
-  
+
   const [greaterThanValue, setGreaterThanValue] = useState(
     initialValue?.greaterThanValue?.toString() ?? ""
   );
@@ -45,7 +46,7 @@ const DurationFilter = ({
   const handleLessThanChange = (text) => {
     setLessThanValue(text);
   };
-  
+
   const handleUnitChange = (unit) => {
     setUnit(unit);
   };
@@ -95,21 +96,21 @@ const DurationFilter = ({
     <View>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
+        <CustomTextInput
+          containerStyle={styles.input}
           value={greaterThanValue}
           onChangeText={handleGreaterThanChange}
           placeholder={placeholder || `${t("greater_than")}...`}
-          placeholderTextColor="darkgrey"
           keyboardType="numeric"
+          showClearButton={false}
         />
-        <TextInput
-          style={styles.input}
+        <CustomTextInput
+          containerStyle={styles.input}
           value={lessThanValue}
           onChangeText={handleLessThanChange}
           placeholder={placeholder || `${t("less_than")}...`}
-          placeholderTextColor="darkgrey"
           keyboardType="numeric"
+          showClearButton={false}
         />
         <View style={styles.pickerContainer}>
           <Picker
@@ -133,7 +134,7 @@ const DurationFilter = ({
 
 const styles = StyleSheet.create({
   label: {
-    marginBottom: "4%",
+    marginBottom: "2%",
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -144,10 +145,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
     marginBottom: "4%",
   },
   pickerContainer: {

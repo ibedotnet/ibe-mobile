@@ -98,13 +98,6 @@ const Timesheet = ({ route, navigation }) => {
             billableTime >= 3600000 ? "hours" : "minutes"
           )?.displayTime || "";
 
-        const absenceTime = item?.["TimeConfirmation-absenceTime"] || 0;
-        const convertedAbsenceTime =
-          convertMillisecondsToUnit(
-            absenceTime,
-            absenceTime >= 3600000 ? "hours" : "minutes"
-          )?.displayTime || "";
-
         const overTime = item?.["TimeConfirmation-overTime"] || 0;
         const convertedOverTime =
           convertMillisecondsToUnit(
@@ -116,7 +109,6 @@ const Timesheet = ({ route, navigation }) => {
         const additionalData = {
           totalTime: convertedTotalTime,
           billableTime: convertedBillableTime,
-          absenceTime: convertedAbsenceTime,
           overTime: convertedOverTime,
         };
         setAdditionalData((prevData) => ({
@@ -363,6 +355,9 @@ const Timesheet = ({ route, navigation }) => {
                 )
               : "Invalid end date";
 
+            const statusTemplateExtId =
+              item?.["TimeConfirmation-extStatus-processTemplateID"] || "";
+
             const statusLabel =
               item?.[
                 "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel"
@@ -395,6 +390,7 @@ const Timesheet = ({ route, navigation }) => {
                 // Double click detected, navigate to add timesheet screen
                 navigation.navigate("TimesheetDetail", {
                   timesheetId,
+                  statusTemplateExtId,
                 });
               }
 
@@ -451,7 +447,7 @@ const Timesheet = ({ route, navigation }) => {
                                   style={styles.additionalDataLabelContainer}
                                 >
                                   <Text style={styles.additionalDataLabel}>
-                                    {t("timesheet_total_time")}
+                                    {t("timesheet_work_time")}
                                   </Text>
                                 </View>
                                 <View
@@ -462,7 +458,6 @@ const Timesheet = ({ route, navigation }) => {
                                   </Text>
                                 </View>
                               </View>
-
                               <View style={styles.additionalDataItem}>
                                 <View
                                   style={styles.additionalDataLabelContainer}
@@ -483,24 +478,6 @@ const Timesheet = ({ route, navigation }) => {
                                   </Text>
                                 </View>
                               </View>
-
-                              <View style={styles.additionalDataItem}>
-                                <View
-                                  style={styles.additionalDataLabelContainer}
-                                >
-                                  <Text style={styles.additionalDataLabel}>
-                                    {t("timesheet_absence_time")}
-                                  </Text>
-                                </View>
-                                <View
-                                  style={styles.additionalDataValueContainer}
-                                >
-                                  <Text style={styles.additionalDataValue}>
-                                    {additionalData[timesheetId]["absenceTime"]}
-                                  </Text>
-                                </View>
-                              </View>
-
                               <View style={styles.additionalDataItem}>
                                 <View
                                   style={styles.additionalDataLabelContainer}
@@ -640,7 +617,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
     alignItems: "center",
     marginTop: "2%",
   },

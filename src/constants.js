@@ -27,7 +27,7 @@ const Environment = {
  * @type {Object.<string, string>}
  */
 const BASE_URL = {
-  [Environment.DEVELOPMENT]: "http://172.17.0.80",
+  [Environment.DEVELOPMENT]: "http:///172.17.0.49",
   [Environment.TESTING]: "http://testserver.ibenv.net",
   [Environment.PRODUCTION]: "http://appnew.ibenv.net",
 };
@@ -216,6 +216,13 @@ const MAX_UPLOAD_FILE_SIZE = 10;
 const PAGE_SIZE = 20;
 
 /**
+ * List of preferred languages to use as fallbacks for language-specific operations.
+ * @constant
+ * @type {Array<string>}
+ */
+const PREFERRED_LANGUAGES = ["en", "en_GB"];
+
+/**
  * Flag indicating whether the application is running in test mode.
  * @constant
  * @type {boolean}
@@ -263,6 +270,7 @@ export {
   LOGIN_INPUTS_MAXLENGTH,
   MAX_UPLOAD_FILE_SIZE,
   PAGE_SIZE,
+  PREFERRED_LANGUAGES,
   TEST_MODE,
   VALID_FILE_EXTENSIONS,
 };

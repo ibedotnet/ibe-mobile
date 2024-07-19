@@ -119,9 +119,12 @@ const Login = ({ navigation }) => {
     APP.LOGIN_USER_ID = data?.User?.[0]?.["User-id"] ?? "";
     APP.LOGIN_USER_LANGUAGE =
       data?.User?.[0]?.["User-preferences"]?.language ?? "en";
+    loggedInUserInfo.personId = data?.User?.[0]?.["Person-id"] ?? "";
     loggedInUserInfo.timeConfirmationType =
       data?.empWorkSchedue?.timeConfirmationType ?? "";
     loggedInUserInfo.workScheduleExtId = data?.empWorkSchedue?.extID ?? "";
+    loggedInUserInfo.dailyStdHours =
+      data?.empWorkSchedue?.dailyStdHours ?? 28800000;
     loggedInUserInfo.calendarExtId = data?.empWorkCalendar?.extID ?? "";
     loggedInUserInfo.nonWorkingDates =
       data?.empWorkCalendar?.nonWorkingDates ?? [];

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button } from "react-native";
+import { View, Text, Button } from "react-native";
+import CustomTextInput from "../CustomTextInput";
 
 const AmountFilter = ({ onFilter }) => {
   const [lessThan, setLessThan] = useState("");
@@ -24,20 +25,22 @@ const AmountFilter = ({ onFilter }) => {
       <Text>Amount Filter</Text>
       <View>
         <Text>Less Than:</Text>
-        <TextInput
+        <CustomTextInput
           keyboardType="numeric"
           placeholder="Enter amount"
           value={lessThan}
           onChangeText={(text) => setLessThan(text)}
+          showClearButton={false}
         />
       </View>
       <View>
         <Text>Greater Than:</Text>
-        <TextInput
+        <CustomTextInput
           keyboardType="numeric"
           placeholder="Enter amount"
           value={greaterThan}
           onChangeText={(text) => setGreaterThan(text)}
+          showClearButton={false}
         />
       </View>
       <Button title="Apply Filter" onPress={handleFilter} />

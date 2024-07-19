@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
-
+import { StyleSheet, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-
 import { useTranslation } from "react-i18next";
-
 import { isEqual } from "../utils/FormatUtils";
+import CustomTextInput from "./CustomTextInput";
 
 /**
  * CustomPicker component provides a customizable picker component for React Native.
  * @param {Object} props - Component props.
+ * @param {string} props.placeholder - Placeholder text for the picker.
  * @param {Array} props.items - Array of objects representing picker items. Should be of the form { label: string, value: string }.
  * @param {string} props.initialValue - Initial value for the picker.
  * @param {Function} props.onFilter - Callback function triggered when the picker value changes.
  * @param {boolean} props.clearValue - Boolean indicating whether to clear the value.
  * @param {boolean} props.disabled - Boolean indicating whether the picker is disabled.
+ * @param {boolean} props.hideSearchInput - Boolean indicating whether to hide the search input.
+ * @param {Object} props.containerStyle - Custom style for the container of the picker and search input.
+ * @param {Object} props.pickerStyle - Custom style for the Picker component.
+ * @param {Object} props.inputStyle - Custom style for the TextInput component.
  * @returns {JSX.Element} CustomPicker component JSX.
  */
 const CustomPicker = ({
@@ -24,6 +27,10 @@ const CustomPicker = ({
   onFilter,
   clearValue = false,
   disabled = false,
+  hideSearchInput = false,
+  containerStyle = {},
+  pickerStyle = {},
+  inputStyle = {},
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -101,30 +108,33 @@ const CustomPicker = ({
   }, [initialValue]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       {/* Picker component */}
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={handleValueChange}
-        enabled={!disabled}
-      >
-        {/* Render default/placeholder option */}
-        <Picker.Item label={placeholder} value={null} />
+      <View style={[styles.picker, pickerStyle]}>
+        <Picker
+          selectedValue={selectedValue}
+          onValueChange={handleValueChange}
+          enabled={!disabled}
+        >
+          {/* Render default/placeholder option */}
+          <Picker.Item label={placeholder} value={null} />
 
-        {/* Render filtered picker items */}
-        {filteredItems.map((item, index) => (
-          <Picker.Item key={index} label={item.label} value={item.value} />
-        ))}
-      </Picker>
+          {/* Render filtered picker items */}
+          {filteredItems.map((item, index) => (
+            <Picker.Item key={index} label={item.label} value={item.value} />
+          ))}
+        </Picker>
+      </View>
       {/* Search input */}
-      <TextInput
-        style={styles.input}
-        placeholder={t("placeholder_type_to_search")}
-        placeholderTextColor="darkgrey"
-        value={searchTerm}
-        onChangeText={setSearchTerm}
-        editable={!disabled}
-      />
+      {!hideSearchInput && (
+        <CustomTextInput
+          containerStyle={[styles.input, inputStyle]}
+          placeholder={`${t("placeholder_type_to_search")}...`}
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          editable={!disabled}
+        />
+      )}
     </View>
   );
 };
@@ -137,11 +147,14 @@ const styles = StyleSheet.create({
     borderColor: "black",
     marginBottom: "4%",
   },
+  picker: {
+    width: "100%",
+  },
   input: {
+    borderWidth: 0,
     borderTopWidth: 1,
-    borderColor: "black",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
 });
 

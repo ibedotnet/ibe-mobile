@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -16,7 +16,8 @@ import { fetchData } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 import { parseUserComms } from "../utils/UserUtils";
-import { API_ENDPOINTS, APP } from "../constants";
+import { API_ENDPOINTS} from "../constants";
+import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useRequestQueueContext } from "../../context/RequestQueueContext";
 
 const User = ({ route, navigation }) => {
@@ -25,6 +26,8 @@ const User = ({ route, navigation }) => {
 
   // Initialize useTranslation hook
   const { t, i18n } = useTranslation(); // Translation function and localization instance.
+
+  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
 
   // States to store initial states
   const [initialSelectedLanguage, setInitialSelectedLanguage] = useState(null); // Represents the initially selected language before any changes.
@@ -314,7 +317,7 @@ const User = ({ route, navigation }) => {
               numberOfLines={2}
               ellipsizeMode="tail"
             >
-              {APP.LOGIN_USER_WORK_SCHEDULE_NAME}
+              {loggedInUserInfo.workScheduleExtId}
             </Text>
           </View>
         </View>
@@ -387,7 +390,7 @@ const styles = StyleSheet.create({
   },
   sectionContainer: {
     marginVertical: "4%",
-    paddingHorizontal: "2%",
+    paddingHorizontal: "4%",
     backgroundColor: "white",
     borderRadius: 8,
     elevation: 6,

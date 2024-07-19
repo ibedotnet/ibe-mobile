@@ -157,7 +157,7 @@ const DateFilter = ({
 
 const styles = StyleSheet.create({
   label: {
-    marginBottom: "4%",
+    marginBottom: "2%",
     fontSize: 16,
     fontWeight: "bold",
   },

@@ -74,6 +74,11 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
             "Conflict: A conflict occurred with the current state of the target resource."
           );
           break;
+        case 413:
+          throw new Error(
+            "Payload too large."
+          );
+          break;
         case 429:
           throw new Error(
             "Too Many Requests: The user has sent too many requests in a given amount of time."
@@ -101,13 +106,13 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
           break;
         default:
           throw new Error(
-            `HTTP error! Status: ${response.status}, Status Text: ${response.statusText}, Message: ${jsonResponse.message}`
+            `HTTP error! Status: ${response.status}, Status Text: ${response.statusText}`
           );
       }
     }
 
     const responseText = await response.text();
-    //console.debug("Response text: " + responseText);
+    console.debug("Response text: " + responseText);
 
     const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
 
@@ -225,9 +230,9 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "TimeConfirmation-start",
           "TimeConfirmation-end",
           "TimeConfirmation-totalTime",
+          "TimeConfirmation-extStatus-processTemplateID",
           "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel",
           "TimeConfirmation-remark:text",
-          "TimeConfirmation-absenceTime",
           "TimeConfirmation-billableTime",
           "TimeConfirmation-totalTime",
           "TimeConfirmation-totalOvertime",
@@ -575,12 +580,13 @@ const uploadBinaryResource = async (imagePath) => {
     // Obtain new object IDs from the server
     const queryStringParams = convertToQueryString({ count: 50 });
     const objectIds = await fetchData(
-      `${API_ENDPOINTS.NEW_OBJECT_ID}?${queryStringParams}`
+      `${API_ENDPOINTS.NEW_OBJECT_ID}?${queryStringParams}`,
+      "GET"
     );
 
     // Check if new object IDs were obtained successfully
     if (!objectIds || !(objectIds instanceof Array) || objectIds.length === 0) {
-      throw new Error("Failed to obtain new object ID");
+      throw new Error("Failed to obtain new object Id");
     }
 
     // Extract photo and thumbnail IDs from the obtained object IDs
@@ -614,16 +620,16 @@ const uploadBinaryResource = async (imagePath) => {
       formData
     );
 
-    // Check if the upload was successful
-    if (!uploadResourceResponse.success) {
-      throw new Error("Failed to upload binary resource");
-    }
-
     // Log upload status and return uploaded photo and thumbnail IDs
     console.debug(
       "Binary Resource upload status:",
       JSON.stringify(uploadResourceResponse)
     );
+
+    // Check if the upload was successful
+    if (!uploadResourceResponse.success) {
+      throw new Error("Failed to upload binary resource");
+    }
 
     const binaryResource = {
       photoId: uploadResourceResponse.id,

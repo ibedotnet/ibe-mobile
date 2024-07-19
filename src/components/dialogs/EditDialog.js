@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Button, Modal, Text, TextInput, StyleSheet, View } from "react-native";
+import { Button, Modal, Text, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -7,6 +7,7 @@ import {
   RichToolbar,
   actions,
 } from "react-native-pell-rich-editor";
+import CustomTextInput from "../CustomTextInput";
 
 /**
  * EditDialog component
@@ -111,14 +112,14 @@ const EditDialog = ({
               />
             </View>
           ) : (
-            <TextInput
+            <CustomTextInput
               value={value}
               onChangeText={(text) => {
                 setValue(text);
                 setError(null);
               }}
               autoFocus={true}
-              style={[styles.input, error && styles.inputError]}
+              containerStyle={[styles.input, error && styles.inputError]}
             />
           )}
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -153,10 +154,6 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: "4%",
-    padding: "2%",
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 5,
   },
   inputError: {
     borderColor: "red",

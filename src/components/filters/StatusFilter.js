@@ -105,7 +105,7 @@ const StatusFilter = ({
         );
         setPickerOptions(statusLabelAndStepMap);
         setOptionsLoaded(true);
-        setLoading(false); // Set loading to false after data is loaded
+        setLoading(false);
       } else {
         console.error("Error fetching process template data:", response.error);
       }
@@ -157,7 +157,7 @@ const StatusFilter = ({
 
 const styles = StyleSheet.create({
   label: {
-    marginBottom: "4%",
+    marginBottom: "2%",
     fontSize: 16,
     fontWeight: "bold",
   },

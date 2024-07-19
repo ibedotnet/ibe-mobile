@@ -80,7 +80,7 @@ const CustomButton = ({
       style={[
         styles.button,
         backgroundColor && {
-          opacity: pressed || disabled ? 0.8 : 1,
+          opacity: pressed || disabled ? 0.6 : 1,
         },
         style, // Merge additional styles passed via props
       ]}
@@ -98,7 +98,7 @@ const CustomButton = ({
           style={[
             label && { marginRight: 5 }, // Apply marginRight only if label exists
             style && style.icon,
-            { opacity: pressed || disabled ? 0.8 : 1 },
+            { opacity: pressed || disabled ? 0.6 : 1 },
           ]} // Merge icon styles
           accessibilityLabel={`${label} button`}
         />
@@ -109,7 +109,7 @@ const CustomButton = ({
           styles.buttonLabel,
           !backgroundColor && { color: "black" },
           labelStyle,
-          { opacity: pressed || disabled ? 0.8 : 1 },
+          { opacity: pressed || disabled ? 0.6 : 1 },
         ]}
         numberOfLines={1}
         ellipsizeMode="tail"
