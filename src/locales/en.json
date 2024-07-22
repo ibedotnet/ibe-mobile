@@ -172,5 +172,5 @@
   "delete_item": "Delete Item",
   "delete_item_confirmation": "Are you sure you want to delete this item?",
   "time_type": "Time Type",
-  "item_exists": "An item with the same taskId and billable status already exists on {{selectedDate}}."
+  "item_exists": "An item with the same taskId already exists on {{selectedDate}}."
 }

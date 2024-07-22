@@ -75,10 +75,13 @@ const TimesheetDetailGeneral = ({
     itemStatusIDMap,
   } = timesheetDetail;
 
+  const { timesheetTypePeriod = 7 } = timesheetTypeDetails; // Default period is 7 days (weekly)
+
   const timesheetStartDate = convertToDateObject(timesheetStart);
   const timesheetEndDate = convertToDateObject(timesheetEnd);
 
   const [type, setType] = useState(timesheetType);
+  const [period, setPeriod] = useState(timesheetTypePeriod);
   const [headerExtStatus, setHeaderExtStatus] = useState(timesheetExtStatus);
   const [weekendList, setWeekendList] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
@@ -87,6 +90,7 @@ const TimesheetDetailGeneral = ({
   const [visibleDates, setVisibleDates] = useState([]);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isEditingItem, setIsEditingItem] = useState(false);
+  const [isItemEditMode, setIsItemEditMode] = useState(false);
   const [currentItem, setCurrentItem] = useState({});
   const [timesheetItemsMap, setTimesheetItemsMap] = useState(new Map());
   const [start, setStart] = useState(timesheetStartDate);
@@ -323,7 +327,7 @@ const TimesheetDetailGeneral = ({
         );
 
         // Create a unique key combining taskId and billable
-        const uniqueKey = `${taskId}-${billable}`;
+        const uniqueKey = `${taskId}`;
 
         // Find or create the task entry
         let task = tasks.find((t) => t.uniqueKey === uniqueKey);
@@ -436,8 +440,13 @@ const TimesheetDetailGeneral = ({
   };
 
   const fetchPreviousDates = () => {
-    const newEnd = addDays(visibleDates[0], -1);
-    const newStart = addDays(newEnd, -6);
+    // Extract and convert the fullDate of the first visible date
+    const firstVisibleDate = new Date(visibleDates[0].fullDate);
+
+    // Calculate new end and start dates using the period
+    const newEnd = addDays(firstVisibleDate, -1);
+    const newStart = addDays(newEnd, -(period - 1)); // period - 1 to cover the entire period
+
     setStart(newStart);
     setEnd(newEnd);
 
@@ -446,13 +455,23 @@ const TimesheetDetailGeneral = ({
   };
 
   const fetchNextDates = () => {
-    const newStart = addDays(visibleDates[visibleDates.length - 1], 1);
-    const newEnd = addDays(newStart, 6);
+    // Extract and convert the fullDate of the last visible date
+    const lastVisibleDate = new Date(
+      visibleDates[visibleDates.length - 1].fullDate
+    );
+
+    // Calculate new start and end dates using the period
+    const newStart = addDays(lastVisibleDate, 1);
+    const newEnd = addDays(newStart, period - 1); // period - 1 to cover the entire period
+
     setStart(newStart);
     setEnd(newEnd);
 
-    // Scroll to the left
-    dateListRef.current.scrollTo({ x: 0, animated: true });
+    // Scroll to the right
+    dateListRef.current.scrollTo({
+      x: dateListRef.current.scrollWidth,
+      animated: true,
+    });
   };
 
   const isHolidayOnDate = (date) => {
@@ -626,6 +645,8 @@ const TimesheetDetailGeneral = ({
   };
 
   const handleCreateItemClick = (item) => {
+    setIsItemEditMode(false);
+
     setCurrentItem({
       // Set default values for a new item
       customerId: "",
@@ -652,6 +673,7 @@ const TimesheetDetailGeneral = ({
   };
 
   const handleEditItemClick = (item) => {
+    setIsItemEditMode(true);
     setCurrentItem(item);
     setIsEditingItem(true);
   };
@@ -679,9 +701,7 @@ const TimesheetDetailGeneral = ({
       : [];
 
     const index = items.findIndex(
-      (item) =>
-        item.taskId === itemToDelete.taskId &&
-        item.billable === itemToDelete.billable
+      (item) => item.taskId === itemToDelete.taskId
     );
 
     if (index !== -1) {
@@ -715,47 +735,87 @@ const TimesheetDetailGeneral = ({
   const handleConfirmEditItem = (editedItem) => {
     const selectedDateFormatted = format(new Date(selectedDate), "yyyy-MM-dd");
 
+    // Get the existing items for the selected date
+    let items = timesheetItemsMap.has(selectedDateFormatted)
+      ? [...timesheetItemsMap.get(selectedDateFormatted)]
+      : [];
+
+    // Find the index of the item to be updated, if it exists
+    const existingItemIndex = items.findIndex(
+      (item) => item.taskId === currentItem.taskId
+    );
+
+    if (existingItemIndex !== -1) {
+      // Item already exists; update it
+      items[existingItemIndex] = editedItem;
+    } else {
+      // Item does not exist; add it to the list
+      items.push(editedItem);
+    }
+
+    // Update the timesheet items map with the new list
+    const updatedTimesheetItemsMap = new Map(timesheetItemsMap);
+    updatedTimesheetItemsMap.set(selectedDateFormatted, items);
+
+    console.debug(
+      `On confirm, the items going to be updated on date ${selectedDateFormatted} are ${JSON.stringify(
+        items
+      )}`
+    );
+
+    setTimesheetItemsMap(updatedTimesheetItemsMap);
+    setCurrentItem({});
+    setIsEditingItem(false);
+
+    SetTasks(convertTimesheetItemsMapToTasks(updatedTimesheetItemsMap));
+  };
+
+  const handleConfirmEditItem1 = (editedItem) => {
+    const selectedDateFormatted = format(new Date(selectedDate), "yyyy-MM-dd");
+
+    // Get the existing items for the selected date
     let items = timesheetItemsMap.has(selectedDateFormatted)
       ? [...timesheetItemsMap.get(selectedDateFormatted)]
       : [];
 
     // Check if the edited item already exists in the list
     const existingItemIndex = items.findIndex(
-      (item) =>
-        item.taskId === editedItem.taskId &&
-        item.billable === editedItem.billable
+      (item) => item.taskId === editedItem.taskId
     );
 
-    const index = items.findIndex(
-      (item) =>
-        item.taskId === currentItem.taskId &&
-        item.billable === currentItem.billable
-    );
+    // Check for duplicate taskId in items that are not the current item being edited
+    const duplicateItemIndex = items.findIndex((item) => {
+      console.log("item", item.taskText);
+      console.log("edited item", editedItem.taskText);
+      console.log("current item", currentItem.taskText);
+      return (
+        item.taskId === editedItem.taskId && item.taskId !== currentItem.taskId
+      );
+    });
 
-    if (existingItemIndex !== -1) {
-      if (existingItemIndex !== index) {
-        // An item with the same taskId and billable already exists, discard editedItem
-        Alert.alert(
-          t("validation_error"),
-          t("item_exists", { selectedDate: selectedDateFormatted }),
-          [{ text: t("ok"), style: "cancel" }],
-          { cancelable: false }
-        );
-        return; // Exit the function to prevent further processing
-      } else {
-        // Update existing item
-        items[index] = editedItem;
-      }
+    if (duplicateItemIndex !== -1) {
+      // An item with the same taskId already exists and it's not the same as the edited item
+      Alert.alert(
+        t("validation_error"),
+        t("item_exists", { selectedDate: selectedDateFormatted }),
+        [{ text: t("ok"), style: "cancel" }],
+        { cancelable: false }
+      );
+      return; // Exit the function to prevent further processing
+    } else if (existingItemIndex !== -1) {
+      // Item already exists; update it
+      items[existingItemIndex] = editedItem;
     } else {
-      // Add new item
+      // Item does not exist; add it to the list
       items.push(editedItem);
     }
 
+    // Update the timesheet items map with the new list
     const updatedTimesheetItemsMap = new Map(timesheetItemsMap);
     updatedTimesheetItemsMap.set(selectedDateFormatted, items);
 
     console.debug(
-      `On confirm the items going to be updated on date ${selectedDateFormatted} is/are ${JSON.stringify(
+      `On confirm, the items going to be updated on date ${selectedDateFormatted} are ${JSON.stringify(
         items
       )}`
     );
@@ -1074,7 +1134,7 @@ const TimesheetDetailGeneral = ({
     if (isValid(start)) {
       setSelectedDate(start);
     }
-  }, [tasks]);
+  }, []);
 
   useEffect(() => {
     const formattedDate = selectedDate
@@ -1191,7 +1251,11 @@ const TimesheetDetailGeneral = ({
         </CollapsiblePanel>
       )}
       <View style={styles.dateListContainer}>
-        <Pressable style={styles.dateArrow} onPress={fetchPreviousDates}>
+        <Pressable
+          style={styles.dateArrow}
+          onPress={fetchPreviousDates}
+          disabled={true}
+        >
           <MaterialCommunityIcons
             name="chevron-left"
             size={36}
@@ -1206,7 +1270,11 @@ const TimesheetDetailGeneral = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.dateList}
         />
-        <Pressable style={styles.dateArrow} onPress={fetchNextDates}>
+        <Pressable
+          style={styles.dateArrow}
+          onPress={fetchNextDates}
+          disabled={true}
+        >
           <MaterialCommunityIcons
             name="chevron-right"
             size={36}
@@ -1251,7 +1319,7 @@ const TimesheetDetailGeneral = ({
           timesheetTypeDetails={timesheetTypeDetails}
           onConfirm={handleConfirmEditItem}
           onCancel={handleCancelEditItem}
-          isEditItem={true}
+          isItemEditMode={isItemEditMode}
         />
       )}
     </View>

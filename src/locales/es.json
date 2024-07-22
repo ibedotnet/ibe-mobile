@@ -173,5 +173,5 @@
   "delete_item": "Eliminar ítem",
   "delete_item_confirmation": "¿Estás seguro de que quieres eliminar este ítem?",
   "time_type": "Tipo de Tiempo",
-  "item_exists": "Ya existe un ítem con el mismo taskId y estado de facturación en {{selectedDate}}."
+  "item_exists": "Un artículo con el mismo taskId ya existe el {{selectedDate}}."
 }

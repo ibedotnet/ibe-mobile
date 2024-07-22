@@ -24,13 +24,11 @@ const TimesheetDetailItemEditor = ({
   timesheetTypeDetails,
   onConfirm,
   onCancel,
-  isEditItem,
+  isItemEditMode,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-
   const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
-
   const { itemCommentRequired } = timesheetTypeDetails;
 
   const [editedItem, setEditedItem] = useState({ ...item });
@@ -94,10 +92,10 @@ const TimesheetDetailItemEditor = ({
     const actualTime = calculateActualTime(text, timeUnit);
 
     // Update editedItem with the new actualTime
-    setEditedItem({
-      ...editedItem,
+    setEditedItem((prevItem) => ({
+      ...prevItem,
       actualTime: actualTime,
-    });
+    }));
   };
 
   const handleTimeUnitChange = (value) => {
@@ -107,10 +105,10 @@ const TimesheetDetailItemEditor = ({
     const actualTime = calculateActualTime(timeValue, value);
 
     // Update editedItem with the new actualTime
-    setEditedItem({
-      ...editedItem,
+    setEditedItem((prevItem) => ({
+      ...prevItem,
       actualTime: actualTime,
-    });
+    }));
   };
 
   const handleRemarkChange = (text) => {
@@ -474,11 +472,13 @@ const TimesheetDetailItemEditor = ({
 
   const handleTaskChange = ({ value, label, additionalData }) => {
     const extID = additionalData.extID ?? "";
+    const taskBillable = additionalData.taskBillable ?? false;
 
     console.debug(`Additonal data in task: ${JSON.stringify(additionalData)}`);
 
     setEditedItem({
       ...editedItem,
+      billable: taskBillable,
       taskId: value,
       taskText: label,
       taskExtId: extID,
@@ -522,25 +522,13 @@ const TimesheetDetailItemEditor = ({
     });
   };
 
-  const handleBillableValueChange = (value, editedItem) => {
-    // Determine if the value is billable
-    const billable = value;
-    const productive = billable; // If billable is true, then productive is also true
-    let billableTime = "";
-
-    // Set billableTime based on your logic
-    if (billable) {
-      billableTime = editedItem.actualTime;
-    }
-
-    // Update the state with new values
-    setEditedItem({
-      ...editedItem,
-      billable: billable,
-      productive: productive,
-      billableTime: billableTime,
-    });
-  };
+  useEffect(() => {
+    setEditedItem((prevItem) => ({
+      ...prevItem,
+      productive: prevItem.billable,
+      billableTime: prevItem.billable ? prevItem.actualTime : 0,
+    }));
+  }, [editedItem.billable, editedItem.actualTime]);
 
   return (
     <Modal
@@ -556,7 +544,9 @@ const TimesheetDetailItemEditor = ({
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {isEditItem ? t("timesheet_edit_item") : t("timesheet_create_item")}
+            {isItemEditMode
+              ? t("timesheet_edit_item")
+              : t("timesheet_create_item")}
           </Text>
           <View style={styles.modalInputContainer}>
             <CustomRemotePicker
@@ -619,9 +609,8 @@ const TimesheetDetailItemEditor = ({
               labelItemField={"Task-text:text"}
               valueItemField={"Task-id"}
               additionalFields={[
-                {
-                  extID: "Task-extID",
-                },
+                { extID: "Task-extID" },
+                { taskBillable: "Task-billable" },
                 { taskCustomerId: "Task-customerID" },
                 { taskCustomerExtId: "Task-customerID:Customer-extID" },
                 { taskCustomerText: "Task-customerID:Customer-name-text" },
@@ -671,13 +660,14 @@ const TimesheetDetailItemEditor = ({
             <View>
               <Text style={styles.modalInputLabel}>{t("billable")}</Text>
               <Switch
-                trackColor={{ false: "#767577", true: "#81b0ff" }}
-                thumbColor={editedItem.billable ? "#f5dd4b" : "#f4f3f4"}
-                ios_backgroundColor="#3e3e3e"
+                trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
+                thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
+                ios_backgroundColor="#d3d3d3"
                 value={editedItem.billable}
                 onValueChange={(value) =>
-                  handleBillableValueChange(value, editedItem)
+                  setEditedItem({ ...editedItem, billable: value })
                 }
+                disabled={true}
               />
             </View>
             <View style={[styles.modalInputContainer, styles.flexContainer]}>

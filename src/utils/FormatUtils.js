@@ -371,11 +371,6 @@ const getRemarkText = (remarks, language, preferredLanguages = []) => {
  * @returns {Array} Updated array of remarks with the remark text updated or added.
  */
 const setRemarkText = (remarks = [], language = "en", newText) => {
-  // If newText is empty, return the original remarks array
-  if (!newText) {
-    return remarks;
-  }
-
   // Clone the remarks array to avoid mutating the original state directly
   const updatedRemarks = [...remarks];
 
@@ -387,8 +382,8 @@ const setRemarkText = (remarks = [], language = "en", newText) => {
   if (index !== -1) {
     // Update the existing remark if found
     updatedRemarks[index] = { ...updatedRemarks[index], text: newText };
-  } else {
-    // If remark for the language doesn't exist, create a new one
+  } else if (newText) {
+    // If remark for the language doesn't exist and newText is not empty, create a new one
     updatedRemarks.push({ language, text: newText });
   }
 
