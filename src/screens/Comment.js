@@ -50,18 +50,23 @@ const Comment = ({
     setIsEditModalVisible(true);
   };
 
-  const confirmEditChanges = (value) => {
+  const confirmEditChanges = (values) => {
     setComments((prevComments) => {
+      // Extract the rich text value using the known id
+      const richTextValue = values["richText"] || "";
+
       if (selectedComment) {
+        // Update the existing comment
         return prevComments.map((comment) =>
           comment.id === selectedComment.id
-            ? { ...comment, content: value, isUpdated: true }
+            ? { ...comment, content: richTextValue, isUpdated: true }
             : comment
         );
       } else {
+        // Add a new comment
         const newCommentObj = {
           id: new Date().getTime().toString(),
-          content: value,
+          content: richTextValue,
           isNewlyAdded: true,
         };
         return [newCommentObj, ...prevComments];
@@ -70,6 +75,7 @@ const Comment = ({
 
     console.debug("Comment list after update: " + JSON.stringify(comments));
 
+    // Reset the state and close the modal
     setSelectedComment(null);
     setIsEditModalVisible(false);
   };
@@ -227,8 +233,9 @@ const Comment = ({
         onClose={() => setIsEditModalVisible(false)}
         onConfirm={confirmEditChanges}
         title={selectedComment ? t("edit_comment") : t("add_comment")}
-        initialValue={newComment}
-        isRichText={true}
+        inputsConfigs={[
+          { id: "richText", type: "richText", initialValue: newComment },
+        ]}
       />
       <View style={styles.header}>
         <Text style={styles.countText}>

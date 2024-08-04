@@ -122,9 +122,22 @@ const Login = ({ navigation }) => {
     loggedInUserInfo.personId = data?.User?.[0]?.["Person-id"] ?? "";
     loggedInUserInfo.timeConfirmationType =
       data?.empWorkSchedue?.timeConfirmationType ?? "";
+    loggedInUserInfo.hireDate =
+      data?.User?.[0]?.["Resource-core-hireDate"] ?? null;
+    loggedInUserInfo.hireDate =
+      data?.User?.[0]?.["Resource-core-termDate"] ?? null;
+    loggedInUserInfo.companyId = data?.User?.[0]?.["Resource-companyID"] ?? "";
     loggedInUserInfo.workScheduleExtId = data?.empWorkSchedue?.extID ?? "";
     loggedInUserInfo.dailyStdHours =
       data?.empWorkSchedue?.dailyStdHours ?? 28800000;
+    loggedInUserInfo.stdWorkHours =
+      data?.empWorkSchedue?.stdWorkHours ?? 28800000;
+    loggedInUserInfo.minWorkHours =
+      data?.empWorkSchedue?.minWorkHours ?? 28800000;
+    loggedInUserInfo.maxWorkHours =
+      data?.empWorkSchedue?.maxWorkHours ?? 28800000;
+    loggedInUserInfo.workHoursInterval =
+      data?.empWorkSchedue?.workHoursInterval ?? "week";
     loggedInUserInfo.calendarExtId = data?.empWorkCalendar?.extID ?? "";
     loggedInUserInfo.nonWorkingDates =
       data?.empWorkCalendar?.nonWorkingDates ?? [];
@@ -133,14 +146,26 @@ const Login = ({ navigation }) => {
     loggedInUserInfo.startOfWeek = data?.empWorkCalendar?.startOfWeek ?? 0;
 
     console.debug(
-      `Logged in details
+      `Logged in details:
         user id: ${APP.LOGIN_USER_ID},
         language: ${APP.LOGIN_USER_LANGUAGE},
         client id: ${APP.LOGIN_USER_CLIENT},
         employee id: ${APP.LOGIN_USER_EMPLOYEE_ID},
-        preferred date format: ${APP.LOGIN_USER_DATE_FORMAT}
-        works schedule extid: ${loggedInUserInfo.workScheduleExtId}
-        timesheet type: ${loggedInUserInfo.timeConfirmationType}`
+        preferred date format: ${APP.LOGIN_USER_DATE_FORMAT},
+        person id: ${loggedInUserInfo.personId},
+        time confirmation type: ${loggedInUserInfo.timeConfirmationType},
+        hire date: ${loggedInUserInfo.hireDate},
+        company id: ${loggedInUserInfo.companyId},
+        work schedule ext id: ${loggedInUserInfo.workScheduleExtId},
+        daily std hours: ${loggedInUserInfo.dailyStdHours},
+        std work hours: ${loggedInUserInfo.stdWorkHours},
+        min work hours: ${loggedInUserInfo.minWorkHours},
+        max work hours: ${loggedInUserInfo.maxWorkHours},
+        work hours interval: ${loggedInUserInfo.workHoursInterval},
+        calendar ext id: ${loggedInUserInfo.calendarExtId},
+        non-working dates: ${loggedInUserInfo.nonWorkingDates},
+        non-working days: ${loggedInUserInfo.nonWorkingDays},
+        start of week: ${loggedInUserInfo.startOfWeek}`
     );
   };
 

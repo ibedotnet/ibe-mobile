@@ -214,12 +214,13 @@ const downloadCallback = (
 const handleMediaLibraryAccess = async (downloadPath) => {
   try {
     // Check if permission to access media library is granted
-    const mediaLibraryPermission = await MediaLibrary.getPermissionsAsync();
+    let mediaLibraryPermission = await MediaLibrary.getPermissionsAsync();
     if (!mediaLibraryPermission.granted) {
       // If permission is not granted, request permission
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
-        throw new Error("Permission to access media library is required.");
+        console.warn("Permission to access media library is required.");
+        return null;
       }
     }
 
@@ -378,8 +379,7 @@ const handlePreview = async (
     setIsPreviewModalVisible(true);
     setPreviewFileTitle(item.name);
 
-    if (item["isNewlyAdded"] && item["newlyAddedFileLocalUri"]) {
-      // Set the new file URI for preview
+    if (item["newlyAddedFileLocalUri"]) {
       setPreviewFileUri(item["newlyAddedFileLocalUri"]);
       return;
     }

@@ -48,67 +48,69 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
     ]);
 
     if (!response.ok) {
+      let error;
       switch (response.status) {
         case 400:
-          throw new Error(
+          error = new Error(
             "Bad Request: The request could not be understood or was missing required parameters."
           );
           break;
         case 401:
-          throw new Error(
+          error = new Error(
             "Unauthorized: Authentication failed or user lacks necessary permissions."
           );
           break;
         case 403:
-          throw new Error(
+          error = new Error(
             "Forbidden: The server understood the request, but it refuses to authorize it."
           );
           break;
         case 404:
-          throw new Error(
+          error = new Error(
             "Not Found: The requested resource could not be found."
           );
           break;
         case 409:
-          throw new Error(
+          error = new Error(
             "Conflict: A conflict occurred with the current state of the target resource."
           );
           break;
         case 413:
-          throw new Error(
-            "Payload too large."
-          );
+          error = new Error("Payload too large.");
           break;
         case 429:
-          throw new Error(
+          error = new Error(
             "Too Many Requests: The user has sent too many requests in a given amount of time."
           );
           break;
         case 500:
-          throw new Error(
+          error = new Error(
             "Internal Server Error: The server encountered an unexpected condition."
           );
           break;
         case 502:
-          throw new Error(
+          error = new Error(
             "Bad Gateway: The server, while acting as a gateway or proxy, received an invalid response from an upstream server."
           );
           break;
         case 503:
-          throw new Error(
+          error = new Error(
             "Service Unavailable: The server is not ready to handle the request. Common causes are a server that is down for maintenance or is overloaded."
           );
           break;
         case 504:
-          throw new Error(
+          error = new Error(
             "Gateway Timeout: The server, while acting as a gateway or proxy, did not receive a timely response from an upstream server."
           );
           break;
         default:
-          throw new Error(
+          error = new Error(
             `HTTP error! Status: ${response.status}, Status Text: ${response.statusText}`
           );
       }
+
+      error.status = response.status; // Add the status code to the error object
+      throw error;
     }
 
     const responseText = await response.text();
@@ -117,11 +119,16 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
     const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
 
     if (
-      jsonResponse.hasOwnProperty("success") &&
-      jsonResponse.success === false
+      (jsonResponse.hasOwnProperty("success") &&
+        jsonResponse.success === false) ||
+      (jsonResponse.messages &&
+        jsonResponse.messages.some((msg) => msg.message_type === "error")) ||
+      (jsonResponse.details &&
+        jsonResponse.details.some((detail) => detail.success === false))
     ) {
-      let errorMessage = jsonResponse.errorMessage;
+      let errorMessage = jsonResponse.errorMessage || "";
 
+      // Append additional error details if available
       if (jsonResponse.hasOwnProperty("errorCode")) {
         errorMessage += ` | Code: ${jsonResponse.errorCode}`;
       }
@@ -130,6 +137,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
         errorMessage += ` | Detail: ${jsonResponse.errorDetail}`;
       }
 
+      // Append UI message details if available
       if (
         jsonResponse.hasOwnProperty("ui_message") &&
         jsonResponse.ui_message.hasOwnProperty("message_id") &&
@@ -138,6 +146,32 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
         errorMessage += ` | UI Message ID: ${jsonResponse.ui_message.message_id}, Message Text: ${jsonResponse.ui_message.message_text}`;
       }
 
+      // Filter and join error messages from the messages array
+      const errorMessagesFromMessages =
+        jsonResponse.messages
+          ?.filter((msg) => msg.message_type === "error")
+          .map((msg) => msg.message_text)
+          .join(" | ") || "";
+
+      // Filter and join error messages from the details array
+      const errorMessagesFromDetails =
+        jsonResponse.details
+          ?.filter((detail) => detail.success === false)
+          .flatMap((detail) => detail.messages.map((msg) => msg.message_text))
+          .join(" | ") || "";
+
+      const combinedErrorMessages = [
+        errorMessagesFromMessages,
+        errorMessagesFromDetails,
+      ]
+        .filter(Boolean) // Remove empty strings
+        .join(" | ");
+
+      if (combinedErrorMessages) {
+        errorMessage += `Error: ${combinedErrorMessages}`;
+      }
+
+      // Log the error message and show a toast notification
       console.error(errorMessage);
       showToast(errorMessage, "error");
     }
@@ -571,48 +605,96 @@ const loadMoreData = async (
 };
 
 /**
- * Uploads a binary resource (e.g., image) to the server.
+ * Uploads a binary resource (e.g., image) and creates an attachment entry in the IBE client database.
+ * The function returns the ID of the newly created attachment.
+ *
  * @param {string} imagePath - The local path of the image to be uploaded.
- * @returns {Promise<Object>} - A promise resolving to an object containing uploaded photo and thumbnail IDs.
+ * @param {boolean} fetchNewObjectIds - Whether to fetch new object IDs.
+ * @param {Object} options - Additional options for the upload.
+ * @param {string} [options.type] - The MIME type of the image.
+ * @param {string} [options.name] - The name of the image file.
+ * @param {number} [options.tHeight] - The height of the thumbnail.
+ * @param {number} [options.tWidth] - The width of the thumbnail.
+ * @param {boolean} [options.convertToPng] - Whether to convert the image to PNG.
+ * @param {string} [options.ocrCheck] - The MIME type for OCR check.
+ * @param {Object} [queryParams] - Additional query string parameters.
+ * @param {string} [queryParams.client] - Client information.
+ * @param {boolean} [queryParams.allClient] - All client flag.
+ * @param {string} [queryParams.user] - User information.
+ * @returns {Promise<Object>} - A promise resolving to an object containing uploaded file id and thumbnail IDs.
  */
-const uploadBinaryResource = async (imagePath) => {
+const uploadBinaryResource = async (
+  imagePath,
+  fetchNewObjectIds,
+  { type, name, tHeight, tWidth, convertToPng, ocrCheck } = {},
+  queryParams = {}
+) => {
   try {
-    // Obtain new object IDs from the server
-    const queryStringParams = convertToQueryString({ count: 50 });
-    const objectIds = await fetchData(
-      `${API_ENDPOINTS.NEW_OBJECT_ID}?${queryStringParams}`,
-      "GET"
-    );
+    let photoId = "";
+    let thumbId = "";
 
-    // Check if new object IDs were obtained successfully
-    if (!objectIds || !(objectIds instanceof Array) || objectIds.length === 0) {
-      throw new Error("Failed to obtain new object Id");
+    // Obtain new object IDs from the server if needed
+    if (fetchNewObjectIds) {
+      const objectIdQueryParams = convertToQueryString({ count: 50 });
+      const objectIds = await fetchData(
+        `${API_ENDPOINTS.NEW_OBJECT_ID}?${objectIdQueryParams}`,
+        "GET"
+      );
+
+      // Check if new object IDs were obtained successfully
+      if (
+        !objectIds ||
+        !(objectIds instanceof Array) ||
+        objectIds.length === 0
+      ) {
+        throw new Error("Failed to obtain new object Id");
+      }
+
+      // Extract photo and thumbnail IDs from the obtained object IDs
+      photoId = objectIds[objectIds.length - 1];
+      thumbId = objectIds.length > 1 ? objectIds[objectIds.length - 2] : "";
     }
-
-    // Extract photo and thumbnail IDs from the obtained object IDs
-    const photoId = objectIds[objectIds.length - 1];
-    const thumbId = objectIds.length > 1 ? objectIds[objectIds.length - 2] : "";
 
     // Prepare form data for upload
     const formData = new FormData();
     formData.append("resourceFile", {
       uri: imagePath,
-      type: "image/png",
-      name: "user-photo.jpg",
+      type: type || "image/png",
+      name: name || "user-photo.jpg",
     });
-    formData.append("tHeight", "600");
-    formData.append("tWidth", "400");
-    formData.append("photoID", photoId);
-    formData.append("thumbID", thumbId);
-    formData.append("convertToPng", "true");
 
-    // Upload the binary resource
-    const queryStringParams1 = convertToQueryString({
-      client: APP.LOGIN_USER_CLIENT,
-      allClient: false,
-    });
+    if (tHeight !== undefined) {
+      formData.append("tHeight", tHeight.toString());
+    }
+
+    if (tWidth !== undefined) {
+      formData.append("tWidth", tWidth.toString());
+    }
+
+    if (convertToPng !== undefined) {
+      formData.append("convertToPng", convertToPng.toString());
+    }
+
+    if (ocrCheck !== undefined) {
+      formData.append("ocrCheck", ocrCheck);
+    }
+
+    if (fetchNewObjectIds) {
+      formData.append("photoID", photoId);
+      formData.append("thumbID", thumbId);
+    }
+
+    // Build dynamic query string parameters
+    const dynamicQueryParams = {};
+    if (queryParams.client) dynamicQueryParams.client = queryParams.client;
+    if (queryParams.allClient)
+      dynamicQueryParams.allClient = queryParams.allClient;
+    if (queryParams.user) dynamicQueryParams.user = queryParams.user;
+
+    const uploadQueryParams = convertToQueryString(dynamicQueryParams);
+
     const uploadResourceResponse = await fetchData(
-      `${API_ENDPOINTS.UPLOAD_BINARY_RESOURCE}?${queryStringParams1}`,
+      `${API_ENDPOINTS.UPLOAD_BINARY_RESOURCE}?${uploadQueryParams}`,
       "POST",
       {
         "Content-Type": "multipart/form-data",
@@ -620,25 +702,19 @@ const uploadBinaryResource = async (imagePath) => {
       formData
     );
 
-    // Log upload status and return uploaded photo and thumbnail IDs
-    console.debug(
-      "Binary Resource upload status:",
-      JSON.stringify(uploadResourceResponse)
-    );
-
-    // Check if the upload was successful
     if (!uploadResourceResponse.success) {
       throw new Error("Failed to upload binary resource");
     }
 
     const binaryResource = {
-      photoId: uploadResourceResponse.id,
+      attachmentId: uploadResourceResponse.id,
       thumbId: uploadResourceResponse.thumbID,
     };
 
     return binaryResource;
   } catch (error) {
-    console.error("Error in uploadBinaryResource:", error);
+    console.error("Error uploading binary resource:", error);
+    throw error; // Re-throw the error to be caught by the caller
   }
 };
 

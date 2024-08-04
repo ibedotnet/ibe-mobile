@@ -538,16 +538,12 @@ const TimesheetDetailItemEditor = ({
       onRequestClose={onCancel}
     >
       <View style={styles.modalContainer}>
+        <Text style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
+          {isItemEditMode
+            ? t("timesheet_edit_item")
+            : t("timesheet_create_item")}
+        </Text>
         <ScrollView contentContainerStyle={styles.modalContent}>
-          <Text
-            style={styles.modalTitle}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {isItemEditMode
-              ? t("timesheet_edit_item")
-              : t("timesheet_create_item")}
-          </Text>
           <View style={styles.modalInputContainer}>
             <CustomRemotePicker
               queryParams={{
@@ -729,6 +725,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   modalTitle: {
+    color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 20,

@@ -346,7 +346,12 @@ const formatLeaveDuration = (
  * @param {Array} preferredLanguages - Array of fallback language codes.
  * @returns {string} The text of the remark in the specified language, or an empty string if not found.
  */
-const getRemarkText = (remarks, language, preferredLanguages = []) => {
+const getRemarkText = (remarks = [], language, preferredLanguages = []) => {
+  // Ensure remarks is an array
+  if (!Array.isArray(remarks)) {
+    return "";
+  }
+
   // Combine primary language and preferred languages for search
   const searchLanguages = [language, ...preferredLanguages];
 
@@ -357,6 +362,80 @@ const getRemarkText = (remarks, language, preferredLanguages = []) => {
 
   // Return the text of the found remark or an empty string if not found
   return remark ? remark.text : "";
+};
+
+/**
+ * Normalizes a given date by setting its time according to the specified default time.
+ *
+ * @param {Date | string | null} base - The base date to normalize. If null, the current date is used. If a string is provided, it will be parsed into a Date object.
+ * @param {string} [defaultTime='date'] - Specifies how to set the time:
+ *   'date' - Sets the time to 12:00:00 GMT.
+ *   'timeFrom' - Sets the time to 00:00:00.
+ *   'timeTo' - Sets the time to 23:59:59.
+ *   'now' - Sets the time to the current time for today only, otherwise sets to 12:00:00.
+ * @param {boolean} [nowTimeForTodayOnly=false] - If true, sets the time to the current time for today only.
+ * @returns {Date | null} The normalized date, or null if the base date is invalid.
+ */
+const normalizeDateToUTC = (
+  base = new Date(),
+  defaultTime = "date",
+  nowTimeForTodayOnly = false
+) => {
+  if (typeof base === "string") {
+    base = new Date(base);
+  }
+
+  if (isNaN(base) || !isFinite(base)) return null;
+
+  const setMidday = (date) =>
+    new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0)
+    );
+  const setStartOfDay = (date) =>
+    new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0)
+    );
+  const setEndOfDay = (date) =>
+    new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59)
+    );
+  const setCurrentTime = (date, current) =>
+    new Date(
+      Date.UTC(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        current.getUTCHours(),
+        current.getUTCMinutes(),
+        current.getUTCSeconds(),
+        current.getUTCMilliseconds()
+      )
+    );
+
+  let date;
+  switch (defaultTime) {
+    case "timeFrom":
+      date = setStartOfDay(base);
+      break;
+    case "timeTo":
+      date = setEndOfDay(base);
+      break;
+    case "now":
+      if (nowTimeForTodayOnly) {
+        const today = new Date();
+        if (today.toDateString() === base.toDateString()) {
+          date = setCurrentTime(base, today);
+        } else {
+          date = setMidday(base);
+        }
+      } else {
+        date = setCurrentTime(base, new Date());
+      }
+      break;
+    default:
+      date = setMidday(base);
+  }
+  return date;
 };
 
 /**
@@ -501,6 +580,7 @@ export {
   convertToMilliseconds,
   formatLeaveDuration,
   getRemarkText,
+  normalizeDateToUTC,
   setRemarkText,
   isEqual,
   makeFirstLetterLowercase,

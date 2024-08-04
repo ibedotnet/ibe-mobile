@@ -35,7 +35,8 @@ if (!isRunningInExpoGo) {
   // The react-native-pdf package is a native module, which means it requires native code to work.
   // Expo Go does not support installing native modules yet. This is why the react-native-pdf package won’t work in the Expo Go app.
   // We will conditionally run in development build method. If not in Expo Go, conditionally import react-native-pdf.
-  Pdf = require("react-native-pdf").default;
+  
+  //Pdf = require("react-native-pdf").default; // TODO: Find an alternative package or solution.
 }
 
 /**
@@ -164,7 +165,7 @@ const PreviewDialog = ({
         </GestureDetector>
       </View>
     );
-  } else if (fileType === "pdf" && !isRunningInExpoGo) {
+  } else if (Pdf && fileType === "pdf" && !isRunningInExpoGo) {
     content = (
       <Pdf
         source={{ uri: fileUri }}

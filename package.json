@@ -42,7 +42,6 @@
     "react-native": "0.74.1",
     "react-native-gesture-handler": "~2.16.1",
     "react-native-pager-view": "6.3.0",
-    "react-native-pdf": "^6.7.5",
     "react-native-pell-rich-editor": "^1.9.0",
     "react-native-reanimated": "~3.10.1",
     "react-native-root-siblings": "^5.0.1",

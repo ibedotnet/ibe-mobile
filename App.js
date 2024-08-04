@@ -19,6 +19,11 @@ import {
   TimesheetForceRefreshProvider,
 } from "./context/ForceRefreshContext";
 import { RequestQueueProvider } from "./context/RequestQueueContext";
+import {
+  AbsenceSaveProvider,
+  ExpenseSaveProvider,
+  TimesheetSaveProvider,
+} from "./context/SaveContext";
 
 /**
  * Function to get the initial language of the device/platform.
@@ -82,16 +87,27 @@ const App = () => {
         <LoggedInUserInfoProvider>
           {/* ConnectivityProvider and RequestQueueProvider wrap the MainNavigator to provide access to their respective contexts */}
           <ConnectivityProvider>
+            {/**
+             * TimesheetSaveProvider: Manages the save state related to the Timesheet module.
+             * - ExpenseSaveProvider: Manages the save state related to the Expense module.
+             * - AbsenceSaveProvider: Manages the save state related to the Absence module.
+             */}
             <RequestQueueProvider>
-              {/* TimesheetForceRefreshProvider, ExpenseForceRefreshProvider, and AbsenceForceRefreshProvider are context providers wrapping MainNavigator */}
-              <TimesheetForceRefreshProvider>
-                <ExpenseForceRefreshProvider>
-                  <AbsenceForceRefreshProvider>
-                    {/* MainNavigator is the main navigation component */}
-                    <MainNavigator />
-                  </AbsenceForceRefreshProvider>
-                </ExpenseForceRefreshProvider>
-              </TimesheetForceRefreshProvider>
+              <TimesheetSaveProvider>
+                <ExpenseSaveProvider>
+                  <AbsenceSaveProvider>
+                    {/* TimesheetForceRefreshProvider, ExpenseForceRefreshProvider, and AbsenceForceRefreshProvider are context providers wrapping MainNavigator */}
+                    <TimesheetForceRefreshProvider>
+                      <ExpenseForceRefreshProvider>
+                        <AbsenceForceRefreshProvider>
+                          {/* MainNavigator is the main navigation component */}
+                          <MainNavigator />
+                        </AbsenceForceRefreshProvider>
+                      </ExpenseForceRefreshProvider>
+                    </TimesheetForceRefreshProvider>
+                  </AbsenceSaveProvider>
+                </ExpenseSaveProvider>
+              </TimesheetSaveProvider>
             </RequestQueueProvider>
             {/* Render OfflineView component */}
             {<OfflineView />}

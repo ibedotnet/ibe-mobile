@@ -7,7 +7,13 @@ import { RichEditor } from "react-native-pell-rich-editor";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants";
+import {
+  API_ENDPOINTS,
+  APP,
+  BUSOBJCATMAP,
+  INTSTATUS,
+  TEST_MODE,
+} from "../constants";
 
 import { format } from "date-fns";
 import { fetchData } from "../utils/APIUtils";
@@ -119,7 +125,7 @@ const History = ({ busObjCat, busObjID }) => {
       type: typeFilterValue ? typeFilterValue : "",
       dateEvent: dateEvent,
       personEvent: userFilterValue ? userFilterValue : "",
-      busObjCat: busObjCat,
+      busObjCat: BUSOBJCATMAP[busObjCat],
     },
   });
 

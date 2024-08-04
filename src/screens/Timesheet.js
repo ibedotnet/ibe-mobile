@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Button,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -11,9 +14,21 @@ import { useTranslation } from "react-i18next";
 
 import { format, isValid } from "date-fns";
 
-import { APP, BUSOBJCAT, DOUBLE_CLICK_DELTA, PAGE_SIZE } from "../constants";
+import {
+  API_ENDPOINTS,
+  APP,
+  BUSOBJCAT,
+  DOUBLE_CLICK_DELTA,
+  PAGE_SIZE,
+  TEST_MODE,
+} from "../constants";
 
-import { fetchBusObjCatData, loadMoreData } from "../utils/APIUtils";
+import {
+  fetchBusObjCatData,
+  fetchData,
+  getAppName,
+  loadMoreData,
+} from "../utils/APIUtils";
 import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
 import {
   convertMillisecondsToUnit,
@@ -23,6 +38,7 @@ import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 
 import CustomButton from "../components/CustomButton";
+import CustomDateTimePicker from "../components/CustomDateTimePicker";
 import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
@@ -43,6 +59,8 @@ const Timesheet = ({ route, navigation }) => {
   // which is accessing the TimesheetForceRefreshContext.
   const { forceRefresh, updateForceRefresh } = useTimesheetForceRefresh();
 
+  const navigationTimeoutRef = useRef(null); // Ref to store the timeout ID
+
   // State variables
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +75,211 @@ const Timesheet = ({ route, navigation }) => {
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
   const [lastPress, setLastPress] = useState(0);
+
+  const [isModalVisibleInCreate, setModalVisibleInCreate] = useState(false);
+  const [selectedDateInCreate, setSelectedDateInCreate] = useState(new Date()); // Default to today's date
+  const [isLoadingInCreate, setIsLoadingInCreate] = useState(false); // To track if a network call is in progress
+  const [errorMessageInCreate, setErrorMessageInCreate] = useState(null);
+  const [infoMessageInCreate, setInfoMessageInCreate] = useState(null);
+
+  /**
+   * Opens the modal for creating a timesheet entry.
+   */
+  const showCreateTimesheetPopup = () => {
+    setModalVisibleInCreate(true);
+  };
+
+  /**
+   * Updates the selected date when the user picks a date.
+   * @param {Date} date - The newly selected date.
+   */
+  const handleDateChangeInCreate = (date) => {
+    setSelectedDateInCreate(date);
+  };
+
+  /**
+   * Sets an error message to be displayed and clears any informational message.
+   * @param {string} message - The error message to display.
+   */
+  const showErrorInCreate = (message) => {
+    setErrorMessageInCreate(message);
+    setInfoMessageInCreate(null); // Clear info message
+  };
+
+  /**
+   * Sets an informational message to be displayed and clears any error message.
+   * @param {string} message - The informational message to display.
+   */
+  const showInfoInCreate = (message) => {
+    setInfoMessageInCreate(message);
+    setErrorMessageInCreate(null); // Clear error message
+  };
+
+  /**
+   * Checks if a timesheet exists for the given date.
+   * @param {Date} date - The date to check.
+   * @returns {Promise<Object>} - The response object containing the result.
+   */
+  const checkTimesheetExistsForDate = async (date) => {
+    showInfoInCreate(t("checking_timesheet"));
+
+    const formattedDate = date.toISOString();
+
+    // Define query fields to fetch time confirmation data
+    const queryFields = {
+      fields: [
+        "TimeConfirmation-id",
+        "TimeConfirmation-start",
+        "TimeConfirmation-end",
+        "TimeConfirmation-employeeID",
+        "TimeConfirmation-extStatus",
+        "TimeConfirmation-extStatus-processTemplateID",
+      ],
+      where: [
+        {
+          fieldName: "TimeConfirmation-employeeID",
+          operator: "=",
+          value: APP.LOGIN_USER_EMPLOYEE_ID,
+        },
+        {
+          fieldName: "TimeConfirmation-start",
+          operator: "<=",
+          value: formattedDate,
+        },
+        {
+          fieldName: "TimeConfirmation-end",
+          operator: ">=",
+          value: formattedDate,
+        },
+      ],
+    };
+
+    // Define common query parameters
+    const commonQueryParams = {
+      testMode: TEST_MODE,
+      client: parseInt(APP.LOGIN_USER_CLIENT),
+      user: APP.LOGIN_USER_ID,
+      userID: APP.LOGIN_USER_ID,
+      appName: JSON.stringify(getAppName(BUSOBJCAT.TIMESHEET)),
+      language: APP.LOGIN_USER_LANGUAGE,
+      intStatus: JSON.stringify([0, 1, 2]),
+    };
+
+    // Construct form data for the request
+    const formData = {
+      query: JSON.stringify(queryFields),
+      ...commonQueryParams,
+    };
+
+    try {
+      // Fetch data from the server
+      const response = await fetchData(
+        API_ENDPOINTS.QUERY,
+        "POST",
+        {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        new URLSearchParams(formData).toString()
+      );
+
+      // Process the response if successful and data is available
+      if (
+        response.success === true &&
+        response.data &&
+        response.data instanceof Array &&
+        response.data.length > 0
+      ) {
+        // Map fetched time confirmations to desired format
+        const fetchedTimeConfirmation = response.data.map((confirmation) => {
+          const id = confirmation["TimeConfirmation-id"];
+          const start = confirmation["TimeConfirmation-start"];
+          const end = confirmation["TimeConfirmation-end"];
+          const employeeID = confirmation["TimeConfirmation-employeeID"];
+          const statusTemplateExtId =
+            confirmation["TimeConfirmation-extStatus-processTemplateID"];
+          return {
+            id,
+            start,
+            end,
+            employeeID,
+            statusTemplateExtId,
+          };
+        });
+
+        return { exists: true, data: fetchedTimeConfirmation };
+      } else {
+        return { exists: false, data: [] };
+      }
+    } catch (error) {
+      console.error("Error checking timesheet existence:", error);
+      throw error;
+    } finally {
+      showInfoInCreate(null);
+    }
+  };
+
+  /**
+   * Handles the confirmation of the timesheet creation.
+   * Validates the date, performs a network call, and shows appropriate messages.
+   */
+  const handleConfirmInCreate = async () => {
+    if (!selectedDateInCreate) {
+      showErrorInCreate(t("date_cannot_be_empty")); // Show error if date is empty
+      return;
+    }
+
+    setIsLoadingInCreate(true); // Indicate that network call is in progress
+
+    try {
+      // Make network call to check if timesheet exists for the selected date
+      const response = await checkTimesheetExistsForDate(selectedDateInCreate);
+
+      const handleNavigation = () => {
+        setIsLoadingInCreate(false);
+        handleCloseModalInCreate();
+
+        if (response.exists) {
+          navigation.navigate("TimesheetDetail", {
+            timesheetId: response.data[0].id,
+            statusTemplateExtId: response.data[0].statusTemplateExtId,
+          });
+        } else {
+          navigation.navigate("TimesheetDetail", {
+            selectedDate: selectedDateInCreate.toISOString(),
+          });
+        }
+      };
+
+      if (response.exists) {
+        showInfoInCreate(t("info_timesheet_exists"));
+      } else {
+        showInfoInCreate(t("info_timesheet_not_exists"));
+      }
+
+      // Set a timeout for 3 seconds before navigating
+      navigationTimeoutRef.current = setTimeout(handleNavigation, 3000);
+    } catch (error) {
+      setIsLoadingInCreate(false);
+      console.error("Error checking timesheet existence:", error);
+      showErrorInCreate(t("error_checking_timesheet"));
+    }
+  };
+
+  /**
+   * Closes the modal and clears any displayed messages.
+   */
+  const handleCloseModalInCreate = () => {
+    setModalVisibleInCreate(false);
+    setErrorMessageInCreate(null); // Clear error message
+    setInfoMessageInCreate(null); // Clear informational message
+    setSelectedDateInCreate(new Date()); // Reset selected date
+    setIsLoadingInCreate(false); // Reset loading state when closing the modal
+
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current); // Clear the timeout if it exists
+      navigationTimeoutRef.current = null; // Reset the timeout variable
+    }
+  };
 
   /**
    * Toggle the expansion state of an item and display additional data if available.
@@ -257,14 +480,6 @@ const Timesheet = ({ route, navigation }) => {
   };
 
   /**
-   * Navigate to the timesheet creation screen.
-   */
-  const navigateToTimesheetDetail = () => {
-    // Navigate to the new screen
-    navigation.navigate("TimesheetDetail");
-  };
-
-  /**
    * Rendered component for the left side of the header.
    */
   const headerLeft = () => {
@@ -291,7 +506,7 @@ const Timesheet = ({ route, navigation }) => {
     return (
       <View style={styles.headerRightContainer}>
         <CustomButton
-          onPress={navigateToTimesheetDetail}
+          onPress={showCreateTimesheetPopup}
           label=""
           icon={{
             name: "add-circle-sharp",
@@ -537,6 +752,49 @@ const Timesheet = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
+      {/* Modal for date selection */}
+      <Modal
+        transparent={true}
+        visible={isModalVisibleInCreate}
+        onRequestClose={handleCloseModalInCreate}
+      >
+        <View style={styles.modalOverlayInCreate}>
+          <View style={styles.modalContentInCreate}>
+            <Text style={styles.instructionTextInCreate}>
+              {t("please_select_timesheet_create_date")}
+            </Text>
+            <CustomDateTimePicker
+              placeholder={t("selected")}
+              initialValue={selectedDateInCreate}
+              onFilter={handleDateChangeInCreate}
+              isTimePickerVisible={false}
+              isDisabled={false}
+              showClearButton={false}
+            />
+            {errorMessageInCreate && (
+              <Text style={styles.errorMessageInCreate}>
+                {errorMessageInCreate}
+              </Text>
+            )}
+            {infoMessageInCreate && (
+              <Text style={styles.infoMessageInCreate}>
+                {infoMessageInCreate}
+              </Text>
+            )}
+            {isLoadingInCreate && (
+              <ActivityIndicator size="small" color="#0000ff" />
+            )}
+            <View style={styles.buttonContainerInCreate}>
+              <Button
+                title={t("confirm")}
+                onPress={handleConfirmInCreate}
+                disabled={isLoadingInCreate}
+              />
+              <Button title={t("cancel")} onPress={handleCloseModalInCreate} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -640,6 +898,43 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   additionalDataValue: {},
+  modalOverlayInCreate: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContentInCreate: {
+    width: "90%",
+    backgroundColor: "#fff",
+    padding: "4%",
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  instructionTextInCreate: {
+    fontSize: 16,
+    color: "black",
+    marginBottom: "8%",
+    textAlign: "center",
+  },
+  buttonContainerInCreate: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginTop: "8%",
+  },
+  errorMessageInCreate: {
+    color: "#f00",
+    marginVertical: "8%",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  infoMessageInCreate: {
+    color: "#00f",
+    marginVertical: "8%",
+    fontSize: 16,
+    textAlign: "center",
+  },
 });
 
 export default Timesheet;

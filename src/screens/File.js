@@ -10,7 +10,12 @@ import ConfirmationDialog from "../components/dialogs/ConfimationDialog";
 import EditDialog from "../components/dialogs/EditDialog";
 import PreviewDialog from "../components/dialogs/PreviewDialog";
 
-import { fetchData } from "../utils/APIUtils";
+import {
+  fetchData,
+  getAppName,
+  isDoNotReplaceAnyList,
+  uploadBinaryResource,
+} from "../utils/APIUtils";
 import { handleDownload, handlePreview } from "../utils/FileUtils";
 import {
   convertBytesToMegaBytes,
@@ -18,10 +23,12 @@ import {
 } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
+import updateFields from "../utils/UpdateUtils";
 
 import {
   API_ENDPOINTS,
   APP,
+  BUSOBJCATMAP,
   INTSTATUS,
   MAX_UPLOAD_FILE_SIZE,
   TEST_MODE,
@@ -41,8 +48,10 @@ const File = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const [files, setFiles] = useState([]);
+  const [isFilesDirty, setIsFilesDirty] = useState(false);
 
   // State variables for modal
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -63,6 +72,228 @@ const File = ({
   const [previewFileUri, setPreviewFileUri] = useState(null);
 
   const maxUploadFileSizeInBytes = MAX_UPLOAD_FILE_SIZE * 1024 * 1024; // MAX_UPLOAD_FILE_SIZE in bytes
+
+  // Effect to handle file processing
+  useEffect(() => {
+    if (isFilesDirty) {
+      processFiles(files);
+    }
+  }, [files, isFilesDirty]);
+
+  /**
+   * Asynchronous function to process files based on their status
+   * @param {Array} files - List of files to be processed
+   */
+  const processFiles = async (files) => {
+    let updateParams = {}; // Parameters for updating file details
+
+    // Create a copy of the files array to avoid mutation issues while iterating
+    let filesToProcess = [...files];
+
+    for (const file of filesToProcess) {
+      try {
+        setIsUpdating(true);
+
+        if (file.isNewlyAdded) {
+          // Upload newly added files
+          const newlyAddedAttachment = await uploadBinaryResource(
+            file.newlyAddedFileLocalUri,
+            false, // Fetch new object IDs
+            {
+              name: file.name,
+              tHeight: 175,
+              tWidth: 250,
+              ocrCheck: file.mimeType,
+            },
+            {
+              client: APP.LOGIN_USER_CLIENT,
+              user: APP.LOGIN_USER_ID,
+            }
+          );
+
+          if (!newlyAddedAttachment || !newlyAddedAttachment.attachmentId) {
+            return;
+          }
+
+          // Set update parameters for the newly added file
+          updateParams[`Attachment-thumbnail`] = newlyAddedAttachment.thumbID;
+          updateParams[`Attachment-busObjs`] = {
+            busObjCat: BUSOBJCATMAP[busObjCat],
+            iD: file.busObjId,
+          };
+          updateParams[`Attachment-createdOn`] = new Date();
+          updateParams[`Attachment-intStatus`] = 0;
+          if (file.mimeType) {
+            updateParams[`Attachment-mIMEtype`] = file.mimeType;
+          }
+          updateParams[`Attachment-sourceFile`] = file.name;
+          updateParams[`Attachment-text:text`] = file.name;
+          if (file.attachmentType) {
+            updateParams[`Attachment-type`] = file.attachmentType;
+          }
+          updateParams[`isLinked`] = true;
+
+          file.id = newlyAddedAttachment.attachmentId; // Update the file id with the created attachment id
+
+          // Call the function to handle file update with the new attachment ID
+          await handleFileUpdate(
+            newlyAddedAttachment.attachmentId,
+            updateParams
+          );
+
+          // Set the isNewlyAdded flag to false after successful upload
+          setFiles((prevFiles) =>
+            prevFiles.map((f) =>
+              f.id === file.id ? { ...f, isNewlyAdded: false } : f
+            )
+          );
+
+          // Call the function to update attachment ID in files of busObjCat
+          await updateBusObjCat();
+        } else if (file.isUpdated) {
+          // Update existing files
+          updateParams[`Attachment-sourceFile`] = file.name;
+          updateParams[`Attachment-text:text`] = file.name;
+          if (file.attachmentType) {
+            updateParams[`Attachment-type`] = file.attachmentType;
+          }
+
+          // Call the function to handle file update with the existing attachment ID
+          await handleFileUpdate(file.id, updateParams);
+
+          // Set the isUpdated flag to false after successful update
+          setFiles((prevFiles) =>
+            prevFiles.map((f) =>
+              f.id === file.id ? { ...f, isUpdated: false } : f
+            )
+          );
+        } else if (file.isDeleted) {
+          // Mark files as deleted
+          updateParams[`Attachment-intStatus`] = 3;
+
+          // Call the function to handle file update with the existing attachment ID
+          await handleFileUpdate(file.id, updateParams);
+
+          // Remove the deleted file from the array based on file id
+          const updatedFiles = files.filter((f) => f.id !== file.id);
+          setFiles(updatedFiles);
+        }
+      } catch (error) {
+        // Handle specific error codes and show appropriate messages
+        if (error.status === 413) {
+          // Remove the file from the array if error code 413 occurs
+          const updatedFiles = files.filter((f) => f.id !== file.id);
+          setFiles(updatedFiles);
+
+          console.error("Payload too large. Please upload a smaller file.");
+          showToast(t("upload_error_413"), "error");
+        } else {
+          console.error("Error in pickFile method of File:", error);
+          showToast(`${t("failed_upload_file")}: ${file.name}`, "error");
+        }
+      } finally {
+        setIsUpdating(false);
+        setIsFilesDirty(false);
+      }
+    }
+  };
+
+  /**
+   * Asynchronous function to handle file update
+   * @param {string} attachmentId - ID of the attachment to be updated
+   * @param {Object} updateParams - Parameters for updating the file
+   */
+  const handleFileUpdate = async (attachmentId, updateParams) => {
+    if (!attachmentId) {
+      return;
+    }
+
+    try {
+      // Prepare form data for the update
+      let formData = {
+        data: {
+          [`Attachment-id`]: attachmentId,
+          ...updateParams,
+        },
+      };
+
+      // Prepare query string parameters for the update request
+      const queryStringParams = {
+        userID: APP.LOGIN_USER_ID,
+        client: APP.LOGIN_USER_CLIENT,
+        language: APP.LOGIN_USER_LANGUAGE,
+        testMode: TEST_MODE,
+        component: "platform",
+        doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
+        appName: JSON.stringify(getAppName(busObjCat)),
+      };
+
+      // Call the updateFields function to perform the update
+      const updateResponse = await updateFields(formData, queryStringParams);
+
+      // Show appropriate messages based on the update response
+      if (!updateResponse.success) {
+        showToast(t("update_failure"), "error");
+      }
+
+      if (updateResponse.message) {
+        showToast(updateResponse.message);
+      }
+    } catch (error) {
+      // Handle errors that occur during the file update
+      console.error("Error in handleFileUpdate:", error);
+      showToast(t("failed_update_file"), "error");
+    }
+  };
+
+  /**
+   * Asynchronous function to update the business object category with the file IDs.
+   *
+   * @async
+   * @function
+   * @param {Array} [files=[]] - List of files to be included in the update. Each file should have an `id` property.
+   * @throws {Error} Throws an error if the update process fails.
+   */
+  const updateBusObjCat = async () => {
+    try {
+      // Collect file IDs into an array. Defaults to an empty array if no files are provided.
+      const fileIds = files.length > 0 ? files.map((file) => file.id) : [];
+
+      // Prepare form data for the update request.
+      let formData = {
+        data: {
+          [`${BUSOBJCATMAP[busObjCat]}-id`]: busObjId, // Business object ID to be updated
+          [`${BUSOBJCATMAP[busObjCat]}-files`]: fileIds, // Array of file IDs to be associated with the business object
+        },
+      };
+
+      // Prepare query string parameters for the update request.
+      const queryStringParams = {
+        userID: APP.LOGIN_USER_ID,
+        client: APP.LOGIN_USER_CLIENT,
+        language: APP.LOGIN_USER_LANGUAGE,
+        testMode: TEST_MODE,
+        component: "platform",
+        doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
+        appName: JSON.stringify(getAppName(busObjCat)),
+      };
+
+      // Call the updateFields function to perform the update request.
+      const updateResponse = await updateFields(formData, queryStringParams);
+
+      if (!updateResponse.success) {
+        showToast(t("update_failure"), "error"); // Show error message if the update fails
+      }
+
+      if (updateResponse.message) {
+        showToast(updateResponse.message); // Show success or informational message
+      }
+    } catch (error) {
+      // Handle errors that occur during the file update process.
+      console.error("Error in updateBusObjCat:", error);
+      showToast(t("failed_upload_file"), "error"); // Show error message for failed file update
+    }
+  };
 
   /**
    * Asynchronous function to handle picking files from the device.
@@ -149,6 +380,8 @@ const File = ({
             "warning"
           );
         }
+
+        setIsFilesDirty(true);
       } else {
         // File picking failed for some reason
         console.debug("File picking failed");
@@ -171,24 +404,79 @@ const File = ({
     setSelectedFile(null);
   };
 
-  // Function to confirm changes made in modal
-  const confirmEditChanges = (value) => {
-    // Update file name in files array and mark as updated
-    setFiles((prevFiles) =>
-      prevFiles.map((file) =>
-        file.id === selectedFile.id
-          ? { ...file, name: value, isUpdated: true }
-          : file
-      )
-    );
+  /**
+   * Handles the confirmation of changes made in the EditDialog modal.
+   *
+   * This function updates the file details in the `files` state based on the provided values from the modal.
+   * It extracts the `fileName` and `fileType` from the `values` object and updates the corresponding file
+   * entry in the `files` array. If a file with the matching `id` is found, its details are updated and marked as
+   * updated. The function also sets a flag to indicate that changes have been made and closes the modal.
+   *
+   * @param {Object} values - The values from the EditDialog modal.
+   * @param {string} values.fileName - The updated name of the file.
+   * @param {Object} values.fileType - The updated type of the file, with label and value properties.
+   *
+   * @returns {void}
+   */
+  const confirmEditChanges = (values) => {
+    // Extract the values from the input IDs
+    const fileName = values["fileName"] || "";
+    const fileType = values["fileType"] || {}; // fileType is an object with label and value properties
+
+    // Extract the current values of the selected file
+    const currentFile = selectedFile || {};
+    const currentFileName = currentFile.name || "";
+    const currentFileType = currentFile.attachmentType || "";
+
+    // Check if the values have changed
+    const isFileNameChanged = fileName !== currentFileName;
+    const isFileTypeChanged =
+      fileType.value && fileType.value !== currentFileType;
+
+    // Update the files state only if there are changes
+    if (isFileNameChanged || isFileTypeChanged) {
+      setFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.id === selectedFile.id
+            ? {
+                ...file,
+                name: fileName,
+                attachmentType: fileType.value
+                  ? fileType.value
+                  : file.attachmentType,
+                attachmentTypeName: fileType.label
+                  ? fileType.label
+                  : file.attachmentTypeName,
+                isUpdated: true,
+              }
+            : file
+        )
+      );
+
+      setIsFilesDirty(true);
+    }
 
     closeEditModal();
   };
 
-  const validateFilename = (value) => {
+  /**
+   * Validates the file name input.
+   *
+   * This function performs validation checks on the file name provided in the input values.
+   * It checks for the following:
+   * - Whether the file name is empty.
+   * - Whether the file name consists only of a file extension.
+   * - Whether the file extension is among the supported valid extensions.
+   *
+   * @param {Object} values - An object containing input values, where the file name can be accessed using the key "fileName".
+   * @returns {string|null} - Returns a validation error message if the file name is invalid; otherwise, returns null if the input is valid.
+   */
+  const validateFileName = (values) => {
+    const value = values["fileName"] || "";
+
     // Check if the input value is empty
     if (!value.trim()) {
-      return "No filename provided.";
+      return t("no_filename_provided");
     }
 
     // Get the file extension from the input value
@@ -196,15 +484,14 @@ const File = ({
 
     // Check if the file extension is empty or same as the input value (only extension provided)
     if (fileExtension === value.toLowerCase()) {
-      return "Filename cannot consist only of an extension.";
+      return t("filename_cannot_consist_of_extension");
     }
 
     // Check if the file extension is valid
     if (!VALID_FILE_EXTENSIONS.includes(fileExtension)) {
-      return (
-        "Invalid file extension. Supported extensions are: " +
-        VALID_FILE_EXTENSIONS.join(", ")
-      );
+      return t("invalid_file_extension", {
+        extensions: VALID_FILE_EXTENSIONS.join(", "),
+      });
     }
 
     return null; // Return null if input is valid
@@ -216,14 +503,14 @@ const File = ({
 
   // Function to confirm file deletion
   const confirmDelete = () => {
-    // Mark the file to be deleted as 'isDeleted: true' and filter it out
-    const updatedFiles = files
-      .map((file) =>
-        file.id === fileToDelete.id ? { ...file, isDeleted: true } : file
-      )
-      .filter((file) => file.id !== fileToDelete.id);
+    // Mark the file to be deleted as 'isDeleted: true'
+    const updatedFiles = files.map((file) =>
+      file.id === fileToDelete.id ? { ...file, isDeleted: true } : file
+    );
 
     setFiles(updatedFiles);
+
+    setIsFilesDirty(true);
 
     setIsDeleteConfirmationVisible(false);
   };
@@ -266,6 +553,7 @@ const File = ({
           fields: [
             "Attachment-id",
             "Attachment-type",
+            "Attachment-type:AttachmentType-name",
             "Attachment-thumbnail",
             "Attachment-original",
             "Attachment-sourceFile",
@@ -322,12 +610,14 @@ const File = ({
           // Map fetched files metadata to desired format
           const fetchedFile = response.data.map((file) => {
             const id = file["Attachment-id"];
-            const type = file["Attachment-type"];
+            const attachmentType = file["Attachment-type"];
+            const attachmentTypeName =
+              file["Attachment-type:AttachmentType-name"];
             const mimeType =
               file["Attachment-mIMEtype"] &&
               file["Attachment-mIMEtype"].length < 30
                 ? file["Attachment-mIMEtype"]
-                : type;
+                : "image/png";
             const name = file["Attachment-sourceFile"];
             const original = file["Attachment-original"];
             const thumbnail = file["Attachment-thumbnail"];
@@ -342,7 +632,8 @@ const File = ({
 
             return {
               id,
-              type,
+              attachmentType,
+              attachmentTypeName,
               mimeType,
               name,
               original,
@@ -415,7 +706,6 @@ const File = ({
             {item.mimeType} {item.size && "|"}{" "}
             {item.size && convertBytesToMegaBytes(item.size)}
           </Text>
-
           {item.createdOn && (
             <Text style={styles.fileItemThirdRow}>
               {t("created_on")} {item.createdOn}
@@ -424,6 +714,11 @@ const File = ({
           {item.createdBy && (
             <Text numberOfLines={1} ellipsizeMode="tail">
               {t("created_by")} {item.createdBy}
+            </Text>
+          )}
+          {item.attachmentType && (
+            <Text numberOfLines={1} ellipsizeMode="tail">
+              {item.attachmentTypeName ?? item.attachmentType}
             </Text>
           )}
         </View>
@@ -466,7 +761,7 @@ const File = ({
             }}
             label=""
             backgroundColor={false}
-            disabled={loading || item.isDownloading || item.isNewlyAdded}
+            disabled={loading || item.isDownloading}
           />
         </View>
         {/* Progress bar for download */}
@@ -497,9 +792,62 @@ const File = ({
         isVisible={isEditModalVisible}
         onClose={closeEditModal}
         onConfirm={confirmEditChanges}
-        validateInput={validateFilename}
         title={t("edit_file_name")}
-        initialValue={selectedFile ? selectedFile.name : ""}
+        inputsConfigs={[
+          {
+            id: "fileName",
+            type: "text",
+            initialValue: selectedFile ? selectedFile.name : "",
+            validateInput: validateFileName,
+          },
+          {
+            id: "fileType",
+            type: "dropdown",
+            allowBlank: true,
+            queryFields: {
+              fields: [
+                "AttachmentType-id",
+                "AttachmentType-extID",
+                "AttachmentType-name",
+              ],
+              where: [
+                {
+                  fieldName: "AttachmentType-busObjCat",
+                  operator: "=",
+                  value: "AttachmentType",
+                },
+              ],
+              sort: [
+                {
+                  property: "AttachmentType-name",
+                  direction: "ASC",
+                },
+              ],
+            },
+            commonQueryParams: {
+              filterQueryValue: "",
+              userID: APP.LOGIN_USER_ID,
+              client: parseInt(APP.LOGIN_USER_CLIENT),
+              language: APP.LOGIN_USER_LANGUAGE,
+              testMode: "",
+              appName: JSON.stringify(getAppName(busObjCat)),
+              intStatus: JSON.stringify([INTSTATUS.ACTIVE, 1]),
+              page: 1,
+              start: 0,
+              limit: 20,
+            },
+            pickerLabel: t("type"),
+            initialAdditionalLabel: "",
+            initialItemLabel: selectedFile
+              ? selectedFile.attachmentTypeName
+              : "",
+            initialItemValue: selectedFile ? selectedFile.attachmentType : "",
+            labelItemField: "AttachmentType-name",
+            valueItemField: "AttachmentType-extID",
+            additionalFields: [],
+            searchFields: ["AttachmentType-name", "AttachmentType-extID"],
+          },
+        ]}
       />
       {/* Confirmation dialog for file deletion */}
       <ConfirmationDialog
@@ -544,9 +892,14 @@ const File = ({
         </View>
       </View>
       {loading && (
-        <View style={styles.loaderErrorContainer}>
+        <View style={styles.progressMessageContainer}>
           <Text style={common.loadingText}>{t("loading")}...</Text>
           {error && <Text>Error: {error.message}</Text>}
+        </View>
+      )}
+      {isUpdating && (
+        <View style={styles.progressMessageContainer}>
+          <Text style={common.loadingText}>{t("update_in_progress")}...</Text>
         </View>
       )}
       <FlatList
@@ -565,7 +918,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: "#e5eef7",
   },
-  loaderErrorContainer: {
+  progressMessageContainer: {
     paddingVertical: "4%",
     alignItems: "center",
   },

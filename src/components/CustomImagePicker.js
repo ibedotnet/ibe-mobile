@@ -122,12 +122,26 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
         setIsLoading(true);
 
         // Upload the selected image and get binary resource
-        const binaryResource = await uploadBinaryResource(selectedImage);
+        const binaryResource = await uploadBinaryResource(
+          selectedImage,
+          true, // Fetch new object IDs
+          {
+            type: "image/png",
+            name: "user-photo.jpg",
+            tHeight: 600,
+            tWidth: 400,
+            convertToPng: true,
+          },
+          {
+            client: APP.LOGIN_USER_CLIENT,
+            allClient: false,
+          }
+        );
 
         // Construct formData object with binary resource data
         const formData = {
           data: {
-            [`${linkBackToBusObjcat}-photoID`]: binaryResource.photoId,
+            [`${linkBackToBusObjcat}-photoID`]: binaryResource.attachmentId,
             [`${linkBackToBusObjcat}-thumbnailID`]: binaryResource.thumbId,
             [`${linkBackToBusObjcat}-type`]: "employee",
             [`${linkBackToBusObjcat}-id`]: APP.LOGIN_USER_EMPLOYEE_ID,
@@ -162,8 +176,13 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
           showToast(updateResponse.message);
         }
       } catch (error) {
-        console.error("Error in onSave method of CustomImagePicker:", error);
-        showToast(t("failed_upload_photo"), "error");
+        if (error.status === 413) {
+          console.error("Payload too large. Please upload a smaller file.");
+          showToast(t("upload_error_413"), "error");
+        } else {
+          console.error("Error in onSave method of CustomImagePicker:", error);
+          showToast(t("failed_upload_photo"), "error");
+        }
       } finally {
         setIsLoading(false);
       }

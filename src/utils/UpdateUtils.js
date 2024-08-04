@@ -41,7 +41,7 @@ const updateFields = async (formData, queryStringParams) => {
     }
 
     // Return success status and message
-    return { success: updateResponse.success, message: messageText };
+    return { success: updateResponse.success, message: messageText, response: updateResponse };
   } catch (error) {
     // Log and display error message
     console.error("Error in updateFields:", error);

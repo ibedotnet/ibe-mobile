@@ -25,6 +25,7 @@ const CustomDateTimePicker = ({
   isTimePickerVisible = false,
   onFilter,
   isDisabled = false,
+  showClearButton = true,
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -123,20 +124,22 @@ const CustomDateTimePicker = ({
           : `${placeholder}: ${t("no_date_selected")}`}
       </Text>
       {/* Clear button to clear the selected date, conditionally rendered based on isDisabled prop */}
-      {date && !isDisabled && (
-        <CustomButton
-          onPress={clearDate}
-          label={t("clear")}
-          icon={{
-            name: "clear",
-            library: "MaterialIcons",
-            color: "#005eb8",
-          }}
-          backgroundColor={false}
-          style={{ icon: { marginRight: 0 }, borderLeftWidth: 0.5 }}
-          labelStyle={styles.clearButtonText}
-        />
-      )}
+      {date &&
+        !isDisabled &&
+        showClearButton && (
+          <CustomButton
+            onPress={clearDate}
+            label={t("clear")}
+            icon={{
+              name: "clear",
+              library: "MaterialIcons",
+              color: "#005eb8",
+            }}
+            backgroundColor={false}
+            style={{ icon: { marginRight: 0 }, borderLeftWidth: 0.5 }}
+            labelStyle={styles.clearButtonText}
+          />
+        )}
       {/* Date picker component, rendered conditionally based on show state */}
       {show && (
         <DateTimePicker

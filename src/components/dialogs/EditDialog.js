@@ -1,56 +1,93 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button, Modal, Text, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
-
 import {
   RichEditor,
   RichToolbar,
   actions,
 } from "react-native-pell-rich-editor";
 import CustomTextInput from "../CustomTextInput";
+import CustomRemotePicker from "../CustomRemotePicker";
+import {
+  GestureHandlerRootView,
+  ScrollView,
+} from "react-native-gesture-handler";
 
 /**
  * EditDialog component
  *
- * This component displays a modal dialog with an input field. It can be used for both simple text input and rich text input.
+ * This component displays a modal dialog with input fields. It can handle multiple types of inputs including simple text input and rich text input.
  *
  * @param {boolean} isVisible - Controls the visibility of the dialog.
  * @param {function} onClose - Function to handle dialog close action.
  * @param {function} onConfirm - Function to handle confirm action.
- * @param {function} validateInput - Function to validate the input value. Default validation checks if input is not empty.
  * @param {string} title - Title of the dialog.
- * @param {string} initialValue - Initial value for the input field.
- * @param {boolean} isRichText - Flag to determine if the input should be a rich text editor.
+ * @param {Array} inputsConfigs - Array of input configurations for the input fields, including initial values.
  */
-
 const EditDialog = ({
   isVisible,
   onClose,
   onConfirm,
-  validateInput = (value) =>
-    value.trim() === "" ? "Input cannot be empty" : null, // Default Validation
   title,
-  initialValue,
-  isRichText = false,
+  inputsConfigs = [], // Default to an empty array
 }) => {
   const { t } = useTranslation();
 
-  const [value, setValue] = useState(initialValue);
+  // Initialize state with the initial values from inputsConfigs
+  const [values, setValues] = useState(
+    inputsConfigs.reduce((acc, config) => {
+      acc[config.id] = config.initialValue || "";
+      return acc;
+    }, {})
+  );
   const [error, setError] = useState(null);
 
-  const richText = useRef(null);
+  // Use useRef to store editor references
+  const richTextRefs = useRef({});
+
+  /**
+   * Function to handle input changes and update the state.
+   * @param {string} id - ID of the input field.
+   * @param {string} value - New value for the input field.
+   */
+  const handleInputChange = (id, value) => {
+    setValues((prevValues) => ({
+      ...prevValues,
+      [id]: value,
+    }));
+  };
 
   /**
    * Function to handle confirm action.
-   * Validates the input value, invokes the onConfirm function with the current value, and closes the dialog.
+   * Validates the input values, invokes the onConfirm function with the current values, and closes the dialog.
    */
   const handleConfirm = () => {
-    const validationError = validateInput(value);
-    if (validationError) {
-      setError(validationError);
+    // Function to validate input values if allowBlank is false
+    const emptyValidation = (values) => {
+      for (const value of Object.values(values)) {
+        if (typeof value === "string" && value.trim() === "") {
+          return t("input_cannot_be_empty");
+        }
+      }
+      return null;
+    };
+
+    const validationErrors = inputsConfigs.map((config) => {
+      const fieldValue = values[config.id];
+      const fieldValidation =
+        config.validateInput ||
+        (!config.allowBlank ? emptyValidation : (value) => null); // Use empty validation only if allowBlank is false
+
+      return fieldValidation({ [config.id]: fieldValue });
+    });
+
+    // Check if any validation error occurred
+    const firstError = validationErrors.find((error) => error !== null);
+    if (firstError) {
+      setError(firstError);
     } else {
-      console.debug("Dialog input value on confirm: " + value);
-      onConfirm(value);
+      console.debug("Dialog input values on confirm:", values);
+      onConfirm(values);
       setError(null);
       onClose();
     }
@@ -65,12 +102,92 @@ const EditDialog = ({
     onClose();
   };
 
-  // Update value state when initialValue prop changes or when the component becomes visible
+  // Update values state when inputsConfigs prop changes or when the component becomes visible
   useEffect(() => {
     if (isVisible) {
-      setValue(initialValue);
+      setValues(
+        inputsConfigs.reduce((acc, config) => {
+          acc[config.id] = config.initialValue || "";
+          return acc;
+        }, {})
+      );
     }
-  }, [isVisible, initialValue]);
+  }, [isVisible, inputsConfigs]);
+
+  /**
+   * Render the input field based on its type.
+   * @param {Object} config - Configuration for the input field.
+   * @returns {JSX.Element} The rendered input field.
+   */
+  const renderInputField = (config) => {
+    switch (config.type) {
+      case "richText":
+        return (
+          <View
+            key={config.id}
+            style={[styles.richTextContainer, { minHeight: 150 }]}
+          >
+            <RichToolbar
+              getEditor={() => richTextRefs.current[config.id]}
+              selectedIconTint="black"
+              actions={[
+                actions.setBold,
+                actions.setItalic,
+                actions.setUnderline,
+                actions.insertBulletsList,
+                actions.insertOrderedList,
+                actions.insertLink,
+                actions.undo,
+                actions.redo,
+              ]}
+            />
+            <RichEditor
+              ref={(el) => (richTextRefs.current[config.id] = el)}
+              initialContentHTML={values[config.id]}
+              style={styles.richEditor}
+              placeholder={config.placeholder || t("write_your_comment_here")}
+              pasteAsPlainText={true}
+              initialFocus={config.id === inputsConfigs[0]?.id}
+              onChange={(html) => handleInputChange(config.id, html)}
+            />
+          </View>
+        );
+      case "text":
+        return (
+          <CustomTextInput
+            key={config.id}
+            value={values[config.id]}
+            onChangeText={(text) => handleInputChange(config.id, text)}
+            autoFocus={config.id === inputsConfigs[0]?.id}
+            placeholder={config.placeholder}
+            containerStyle={[styles.input, error && styles.inputError]}
+          />
+        );
+      case "dropdown":
+        return (
+          <View key={config.id} style={[styles.input]}>
+            <CustomRemotePicker
+              queryParams={{
+                queryFields: config.queryFields,
+                commonQueryParams: config.commonQueryParams,
+              }}
+              pickerLabel={config.pickerLabel}
+              initialAdditionalLabel={config.initialAdditionalLabel}
+              initialItemLabel={config.initialItemLabel}
+              initialItemValue={config.initialItemValue}
+              labelItemField={config.labelItemField}
+              valueItemField={config.valueItemField}
+              additionalFields={config.additionalFields}
+              searchFields={config.searchFields}
+              multiline={true}
+              onValueChange={(value) => handleInputChange(config.id, value)}
+            />
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <Modal
@@ -82,46 +199,9 @@ const EditDialog = ({
       <View style={styles.container}>
         <View style={styles.dialogBox}>
           <Text style={styles.title}>{title}</Text>
-          {isRichText ? (
-            <View style={[styles.richTextContainer, { minHeight: 150 }]}>
-              <RichToolbar
-                editor={richText}
-                selectedIconTint="black"
-                actions={[
-                  actions.setBold,
-                  actions.setItalic,
-                  actions.setUnderline,
-                  actions.insertBulletsList,
-                  actions.insertOrderedList,
-                  actions.insertLink,
-                  actions.undo,
-                  actions.redo,
-                ]}
-              />
-              <RichEditor
-                ref={richText}
-                initialContentHTML={value}
-                style={styles.richEditor}
-                placeholder={t("write_your_comment_here")}
-                pasteAsPlainText={true}
-                initialFocus={true}
-                onChange={(html) => {
-                  setValue(html);
-                  setError(null);
-                }}
-              />
-            </View>
-          ) : (
-            <CustomTextInput
-              value={value}
-              onChangeText={(text) => {
-                setValue(text);
-                setError(null);
-              }}
-              autoFocus={true}
-              containerStyle={[styles.input, error && styles.inputError]}
-            />
-          )}
+          <GestureHandlerRootView>
+            <ScrollView>{inputsConfigs.map(renderInputField)}</ScrollView>
+          </GestureHandlerRootView>
           {error && <Text style={styles.errorText}>{error}</Text>}
           <View style={styles.buttonsContainer}>
             <Button onPress={handleClose} title={t("cancel")} />
@@ -136,15 +216,16 @@ const EditDialog = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: "4%",
     justifyContent: "center",
-    alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   dialogBox: {
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     padding: "5%",
     borderRadius: 5,
-    width: "90%",
+    flex: 1,
+    maxHeight: "80%",
   },
   title: {
     fontSize: 16,
@@ -156,7 +237,7 @@ const styles = StyleSheet.create({
     marginBottom: "4%",
   },
   inputError: {
-    borderColor: "red",
+    borderColor: "#f00",
   },
   errorText: {
     color: "red",

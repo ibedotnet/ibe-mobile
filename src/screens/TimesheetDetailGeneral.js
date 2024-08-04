@@ -26,6 +26,7 @@ import {
   convertMillisecondsToDuration,
   convertToDateObject,
   getRemarkText,
+  normalizeDateToUTC,
   setRemarkText,
 } from "../utils/FormatUtils";
 import { screenDimension } from "../utils/ScreenUtils";
@@ -107,7 +108,6 @@ const TimesheetDetailGeneral = ({
     getRemarkText(timesheetRemark, lang, PREFERRED_LANGUAGES)
   );
 
-  // Update the timesheet details whenever relevant state variables change
   useEffect(() => {
     const updatedTimesheetRemark = setRemarkText(
       timesheetRemark,
@@ -115,8 +115,12 @@ const TimesheetDetailGeneral = ({
       headerRemarkText
     );
 
+    // Call the callback function to propagate the changes for the header remark text
+    onTimesheetDetailChange({ timesheetRemark: updatedTimesheetRemark });
+  }, [headerRemarkText]);
+
+  useEffect(() => {
     const updatedValues = {
-      timesheetRemark: updatedTimesheetRemark,
       timesheetTotalTime: totalTime,
       timesheetBillableTime: billableTime,
       timesheetOverTime: overTime,
@@ -125,7 +129,7 @@ const TimesheetDetailGeneral = ({
 
     // Call the callback function to propagate the changes
     onTimesheetDetailChange(updatedValues);
-  }, [totalTime, billableTime, overTime, headerRemarkText, tasks]);
+  }, [totalTime, billableTime, overTime, tasks]);
 
   const handleHeaderRemarkChange = (text) => {
     // Update local state for the header remark text
@@ -357,9 +361,10 @@ const TimesheetDetailGeneral = ({
           actualTime,
           productive,
           billableTime,
-          start: start || originalDate,
-          end: end || originalDate,
+          start: start || normalizeDateToUTC(originalDate),
+          end: end || normalizeDateToUTC(originalDate),
           remark,
+          "remark:text": getRemarkText(remark, lang, PREFERRED_LANGUAGES),
           extStatus,
           statusID: itemStatusIDMap?.[statusLabel] || "",
         });
@@ -732,6 +737,17 @@ const TimesheetDetailGeneral = ({
     setCurrentItem({});
   };
 
+  /**
+   * Handles the confirmation of editing an item in the timesheet.
+   * It updates the existing item if it matches the `taskId`, or adds it as a new item
+   * if no match is found. Checks for duplicate `taskId` values to prevent duplicates.
+   *
+   * @function handleConfirmEditItem
+   * @param {Object} editedItem - The item with updated values to be saved.
+   * @param {string} editedItem.taskId - The ID of the task.
+   * @param {string} editedItem.otherField - Example additional fields of the task.
+   * @returns {void}
+   */
   const handleConfirmEditItem = (editedItem) => {
     const selectedDateFormatted = format(new Date(selectedDate), "yyyy-MM-dd");
 
@@ -740,58 +756,11 @@ const TimesheetDetailGeneral = ({
       ? [...timesheetItemsMap.get(selectedDateFormatted)]
       : [];
 
-    // Find the index of the item to be updated, if it exists
-    const existingItemIndex = items.findIndex(
-      (item) => item.taskId === currentItem.taskId
-    );
-
-    if (existingItemIndex !== -1) {
-      // Item already exists; update it
-      items[existingItemIndex] = editedItem;
-    } else {
-      // Item does not exist; add it to the list
-      items.push(editedItem);
-    }
-
-    // Update the timesheet items map with the new list
-    const updatedTimesheetItemsMap = new Map(timesheetItemsMap);
-    updatedTimesheetItemsMap.set(selectedDateFormatted, items);
-
-    console.debug(
-      `On confirm, the items going to be updated on date ${selectedDateFormatted} are ${JSON.stringify(
-        items
-      )}`
-    );
-
-    setTimesheetItemsMap(updatedTimesheetItemsMap);
-    setCurrentItem({});
-    setIsEditingItem(false);
-
-    SetTasks(convertTimesheetItemsMapToTasks(updatedTimesheetItemsMap));
-  };
-
-  const handleConfirmEditItem1 = (editedItem) => {
-    const selectedDateFormatted = format(new Date(selectedDate), "yyyy-MM-dd");
-
-    // Get the existing items for the selected date
-    let items = timesheetItemsMap.has(selectedDateFormatted)
-      ? [...timesheetItemsMap.get(selectedDateFormatted)]
-      : [];
-
-    // Check if the edited item already exists in the list
-    const existingItemIndex = items.findIndex(
-      (item) => item.taskId === editedItem.taskId
-    );
-
     // Check for duplicate taskId in items that are not the current item being edited
-    const duplicateItemIndex = items.findIndex((item) => {
-      console.log("item", item.taskText);
-      console.log("edited item", editedItem.taskText);
-      console.log("current item", currentItem.taskText);
-      return (
+    const duplicateItemIndex = items.findIndex(
+      (item) =>
         item.taskId === editedItem.taskId && item.taskId !== currentItem.taskId
-      );
-    });
+    );
 
     if (duplicateItemIndex !== -1) {
       // An item with the same taskId already exists and it's not the same as the edited item
@@ -802,8 +771,15 @@ const TimesheetDetailGeneral = ({
         { cancelable: false }
       );
       return; // Exit the function to prevent further processing
-    } else if (existingItemIndex !== -1) {
-      // Item already exists; update it
+    }
+
+    // Check if the item already exists in the list
+    const existingItemIndex = items.findIndex(
+      (item) => item.taskId === currentItem.taskId
+    );
+
+    if (existingItemIndex !== -1) {
+      // Item exists; update it
       items[existingItemIndex] = editedItem;
     } else {
       // Item does not exist; add it to the list
@@ -1176,7 +1152,7 @@ const TimesheetDetailGeneral = ({
           </View>
           <View style={styles.statusContainer}>
             <CustomStatus
-              busObjCat={busObjCat}
+              busObjCat={BUSOBJCATMAP[busObjCat]}
               busObjId={busObjId}
               busObjType={type}
               busObjExtStatus={headerExtStatus}
