@@ -18,6 +18,7 @@ import {
   API_ENDPOINTS,
   APP,
   BUSOBJCAT,
+  BUSOBJCATMAP,
   DOUBLE_CLICK_DELTA,
   PAGE_SIZE,
   TEST_MODE,
@@ -42,6 +43,7 @@ import CustomDateTimePicker from "../components/CustomDateTimePicker";
 import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
+import Sort from "../components/filters/Sort";
 
 /**
  * Timesheet component displays a list of timesheets with the ability to refresh
@@ -72,9 +74,11 @@ const Timesheet = ({ route, navigation }) => {
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [whereConditions, setWhereConditions] = useState([]);
   const [orConditions, setOrConditions] = useState([]);
+  const [sortConditions, setSortConditions] = useState([]);
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
   const [lastPress, setLastPress] = useState(0);
+  const [isSortModalVisible, setIsSortModalVisible] = useState(false);
 
   const [isModalVisibleInCreate, setModalVisibleInCreate] = useState(false);
   const [selectedDateInCreate, setSelectedDateInCreate] = useState(new Date()); // Default to today's date
@@ -370,7 +374,8 @@ const Timesheet = ({ route, navigation }) => {
         limit,
         null,
         whereConditions,
-        orConditions
+        orConditions,
+        sortConditions
       );
       if (response?.error) {
         console.error("Error refreshing data:", response.error);
@@ -384,7 +389,7 @@ const Timesheet = ({ route, navigation }) => {
       // Set refreshing state back to false after data refreshing is complete
       setRefreshing(false);
     }
-  }, [setTimesheets, whereConditions, orConditions, limit]);
+  }, [setTimesheets, whereConditions, orConditions, sortConditions, limit]);
 
   useEffect(() => {
     // Update whereConditions when route params change
@@ -405,7 +410,7 @@ const Timesheet = ({ route, navigation }) => {
     setPage(1);
     // Trigger refresh when the component mounts
     onRefresh();
-  }, [whereConditions, orConditions]);
+  }, [whereConditions, orConditions, sortConditions]);
 
   /**
    * Effect to ensure that the Timesheet component's data is refreshed whenever changes occur in other parts of the application
@@ -480,6 +485,25 @@ const Timesheet = ({ route, navigation }) => {
   };
 
   /**
+   * Opens the sort modal.
+   */
+  const openSortingModal = () => {
+    setIsSortModalVisible(true);
+  };
+
+  /**
+   * Closes the sort modal and sets the sorting conditions.
+   *
+   * @param {Array} sortedArray - Array of sorted conditions.
+   */
+  const closeSortingModal = (sortedArray) => {
+    if (sortedArray) {
+      setSortConditions(sortedArray);
+    }
+    setIsSortModalVisible(false);
+  };
+
+  /**
    * Rendered component for the left side of the header.
    */
   const headerLeft = () => {
@@ -491,7 +515,7 @@ const Timesheet = ({ route, navigation }) => {
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {`${t("timesheets")}${timesheetCount !== 1 ? t("s") : ""}: ${
+          {`${t("timesheet")}${timesheetCount !== 1 ? t("s") : ""}: ${
             timesheetCount > 0 ? timesheetCount : 0
           }`}
         </Text>
@@ -515,7 +539,7 @@ const Timesheet = ({ route, navigation }) => {
             color: "white",
           }}
         />
-        <View style={styles.filterIconContainer}>
+        <View style={styles.headerIconsContainer}>
           <CustomButton
             onPress={navigateToFilters}
             label=""
@@ -527,8 +551,29 @@ const Timesheet = ({ route, navigation }) => {
             }}
           />
           {appliedFiltersCount > 0 && (
-            <View style={styles.filterCountContainer}>
-              <Text style={styles.filterCountText}>{appliedFiltersCount}</Text>
+            <View style={styles.headerIconsCountContainer}>
+              <Text style={styles.headerIconsCountText}>
+                {appliedFiltersCount}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.headerIconsContainer}>
+          <CustomButton
+            onPress={openSortingModal}
+            label=""
+            icon={{
+              name: "sort",
+              library: "FontAwesome",
+              size: 30,
+              color: "white",
+            }}
+          />
+          {sortConditions.length > 0 && (
+            <View style={styles.headerIconsCountContainer}>
+              <Text style={styles.headerIconsCountText}>
+                {sortConditions.length}
+              </Text>
             </View>
           )}
         </View>
@@ -752,14 +797,14 @@ const Timesheet = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
-      {/* Modal for date selection */}
+      {/* Modal for date selection on creating timesheet*/}
       <Modal
         transparent={true}
         visible={isModalVisibleInCreate}
         onRequestClose={handleCloseModalInCreate}
       >
-        <View style={styles.modalOverlayInCreate}>
-          <View style={styles.modalContentInCreate}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
             <Text style={styles.instructionTextInCreate}>
               {t("please_select_timesheet_create_date")}
             </Text>
@@ -795,6 +840,21 @@ const Timesheet = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+      {isSortModalVisible && (
+        <Sort
+          isModalVisible={isSortModalVisible}
+          onClose={closeSortingModal}
+          busObjCat={BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}
+          allFields={[
+            { propertyLabel: "Created On", propertyValue: "createdOn" },
+            { propertyLabel: "Changed On", propertyValue: "changedOn" },
+            { propertyLabel: "Start Date", propertyValue: "start" },
+            { propertyLabel: "End Date", propertyValue: "end" },
+            { propertyLabel: "Work Time", propertyValue: "totalTime" },
+          ]}
+          previousSortRows={sortConditions}
+        />
+      )}
     </View>
   );
 };
@@ -845,15 +905,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   headerRightContainer: {
-    width: screenDimension.width / 4,
+    width: screenDimension.width / 3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
   },
-  filterIconContainer: {
+  headerIconsContainer: {
     position: "relative",
   },
-  filterCountContainer: {
+  headerIconsCountContainer: {
     position: "absolute",
     bottom: 0,
     right: 0,
@@ -866,7 +926,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     pointerEvents: "none",
   },
-  filterCountText: {
+  headerIconsCountText: {
     color: "black",
     fontSize: 12,
     fontWeight: "bold",
@@ -898,13 +958,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   additionalDataValue: {},
-  modalOverlayInCreate: {
+  modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-  modalContentInCreate: {
+  modalContent: {
     width: "90%",
     backgroundColor: "#fff",
     padding: "4%",
@@ -932,6 +992,10 @@ const styles = StyleSheet.create({
   infoMessageInCreate: {
     color: "#00f",
     marginVertical: "8%",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  longPressInfo: {
     fontSize: 16,
     textAlign: "center",
   },

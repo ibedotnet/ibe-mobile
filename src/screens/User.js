@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useTranslation } from "react-i18next";
 import CustomButton from "../components/CustomButton";
 import CustomPicker from "../components/CustomPicker";
@@ -16,7 +17,7 @@ import { fetchData } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 import { parseUserComms } from "../utils/UserUtils";
-import { API_ENDPOINTS} from "../constants";
+import { API_ENDPOINTS } from "../constants";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useRequestQueueContext } from "../../context/RequestQueueContext";
 
@@ -125,6 +126,28 @@ const User = ({ route, navigation }) => {
   };
 
   /**
+   * Clears all data from SecureStore.
+   * @async
+   * @function
+   * @name clearAllSecureStore
+   * @returns {void}
+   */
+  const clearAllSecureStore = async () => {
+    try {
+      // List all known keys to clear
+      const keys = ["username", "clientId", "password"]; // Add other keys as needed
+
+      for (const key of keys) {
+        await SecureStore.deleteItemAsync(key);
+      }
+
+      console.debug("SecureStore cleared successfully");
+    } catch (error) {
+      console.error("Error clearing SecureStore:", error);
+    }
+  };
+
+  /**
    * Handles the logout process.
    * Shows a confirmation dialog before proceeding with the logout action.
    * Clears AsyncStorage and calls the logout API upon confirmation.
@@ -143,11 +166,12 @@ const User = ({ route, navigation }) => {
           text: t("user_logout"),
           onPress: async () => {
             try {
-              // Clear AsyncStorage
-              clearAllAsyncStorage();
+              await clearAllAsyncStorage();
+
+              await clearAllSecureStore();
 
               // Call the logout API
-              const logoutSuccess = callLogoutApi();
+              const logoutSuccess = await callLogoutApi();
 
               if (logoutSuccess) {
                 // Navigate back to the Login screen

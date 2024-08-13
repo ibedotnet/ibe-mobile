@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,13 +25,19 @@ import CustomTextInput from "../components/CustomTextInput";
 
 import {
   convertMillisecondsToDuration,
+  convertToDateFNSFormat,
   convertToDateObject,
   getRemarkText,
   normalizeDateToUTC,
   setRemarkText,
 } from "../utils/FormatUtils";
 import { screenDimension } from "../utils/ScreenUtils";
-import { BUSOBJCAT, BUSOBJCATMAP, PREFERRED_LANGUAGES } from "../constants";
+import {
+  APP,
+  BUSOBJCAT,
+  BUSOBJCATMAP,
+  PREFERRED_LANGUAGES,
+} from "../constants";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 const TimesheetDetailGeneral = ({
@@ -43,6 +50,7 @@ const TimesheetDetailGeneral = ({
   handleReload,
   loading,
   setLoading,
+  selectedDateInCreate,
   onTimesheetDetailChange,
   timesheetTypeDetails,
   timesheetDetail,
@@ -52,10 +60,13 @@ const TimesheetDetailGeneral = ({
 
   const {
     loggedInUserInfo: {
+      hireDate,
+      termDate,
       nonWorkingDates,
       nonWorkingDays,
       startOfWeek,
       dailyStdHours,
+      patterns,
     },
   } = useContext(LoggedInUserInfoContext);
 
@@ -76,20 +87,21 @@ const TimesheetDetailGeneral = ({
     itemStatusIDMap,
   } = timesheetDetail;
 
-  const { timesheetTypePeriod = 7 } = timesheetTypeDetails; // Default period is 7 days (weekly)
+  const [keyboardShown, setKeyboardShown] = useState(false);
 
+  const { timesheetTypePeriod = 7 } = timesheetTypeDetails; // Default period is 7 days (weekly)
   const timesheetStartDate = convertToDateObject(timesheetStart);
   const timesheetEndDate = convertToDateObject(timesheetEnd);
-
   const [type, setType] = useState(timesheetType);
   const [period, setPeriod] = useState(timesheetTypePeriod);
   const [headerExtStatus, setHeaderExtStatus] = useState(timesheetExtStatus);
   const [weekendList, setWeekendList] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
   const [absenceList, setAbsenceList] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(
+    selectedDateInCreate ? new Date(selectedDateInCreate) : null
+  );
   const [visibleDates, setVisibleDates] = useState([]);
-  const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isEditingItem, setIsEditingItem] = useState(false);
   const [isItemEditMode, setIsItemEditMode] = useState(false);
   const [currentItem, setCurrentItem] = useState({});
@@ -107,6 +119,27 @@ const TimesheetDetailGeneral = ({
   const [headerRemarkText, setHeaderRemarkText] = useState(
     getRemarkText(timesheetRemark, lang, PREFERRED_LANGUAGES)
   );
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      () => {
+        setKeyboardShown(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardShown(false);
+      }
+    );
+
+    // cleanup function
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const updatedTimesheetRemark = setRemarkText(
@@ -238,6 +271,9 @@ const TimesheetDetailGeneral = ({
         taskID,
         "taskID:Task-extID": taskExtID,
         "taskID:Task-text-text": taskText,
+        department,
+        "department:BusUnit-extID": departmentExtID,
+        "department:BusUnit-name-text": departmentText,
         billable,
         items,
         extStatus,
@@ -266,6 +302,9 @@ const TimesheetDetailGeneral = ({
           taskId: taskID || "",
           taskExtId: taskExtID || "",
           taskText: taskText || "",
+          departmentId: department || "",
+          departmentExtId: departmentExtID || "",
+          departmentText: departmentText || "",
           billable: billable || false,
           start: start || "",
           end: end || "",
@@ -312,6 +351,9 @@ const TimesheetDetailGeneral = ({
           taskId,
           taskExtId,
           taskText,
+          departmentId,
+          departmentExtId,
+          departmentText,
           billable,
           productive,
           billableTime,
@@ -330,8 +372,8 @@ const TimesheetDetailGeneral = ({
           "yyyy-MM-dd'T'HH:mm:ssxxx"
         );
 
-        // Create a unique key combining taskId and billable
-        const uniqueKey = `${taskId}`;
+        // Create a unique key based on a combination of departmentId and taskId
+        const uniqueKey = `${departmentId || ""}${taskId || ""}`;
 
         // Find or create the task entry
         let task = tasks.find((t) => t.uniqueKey === uniqueKey);
@@ -348,6 +390,9 @@ const TimesheetDetailGeneral = ({
             taskID: taskId,
             "taskID:Task-extID": taskExtId,
             "taskID:Task-text-text": taskText,
+            department: departmentId,
+            "department:BusUnit-extID": departmentExtId,
+            "department:BusUnit-name-text": departmentText,
             billable: billable,
             items: [],
             extStatus: extStatus,
@@ -363,8 +408,12 @@ const TimesheetDetailGeneral = ({
           billableTime,
           start: start || normalizeDateToUTC(originalDate),
           end: end || normalizeDateToUTC(originalDate),
-          remark,
-          "remark:text": getRemarkText(remark, lang, PREFERRED_LANGUAGES),
+          remark, 
+          // TODO: The backend currently only processes remarks in the "en" language.
+          // As a temporary workaround, we are sending the remark using "remark:text".
+          // Once the backend supports multiple languages for remarks,
+          // uncomment the full "remark" array and remove the "remark:text" property.
+          //"remark:text": getRemarkText(remark, lang, PREFERRED_LANGUAGES),
           extStatus,
           statusID: itemStatusIDMap?.[statusLabel] || "",
         });
@@ -429,18 +478,48 @@ const TimesheetDetailGeneral = ({
     return absenceDateEntries;
   };
 
+  // Handler for selecting a date
   const handleDateSelection = (index, date) => {
-    setSelectedDate(date);
+    setSelectedDate(date); // Update the selected date in state
   };
 
+  // Determine the index of the selected date, only if not in edit mode
+  const selectedIndex = !isEditMode
+    ? visibleDates.findIndex(
+        (item) =>
+          format(item.fullDate, "yyyy-MM-dd") ===
+          format(selectedDate, "yyyy-MM-dd")
+      )
+    : -1; // Set to -1 if in edit mode, indicating no need to find index
+
+  // Get layout information for each item in the date list
+  const getDateListItemLayout = (data, index) => ({
+    length: 40, // Fixed height of each item in the list
+    offset: 40 * index, // Calculate the offset for the item based on its index
+    index,
+  });
+
+  // Fallback handler for scrolling to an index if the operation fails
+  const handleDateListScrollToIndexFailed = (error) => {
+    console.error("Scrolling failed in date list", error); // Log the error
+    if (dateListRef.current) {
+      dateListRef.current.scrollToIndex({
+        index: 0, // Scroll to the start of the list
+        animated: true, // Animate the scroll
+      });
+    }
+  };
+
+  // Generate an array of visible dates between start and end dates
   const generateVisibleDates = (start, end) => {
     const interval = { start, end };
-    const dates = eachDayOfInterval(interval);
+    const dates = eachDayOfInterval(interval); // Create an array of dates in the interval
 
     return dates.map((date) => ({
-      day: format(date, "EEE").toUpperCase().slice(0, 2),
-      date: format(date, "dd"),
-      fullDate: date,
+      day: format(date, "EEE").toUpperCase().slice(0, 2), // Format the day as an abbreviated string
+      date: format(date, "dd"), // Format the date as a day of the month
+      month: format(date, "MMM").toUpperCase(), // Format the month as an abbreviated string
+      fullDate: date, // Store the full date object
     }));
   };
 
@@ -456,7 +535,10 @@ const TimesheetDetailGeneral = ({
     setEnd(newEnd);
 
     // Scroll to the left
-    dateListRef.current.scrollTo({ x: 0, animated: true });
+    dateListRef?.current?.scrollToIndex({
+      index: 0,
+      animated: true,
+    });
   };
 
   const fetchNextDates = () => {
@@ -473,8 +555,8 @@ const TimesheetDetailGeneral = ({
     setEnd(newEnd);
 
     // Scroll to the right
-    dateListRef.current.scrollTo({
-      x: dateListRef.current.scrollWidth,
+    dateListRef?.current?.scrollToIndex({
+      index: dateListRef.current.scrollWidth,
       animated: true,
     });
   };
@@ -581,7 +663,7 @@ const TimesheetDetailGeneral = ({
           {item.date}
         </Text>
         <Text style={styles.monthText} numberOfLines={1} ellipsizeMode="tail">
-          {format(start, "MMM").toUpperCase()}
+          {item.month}
         </Text>
       </Pressable>
     );
@@ -649,7 +731,68 @@ const TimesheetDetailGeneral = ({
     return absencesInRange;
   };
 
+  /**
+   * Creates a map with daySeq as the key and stdWorkHours as the value.
+   *
+   * @param {Array} patterns - Array of pattern objects.
+   * @returns {Map} A map with daySeq as keys and stdWorkHours as values.
+   */
+  const createDaySeqMap = (patterns) => {
+    const daySeqMap = new Map();
+
+    patterns.forEach((pattern) => {
+      // Skip the pattern if its intStatus is 3
+      if (pattern.intStatus === 3) {
+        return;
+      }
+
+      pattern.details.forEach((detail) => {
+        // Add to the map only if detail's intStatus is not 3
+        if (detail.intStatus !== 3) {
+          daySeqMap.set(detail.daySeq, detail.stdWorkHours);
+        }
+      });
+    });
+
+    return daySeqMap;
+  };
+
+  const validateItemCreateOrEdit = () => {
+    if (hireDate && selectedDate.getTime() < new Date(hireDate).getTime()) {
+      showToast(
+        t("error_hire_date", {
+          date: format(
+            hireDate,
+            convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+          ),
+        }),
+        "error"
+      );
+      return false;
+    }
+
+    if (termDate && selectedDate.getTime() > new Date(termDate).getTime()) {
+      showToast(
+        t("error_term_date", {
+          date: format(
+            termDate,
+            convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+          ),
+        }),
+        "error"
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const handleCreateItemClick = (item) => {
+    // Perform item validation
+    if (!validateItemCreateOrEdit()) {
+      return; // Exit the function if validation fails
+    }
+
     setIsItemEditMode(false);
 
     setCurrentItem({
@@ -663,6 +806,9 @@ const TimesheetDetailGeneral = ({
       taskId: "",
       taskExtId: "",
       taskText: "",
+      departmentIdId: "",
+      departmentExtId: "",
+      departmentText: "",
       billable: false,
       productive: false,
       billableTime: 0,
@@ -678,6 +824,11 @@ const TimesheetDetailGeneral = ({
   };
 
   const handleEditItemClick = (item) => {
+    // Perform item validation
+    if (!validateItemCreateOrEdit()) {
+      return; // Exit the function if validation fails
+    }
+
     setIsItemEditMode(true);
     setCurrentItem(item);
     setIsEditingItem(true);
@@ -705,8 +856,11 @@ const TimesheetDetailGeneral = ({
       ? [...timesheetItemsMap.get(selectedDateFormatted)]
       : [];
 
+    // Find the index based on either departmentId or taskId
     const index = items.findIndex(
-      (item) => item.taskId === itemToDelete.taskId
+      (item) =>
+        item.taskId === itemToDelete.taskId ||
+        item.departmentId === itemToDelete.departmentId
     );
 
     if (index !== -1) {
@@ -739,16 +893,18 @@ const TimesheetDetailGeneral = ({
 
   /**
    * Handles the confirmation of editing an item in the timesheet.
-   * It updates the existing item if it matches the `taskId`, or adds it as a new item
-   * if no match is found. Checks for duplicate `taskId` values to prevent duplicates.
+   * It updates the existing item if it matches the `taskId` or `departmentId`,
+   * or adds it as a new item if no match is found.
+   * Checks for duplicate `taskId` or `departmentId` values to prevent duplicates.
    *
-   * @function handleConfirmEditItem
+   * @function handleConfirmCreateOrEditItem
    * @param {Object} editedItem - The item with updated values to be saved.
    * @param {string} editedItem.taskId - The ID of the task.
+   * @param {string} editedItem.departmentId - The ID of the department.
    * @param {string} editedItem.otherField - Example additional fields of the task.
    * @returns {void}
    */
-  const handleConfirmEditItem = (editedItem) => {
+  const handleConfirmCreateOrEditItem = (editedItem) => {
     const selectedDateFormatted = format(new Date(selectedDate), "yyyy-MM-dd");
 
     // Get the existing items for the selected date
@@ -756,14 +912,21 @@ const TimesheetDetailGeneral = ({
       ? [...timesheetItemsMap.get(selectedDateFormatted)]
       : [];
 
-    // Check for duplicate taskId in items that are not the current item being edited
+    // Generate a unique key combining departmentId and taskId for comparison
+    const generateUniqueKey = (item) =>
+      `${item.departmentId || ""}${item.taskId || ""}`;
+
+    const editedItemKey = generateUniqueKey(editedItem);
+
+    // Check for duplicate taskId or departmentId in items that are not the current item being edited
     const duplicateItemIndex = items.findIndex(
       (item) =>
-        item.taskId === editedItem.taskId && item.taskId !== currentItem.taskId
+        generateUniqueKey(item) === editedItemKey &&
+        generateUniqueKey(item) !== generateUniqueKey(currentItem)
     );
 
     if (duplicateItemIndex !== -1) {
-      // An item with the same taskId already exists and it's not the same as the edited item
+      // An item with the same taskId or departmentId already exists and it's not the same as the edited item
       Alert.alert(
         t("validation_error"),
         t("item_exists", { selectedDate: selectedDateFormatted }),
@@ -775,7 +938,7 @@ const TimesheetDetailGeneral = ({
 
     // Check if the item already exists in the list
     const existingItemIndex = items.findIndex(
-      (item) => item.taskId === currentItem.taskId
+      (item) => generateUniqueKey(item) === generateUniqueKey(currentItem)
     );
 
     if (existingItemIndex !== -1) {
@@ -810,7 +973,8 @@ const TimesheetDetailGeneral = ({
     if (isHoliday) {
       if (holidayName) {
         holidayMessage +=
-          "Holiday: " +
+          t("holiday") +
+          ": " +
           holidayName +
           "\n" +
           t("hours") +
@@ -869,7 +1033,14 @@ const TimesheetDetailGeneral = ({
             <Text style={styles.dayTypeMessage}>{t("non_working_day")}</Text>
           )}
           <Text style={styles.emptyMessageText}>
-            {t("no_entry_found_selected_date")}
+            {t("no_entry_found_selected_date", {
+              selectedDate: selectedDate
+                ? format(
+                    selectedDate,
+                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                  )
+                : "",
+            })}
           </Text>
         </View>
       );
@@ -904,22 +1075,25 @@ const TimesheetDetailGeneral = ({
                     `${t("no_remarks_available")}...`}
                 </Text>
               </View>
-              {!isParentLocked && (
-                <View style={styles.itemButtonContainer}>
-                  <View style={styles.editButtonContainer}>
-                    <CustomButton
-                      onPress={() => handleEditItemClick(item)}
-                      label=""
-                      icon={{
-                        name: "square-edit-outline",
-                        library: "MaterialCommunityIcons",
-                        size: 24,
-                        color: "#005eb8",
-                      }}
-                      backgroundColor={false}
-                      style={{ paddingHorizontal: 0, paddingVertical: 0 }}
-                    />
-                  </View>
+
+              <View style={styles.itemButtonContainer}>
+                <View style={styles.editButtonContainer}>
+                  <CustomButton
+                    onPress={() => handleEditItemClick(item)}
+                    label=""
+                    icon={{
+                      name: !isParentLocked
+                        ? "square-edit-outline"
+                        : "eye-outline",
+                      library: "MaterialCommunityIcons",
+                      size: 24,
+                      color: "#005eb8",
+                    }}
+                    backgroundColor={false}
+                    style={{ paddingHorizontal: 0, paddingVertical: 0 }}
+                  />
+                </View>
+                {!isParentLocked && (
                   <View style={styles.deleteButtonContainer}>
                     <CustomButton
                       onPress={() => handleDeleteItemClick(item)}
@@ -934,8 +1108,8 @@ const TimesheetDetailGeneral = ({
                       style={{ paddingHorizontal: 0, paddingVertical: 0 }}
                     />
                   </View>
-                </View>
-              )}
+                )}
+              </View>
             </View>
 
             <View style={styles.itemsCardSeparator} />
@@ -1000,7 +1174,21 @@ const TimesheetDetailGeneral = ({
                     numberOfLines={1}
                     ellipsizeMode="tail"
                   >
-                    {item.taskText.trim()}
+                    {item.taskText?.trim()}
+                  </Text>
+                </View>
+              )}
+              {item.departmentText && (
+                <View style={styles.itemsCardRow}>
+                  <Text style={styles.itemsCardRowLabel}>
+                    {t("department")}:
+                  </Text>
+                  <Text
+                    style={styles.itemsCardRowValue}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {item.departmentText?.trim()}
                   </Text>
                 </View>
               )}
@@ -1032,14 +1220,23 @@ const TimesheetDetailGeneral = ({
   }, [start, end]);
 
   useEffect(() => {
-    // Calculate non-working days based on nonWorking days and startOfWeek
-    const calculatedNonWorkingDays =
-      nonWorkingDays && nonWorkingDays.length > 0
-        ? nonWorkingDays.map((day) => (day - startOfWeek + 7) % 7)
-        : [];
+    // Get non working days from patterns if it's defined
+    if (patterns.length > 0) {
+      // Initialize all potential daySeq values
+      const allDaysOfWeek = new Set([0, 1, 2, 3, 4, 5, 6]);
 
-    setWeekendList(calculatedNonWorkingDays);
-  }, [nonWorkingDays, startOfWeek]);
+      const daySeqMap = createDaySeqMap(patterns);
+
+      // Add keys of daySeqMap to nonWorkingDays if not already present and not any key of daySeqMap
+      allDaysOfWeek.forEach((dayOfWeek) => {
+        if (!nonWorkingDays.includes(dayOfWeek) && !daySeqMap.has(dayOfWeek)) {
+          nonWorkingDays.push(dayOfWeek);
+        }
+      });
+    }
+
+    setWeekendList(nonWorkingDays);
+  }, [nonWorkingDays, patterns]);
 
   useEffect(() => {
     const nonWorkingDatesInRange = findNonWorkingDatesInRange(
@@ -1106,8 +1303,9 @@ const TimesheetDetailGeneral = ({
 
     setTimesheetItemsMap(newTimesheetItemsMap);
 
-    // Set selected date to the first date (start)
-    if (isValid(start)) {
+    // On opening the timesheet detail use the date selected at the time of timesheet creation
+    // Otherwise, set the selected date to the start date if it's valid
+    if (!selectedDate && isValid(start)) {
       setSelectedDate(start);
     }
   }, []);
@@ -1118,6 +1316,17 @@ const TimesheetDetailGeneral = ({
       : null;
     setDayTotalTime(dayTotalMap.get(formattedDate) || 0);
   }, [selectedDate, dayTotalMap]);
+
+  // Scroll to the selected date when the component mounts
+  useEffect(() => {
+    if (selectedIndex !== -1 && dateListRef && dateListRef.current) {
+      dateListRef.current.scrollToIndex({
+        index: selectedIndex,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  }, [selectedIndex]);
 
   useEffect(() => {
     recalculateActualTimeMap(
@@ -1139,7 +1348,6 @@ const TimesheetDetailGeneral = ({
     <View style={styles.container}>
       <View style={styles.header}>
         <ScrollView
-          ref={dateListRef}
           horizontal
           contentContainerStyle={styles.horizontalScrollContent}
         >
@@ -1166,66 +1374,64 @@ const TimesheetDetailGeneral = ({
           </View>
         </ScrollView>
       </View>
-      {isPanelVisible && (
-        <CollapsiblePanel title={t("summary")} initiallyCollapsed={true}>
-          <View style={styles.rowContainer}>
-            <View style={[styles.rowChilds, { marginRight: 5 }]}>
-              <Text style={styles.panelChildLabel}>{t("start")}</Text>
-              <CustomDateTimePicker
-                initialValue={start}
-                onFilter={setStart}
-                isDisabled={true}
-              />
-            </View>
-            <View style={styles.rowChilds}>
-              <Text style={styles.panelChildLabel}>{t("end")}</Text>
-              <CustomDateTimePicker
-                initialValue={end}
-                onFilter={setEnd}
-                isDisabled={true}
-              />
-            </View>
-          </View>
-          <View style={styles.panelChild}>
-            <Text style={styles.panelChildLabel}>{t("remark")}</Text>
-            <CustomTextInput
-              containerStyle={{
-                borderColor: isParentLocked && "rgba(0, 0, 0, 0.5)",
-              }}
-              value={headerRemarkText}
-              placeholder={`${t("placeholder_remark")}...`}
-              onChangeText={handleHeaderRemarkChange} // Set header remark
-              editable={!isParentLocked}
+      <CollapsiblePanel title={t("summary")} initiallyCollapsed={true}>
+        <View style={styles.rowContainer}>
+          <View style={[styles.rowChilds, { marginRight: 5 }]}>
+            <Text style={styles.panelChildLabel}>{t("start")}</Text>
+            <CustomDateTimePicker
+              initialValue={start}
+              onFilter={setStart}
+              isDisabled={true}
             />
           </View>
-          <View style={styles.indicatorContainer}>
-            <View>
-              <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
-              <View style={styles.weekendIndicator}>
-                <View style={styles.weekendColorBox} />
-              </View>
-            </View>
-            <View>
-              <Text style={styles.panelChildLabel}>{t("selected")}</Text>
-              <View style={styles.selectedIndicator}>
-                <View style={styles.selectedColorBox} />
-              </View>
-            </View>
-            <View>
-              <Text style={styles.panelChildLabel}>{t("holiday")}</Text>
-              <View style={styles.holidayIndicator}>
-                <View style={styles.holidayColorBox} />
-              </View>
-            </View>
-            <View>
-              <Text style={styles.panelChildLabel}>{t("absence")}</Text>
-              <View style={styles.absenceIndicator}>
-                <View style={styles.absenceColorBox} />
-              </View>
+          <View style={styles.rowChilds}>
+            <Text style={styles.panelChildLabel}>{t("end")}</Text>
+            <CustomDateTimePicker
+              initialValue={end}
+              onFilter={setEnd}
+              isDisabled={true}
+            />
+          </View>
+        </View>
+        <View style={styles.panelChild}>
+          <Text style={styles.panelChildLabel}>{t("remark")}</Text>
+          <CustomTextInput
+            containerStyle={{
+              borderColor: isParentLocked && "rgba(0, 0, 0, 0.5)",
+            }}
+            value={headerRemarkText}
+            placeholder={`${t("placeholder_remark")}...`}
+            onChangeText={handleHeaderRemarkChange} // Set header remark
+            editable={!isParentLocked}
+          />
+        </View>
+        <View style={styles.indicatorContainer}>
+          <View>
+            <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
+            <View style={styles.weekendIndicator}>
+              <View style={styles.weekendColorBox} />
             </View>
           </View>
-        </CollapsiblePanel>
-      )}
+          <View>
+            <Text style={styles.panelChildLabel}>{t("selected")}</Text>
+            <View style={styles.selectedIndicator}>
+              <View style={styles.selectedColorBox} />
+            </View>
+          </View>
+          <View>
+            <Text style={styles.panelChildLabel}>{t("holiday")}</Text>
+            <View style={styles.holidayIndicator}>
+              <View style={styles.holidayColorBox} />
+            </View>
+          </View>
+          <View>
+            <Text style={styles.panelChildLabel}>{t("absence")}</Text>
+            <View style={styles.absenceIndicator}>
+              <View style={styles.absenceColorBox} />
+            </View>
+          </View>
+        </View>
+      </CollapsiblePanel>
       <View style={styles.dateListContainer}>
         <Pressable
           style={styles.dateArrow}
@@ -1239,6 +1445,9 @@ const TimesheetDetailGeneral = ({
           />
         </Pressable>
         <FlatList
+          ref={dateListRef}
+          getItemLayout={getDateListItemLayout}
+          onScrollToIndexFailed={handleDateListScrollToIndexFailed}
           data={visibleDates}
           renderItem={renderDateItem}
           keyExtractor={(item, index) => index.toString()}
@@ -1259,18 +1468,8 @@ const TimesheetDetailGeneral = ({
         </Pressable>
       </View>
       {renderTimesheetItems()}
-      {!loading && (
+      {!loading && !keyboardShown && (
         <View style={styles.floatingContainer}>
-          <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isPanelVisible ? "#f5dd4b" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
-            value={isPanelVisible}
-            onValueChange={() =>
-              setIsPanelVisible((previousState) => !previousState)
-            }
-            style={styles.floatingButton}
-          />
           <CustomButton
             onPress={() => handleCreateItemClick()}
             label=""
@@ -1293,9 +1492,10 @@ const TimesheetDetailGeneral = ({
             selectedDate: selectedDate,
           }}
           timesheetTypeDetails={timesheetTypeDetails}
-          onConfirm={handleConfirmEditItem}
+          onConfirm={handleConfirmCreateOrEditItem}
           onCancel={handleCancelEditItem}
           isItemEditMode={isItemEditMode}
+          isParentLocked={isParentLocked}
         />
       )}
     </View>
@@ -1336,6 +1536,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     marginLeft: 20,
+    marginRight: 10,
   },
   hoursLabel: {
     fontWeight: "bold",
@@ -1501,30 +1702,17 @@ const styles = StyleSheet.create({
   floatingContainer: {
     position: "absolute",
     bottom: 20,
-    left: 20,
+    right: 20,
     alignItems: "center",
   },
   floatingButton: {
     marginBottom: 10,
     width: 50,
     height: 50,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#005eb8",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
-  },
-  floatingContainer1: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 50,
-    right: 120,
-    top: screenDimension.height / 2,
-    borderRadius: 8,
     elevation: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

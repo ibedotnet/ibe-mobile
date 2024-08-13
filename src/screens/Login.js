@@ -14,8 +14,7 @@ import {
 
 import { useTranslation } from "react-i18next";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import * as SecureStore from "expo-secure-store";
 import Checkbox from "expo-checkbox";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -44,16 +43,16 @@ const Login = ({ navigation }) => {
 
   // State variables
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("Client!1331");
-  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
   const [clientId, setClientId] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const logoWidth = screenDimension.width / 2;
 
   /**
-   * Fetches stored username and client ID from AsyncStorage on component mount.
+   * Fetches stored username and client ID from SecureStore on component mount.
    * @async
    * @function
    * @name retrieveStoredCredentials
@@ -61,13 +60,26 @@ const Login = ({ navigation }) => {
    */
   const retrieveStoredCredentials = async () => {
     try {
-      const storedUsername = await AsyncStorage.getItem("username");
-      const storedClientId = await AsyncStorage.getItem("clientId");
+      const storedUsername = await SecureStore.getItemAsync("username");
+      const storedClientId = await SecureStore.getItemAsync("clientId");
+      const storedPassword = await SecureStore.getItemAsync("password");
+
       if (storedUsername) {
         setUsername(storedUsername);
       }
       if (storedClientId) {
         setClientId(storedClientId);
+      }
+      if (storedPassword) {
+        setPassword(storedPassword);
+      }
+
+      if (storedUsername && storedClientId && storedPassword) {
+        try {
+          await onPressLogin(storedUsername, storedPassword, storedClientId);
+        } catch (loginError) {
+          console.error("Error during automatic login:", loginError);
+        }
       }
     } catch (error) {
       console.error("Error retrieving stored credentials: ", error);
@@ -83,9 +95,12 @@ const Login = ({ navigation }) => {
    * Displays a toast message if validation fails.
    * @function
    * @name validateInputs
+   * @param {string} username - The entered username.
+   * @param {string} password - The entered password.
+   * @param {string} clientId - The entered client ID.
    * @returns {boolean} - Returns true if inputs are valid, false otherwise.
    */
-  const validateInputs = () => {
+  const validateInputs = (username, password, clientId) => {
     if (!username) {
       showToast(t("login_username_required"), "error");
       return false;
@@ -124,7 +139,7 @@ const Login = ({ navigation }) => {
       data?.empWorkSchedue?.timeConfirmationType ?? "";
     loggedInUserInfo.hireDate =
       data?.User?.[0]?.["Resource-core-hireDate"] ?? null;
-    loggedInUserInfo.hireDate =
+    loggedInUserInfo.termDate =
       data?.User?.[0]?.["Resource-core-termDate"] ?? null;
     loggedInUserInfo.companyId = data?.User?.[0]?.["Resource-companyID"] ?? "";
     loggedInUserInfo.workScheduleExtId = data?.empWorkSchedue?.extID ?? "";
@@ -138,12 +153,13 @@ const Login = ({ navigation }) => {
       data?.empWorkSchedue?.maxWorkHours ?? 28800000;
     loggedInUserInfo.workHoursInterval =
       data?.empWorkSchedue?.workHoursInterval ?? "week";
+    loggedInUserInfo.patterns = data?.empWorkSchedue?.patterns ?? [];
     loggedInUserInfo.calendarExtId = data?.empWorkCalendar?.extID ?? "";
     loggedInUserInfo.nonWorkingDates =
       data?.empWorkCalendar?.nonWorkingDates ?? [];
     loggedInUserInfo.nonWorkingDays =
       data?.empWorkCalendar?.nonWorkingDays ?? [];
-    loggedInUserInfo.startOfWeek = data?.empWorkCalendar?.startOfWeek ?? 0;
+    loggedInUserInfo.startOfWeek = data?.empWorkCalendar?.startOfWeek ?? 1;
 
     console.debug(
       `Logged in details:
@@ -163,7 +179,6 @@ const Login = ({ navigation }) => {
         max work hours: ${loggedInUserInfo.maxWorkHours},
         work hours interval: ${loggedInUserInfo.workHoursInterval},
         calendar ext id: ${loggedInUserInfo.calendarExtId},
-        non-working dates: ${loggedInUserInfo.nonWorkingDates},
         non-working days: ${loggedInUserInfo.nonWorkingDays},
         start of week: ${loggedInUserInfo.startOfWeek}`
     );
@@ -174,23 +189,30 @@ const Login = ({ navigation }) => {
    * Initiates the login process by calling the authentication API.
    * @async
    * @function
-   * @name onPress
+   * @name onPressLogin
+   * @param {string} username - The entered username.
+   * @param {string} password - The entered password.
+   * @param {string} clientId - The entered client ID.
    * @returns {void}
    */
-  const onPress = async () => {
-    if (!validateInputs()) {
+  const onPressLogin = async (username, password, clientId) => {
+    // Validate the input fields
+    if (!validateInputs(username, password, clientId)) {
       return;
     }
 
     // Hide the keyboard to improve user experience
     Keyboard.dismiss();
 
+    // Set the loading state to true to show a loader
     setIsLoading(true);
 
+    // Convert password to an array of ASCII values as required by the API
     const passwordInASCIIArr = Array.from(password, (char) =>
       char.charCodeAt(0)
     );
 
+    // Prepare the data to be sent in the authentication request
     let authenticateData = {
       user: username,
       password: "[" + passwordInASCIIArr + "]", // API accepts the password as array of ASCII values
@@ -200,6 +222,7 @@ const Login = ({ navigation }) => {
       isPortal: "false",
     };
 
+    // Convert the data to URLSearchParams format
     const formData = new URLSearchParams(authenticateData);
 
     /**
@@ -209,6 +232,7 @@ const Login = ({ navigation }) => {
      */
     const authenticate = async () => {
       try {
+        // Make the API call to authenticate the user
         const authenticationResult = await fetchData(
           API_ENDPOINTS.AUTHENTICATE,
           "POST",
@@ -236,24 +260,30 @@ const Login = ({ navigation }) => {
         // Store credentials if 'Remember Me' is checked
         if (rememberMe) {
           try {
-            await AsyncStorage.setItem("username", username);
-            await AsyncStorage.setItem("clientId", clientId);
+            await SecureStore.setItemAsync("username", username);
+            await SecureStore.setItemAsync("clientId", clientId);
+            await SecureStore.setItemAsync("password", password);
           } catch (error) {
             console.error("Error storing credentials:", error);
           }
         }
 
+        // Update the app user data with the received authentication result
         updateAppUserData(authenticationResult);
 
+        // Navigate to the Home screen after successful login
         navigation.replace("Home", { authenticationResult });
       } catch (error) {
+        // Show a toast message for any exception during login
         showToast(t("login_exception_message"), "error");
         throw error;
       } finally {
+        // Set the loading state to false to hide the loader
         setIsLoading(false);
       }
     };
 
+    // Call the authenticate function
     try {
       await authenticate();
     } catch (error) {
@@ -322,7 +352,10 @@ const Login = ({ navigation }) => {
           />
           <Text style={styles.checkboxText}>{t("login_rememberMe_text")}</Text>
         </View>
-        <Pressable style={styles.loginButton} onPress={onPress}>
+        <Pressable
+          style={styles.loginButton}
+          onPress={() => onPressLogin(username, password, clientId)}
+        >
           <Text style={styles.loginButtonText}>{t("login_button_text")}</Text>
         </Pressable>
         {isLoading && <Loader />}

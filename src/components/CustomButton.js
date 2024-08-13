@@ -23,6 +23,7 @@ import { disableOpacity } from "../styles/common";
  * @param {boolean} [props.disabled=false] - Boolean indicating whether the button is disabled.
  * @param {Object} [props.style] - Additional styles to be applied to the button.
  * @param {Object} [props.labelStyle] - Additional styles to be applied to the button label.
+ * @param {function} [props.onLongPress] - Callback function invoked when the button is long-pressed.
  * @returns {JSX.Element} - Rendered component.
  */
 const CustomButton = ({
@@ -33,6 +34,7 @@ const CustomButton = ({
   disabled = false,
   style = {}, // Default value to ensure it's always an object
   labelStyle,
+  onLongPress, // New prop for long press functionality
 }) => {
   const [pressed, setPressed] = useState(false);
 
@@ -41,6 +43,15 @@ const CustomButton = ({
    */
   const handlePress = () => {
     onPress();
+  };
+
+  /**
+   * Callback function invoked when the button is long-pressed, invokes the onLongPress callback.
+   */
+  const handleLongPress = () => {
+    if (onLongPress) {
+      onLongPress();
+    }
   };
 
   // Define the icon component based on the library provided in the icon prop
@@ -87,6 +98,7 @@ const CustomButton = ({
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       onPress={handlePress}
+      onLongPress={handleLongPress} // Add onLongPress handler
       disabled={disabled}
     >
       {/* Icon component */}

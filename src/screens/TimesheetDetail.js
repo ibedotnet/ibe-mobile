@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
-import { Alert, Keyboard, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTranslation } from "react-i18next";
@@ -16,7 +16,6 @@ import {
   TEST_MODE,
 } from "../constants";
 
-import SaveCancelBar from "../components/SaveCancelBar";
 import CustomButton from "../components/CustomButton";
 
 import TimesheetDetailGeneral from "./TimesheetDetailGeneral";
@@ -71,7 +70,6 @@ const TimesheetDetail = ({ route, navigation }) => {
   // Determine if the component is in edit mode (if a timesheet ID is provided)
   // True if editing an existing timesheet, false if creating a new one
   const [isEditMode, setIsEditMode] = useState(!!timesheetId);
-  const [keyboardShown, setKeyboardShown] = useState(false);
   const [itemStatusIDMap, setItemStatusIDMap] = useState(null);
   const [currentStatus, setCurrentStatus] = useState({});
   const [listOfNextStatus, setListOfNextStatus] = useState([]);
@@ -105,111 +103,169 @@ const TimesheetDetail = ({ route, navigation }) => {
     validateWorkSchedule: "",
   });
 
+  /**
+   * Fetches the selected date period from the timesheet type based on its external ID.
+   *
+   * This function sends a request to an API endpoint to fetch timesheet type details. It retrieves
+   * information such as default settings, comment requirements, and period schedules. It then
+   * identifies the most recent valid period and returns its dates. If no valid period is found or
+   * if an error occurs, appropriate error messages are shown to the user.
+   *
+   * @param {string} timesheetTypeExtId - The external ID of the timesheet type to fetch.
+   * @returns {Promise<object>} - A promise that resolves to an object containing the valid period dates.
+   */
   const fetchSelectedDatePeriodFromTimesheetType = async (
     timesheetTypeExtId
   ) => {
-    const queryFields = {
-      fields: [
-        `TimeConfType-extID`,
-        `TimeConfType-defaultAsHomeDefault`,
-        `TimeConfType-defaultInputDays`,
-        `TimeConfType-headerCommentRequired`,
-        `TimeConfType-itemCommentRequired`,
-        `TimeConfType-maxTasksPreload`,
-        `TimeConfType-minTimeIncrement`,
-        `TimeConfType-nonBillableComments`,
-        `TimeConfType-overtimeAllowed`,
-        `TimeConfType-validateWorkSchedule`,
-        `TimeConfType-periodSchedules`,
-      ],
-      where: [
+    try {
+      // Define the fields and conditions for the query
+      const queryFields = {
+        fields: [
+          `TimeConfType-extID`,
+          `TimeConfType-defaultAsHomeDefault`,
+          `TimeConfType-defaultInputDays`,
+          `TimeConfType-headerCommentRequired`,
+          `TimeConfType-itemCommentRequired`,
+          `TimeConfType-maxTasksPreload`,
+          `TimeConfType-minTimeIncrement`,
+          `TimeConfType-nonBillableComments`,
+          `TimeConfType-overtimeAllowed`,
+          `TimeConfType-validateWorkSchedule`,
+          `TimeConfType-periodSchedules`,
+        ],
+        where: [
+          {
+            fieldName: "TimeConfType-busObjCat",
+            operator: "=",
+            value: "TimeConfirmationType",
+          },
+        ],
+      };
+
+      // Define common query parameters
+      const commonQueryParams = {
+        testMode: TEST_MODE,
+        client: parseInt(APP.LOGIN_USER_CLIENT),
+        user: APP.LOGIN_USER_ID,
+        userID: APP.LOGIN_USER_ID,
+        language: APP.LOGIN_USER_LANGUAGE,
+        intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+      };
+
+      // Prepare form data for the API request
+      const formData = {
+        query: JSON.stringify(queryFields),
+        ...commonQueryParams,
+      };
+
+      // Fetch data from the API
+      const response = await fetchData(
+        API_ENDPOINTS.QUERY,
+        "POST",
         {
-          fieldName: "TimeConfType-busObjCat",
-          operator: "=",
-          value: "TimeConfirmationType",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         },
-      ],
-    };
-
-    const commonQueryParams = {
-      testMode: TEST_MODE,
-      client: parseInt(APP.LOGIN_USER_CLIENT),
-      user: APP.LOGIN_USER_ID,
-      userID: APP.LOGIN_USER_ID,
-      language: APP.LOGIN_USER_LANGUAGE,
-      intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
-    };
-
-    const formData = {
-      query: JSON.stringify(queryFields),
-      ...commonQueryParams,
-    };
-
-    const response = await fetchData(
-      API_ENDPOINTS.QUERY,
-      "POST",
-      {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      new URLSearchParams(formData).toString()
-    );
-
-    if (
-      response.success === true &&
-      response.data &&
-      response.data instanceof Array &&
-      response.data.length > 0
-    ) {
-      // Find the data object with the desired extID
-      const data = response.data.find(
-        (item) => item["TimeConfType-extID"] === timesheetTypeExtId
+        new URLSearchParams(formData).toString()
       );
 
-      if (data) {
-        // Set the timesheet type details with the found data
-        const fetchedPeriodSchedules =
-          data[`TimeConfType-periodSchedules`] || [];
-
-        setTimesheetTypeDetails({
-          defaultAsHomeDefault: data[`TimeConfType-defaultAsHomeDefault`] || "",
-          defaultInputDays: data[`TimeConfType-defaultInputDays`] || "",
-          headerCommentRequired:
-            data[`TimeConfType-headerCommentRequired`] || "",
-          itemCommentRequired: data[`TimeConfType-itemCommentRequired`] || "",
-          minTimeIncrement: data[`TimeConfType-minTimeIncrement`] || "",
-          nonBillableComments:
-            data[`TimeConfType-nonBillableComments`] || false,
-          overtimeAllowed: data[`TimeConfType-overtimeAllowed`] || false,
-          validateWorkSchedule: data[`TimeConfType-validateWorkSchedule`] || "",
-          periodSchedules: fetchedPeriodSchedules,
-        });
-
-        // Get the most recent period from timsheet type
-        const mostRecentPeriod = await getValidPeriodFromTimesheetType(
-          fetchedPeriodSchedules
+      // Check if the response is successful and contains valid data
+      if (
+        response.success === true &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
+        // Find the data object with the desired external ID
+        const data = response.data.find(
+          (item) => item["TimeConfType-extID"] === timesheetTypeExtId
         );
 
-        if (mostRecentPeriod && mostRecentPeriod.periodSchedule) {
-          console.debug(
-            "Most recent valid period id:",
-            mostRecentPeriod.periodSchedule
-          );
+        if (data) {
+          // Extract period schedules and set timesheet type details
+          const fetchedPeriodSchedules =
+            data[`TimeConfType-periodSchedules`] || [];
+          setTimesheetTypeDetails({
+            defaultAsHomeDefault:
+              data[`TimeConfType-defaultAsHomeDefault`] || "",
+            defaultInputDays: data[`TimeConfType-defaultInputDays`] || "",
+            headerCommentRequired:
+              data[`TimeConfType-headerCommentRequired`] || "",
+            itemCommentRequired: data[`TimeConfType-itemCommentRequired`] || "",
+            minTimeIncrement: data[`TimeConfType-minTimeIncrement`] || "",
+            nonBillableComments:
+              data[`TimeConfType-nonBillableComments`] || false,
+            overtimeAllowed: data[`TimeConfType-overtimeAllowed`] || false,
+            validateWorkSchedule:
+              data[`TimeConfType-validateWorkSchedule`] || "",
+            periodSchedules: fetchedPeriodSchedules,
+          });
 
-          const validPeriodForSelectedDate =
-            await getValidPeriodDatesFromPeriodSchedule(
-              mostRecentPeriod.periodSchedule
+          if (fetchedPeriodSchedules && fetchedPeriodSchedules.length > 0) {
+            // Check if there are any fetched period schedules
+            // If there are, proceed to get the most recent valid period from the timesheet type
+
+            const mostRecentPeriod = await getValidPeriodFromTimesheetType(
+              fetchedPeriodSchedules
             );
 
-          return validPeriodForSelectedDate;
+            if (mostRecentPeriod && mostRecentPeriod.periodSchedule) {
+              // If a valid period is found and it has a period schedule, log the period schedule ID
+
+              console.debug(
+                "Most recent valid period id:",
+                mostRecentPeriod.periodSchedule
+              );
+
+              // Fetch the valid period dates based on the period schedule
+              const validPeriodForSelectedDate =
+                await getValidPeriodDatesFromPeriodSchedule(
+                  mostRecentPeriod.periodSchedule
+                );
+
+              // Return the valid period dates for the selected date
+              return validPeriodForSelectedDate;
+            } else {
+              // If the most recent period does not exist or does not refer to a valid period schedule id
+              console.debug(
+                "Valid period not found in the maintained period schedules for the timesheet type."
+              );
+              showToast(t("no_valid_period_in_timesheet_type"), "error");
+              return;
+            }
+          } else {
+            // If no period schedules are found, log a debug message
+            // Default to a weekly interval based on the selected date
+
+            console.debug(
+              "The timesheet type does not have any period maintained, so it will default to a weekly interval."
+            );
+
+            return normalizePeriodToWeek(
+              {
+                from: selectedDate,
+                to: selectedDate,
+              },
+              loggedInUserInfo.startOfWeek
+            );
+          }
         } else {
-          showToast(t("no_valid_period_in_timesheet_type"), "error");
-          console.debug("No valid period found in timsheet type.");
+          // Handle case where no timesheet type is found with the given external ID
+          console.error(
+            `No timesheet type found with extID ${timesheetTypeExtId}`
+          );
+          showToast(t("no_timesheet_type_found"), "error");
         }
       } else {
-        console.error(
-          `No timesheet type found with extID ${timesheetTypeExtId}`
-        );
+        // Handle case where the response format is unexpected or the data array is empty
+        console.error("Unexpected response format or empty data array.");
+        showToast(t("error_fetching_data"), "error");
       }
+    } catch (error) {
+      // Handle any errors that occur during the fetch operation
+      console.error(
+        "Error in fetchSelectedDatePeriodFromTimesheetType:",
+        error
+      );
+      showToast(t("error_fetching_data"), "error");
     }
   };
 
@@ -349,6 +405,28 @@ const TimesheetDetail = ({ route, navigation }) => {
     return date >= range.from && date <= range.to;
   };
 
+  const normalizePeriodToWeek = (period, startOfWeek) => {
+    if (period && period.from && period.to) {
+      // Clone the 'from' date
+      const fromDate = new Date(period.from);
+
+      // Adjust 'fromDate' to the start of the week based on 'startOfWeek'
+      fromDate.setDate(
+        fromDate.getDate() -
+          fromDate.getDay() +
+          startOfWeek -
+          (startOfWeek > fromDate.getDay() ? 7 : 0)
+      );
+
+      // Create a 'toDate' as 6 days after the 'fromDate'
+      const toDate = new Date(fromDate);
+      toDate.setDate(toDate.getDate() + 6);
+
+      // Return the normalized period
+      return { start: fromDate, end: toDate };
+    }
+  };
+
   const handleTimesheetDetailChange = (values) => {
     // Return early if timesheetType is not set to avoid comparing with initial empty value.
     if (!timesheetType) {
@@ -396,7 +474,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         values.timesheetOverTime !== undefined &&
         values.timesheetOverTime !== timesheetOverTime
       ) {
-        setTimesheetBillableTime(values.timesheetOverTime);
+        setTimesheetOverTime(values.timesheetOverTime);
         updatedChanges["totalOvertime"] = values.timesheetOverTime;
       }
     }
@@ -426,38 +504,85 @@ const TimesheetDetail = ({ route, navigation }) => {
   };
 
   const validateTimesheetOnSave = () => {
+    // Destructure the headerCommentRequired property from the timesheetTypeDetails object
     const { headerCommentRequired } = timesheetTypeDetails;
 
+    // Check if the timesheet start date is provided
     if (!timesheetStart) {
-    }
-    if (!timesheetEnd) {
-    }
-    if (!timesheetCompanyId) {
-    }
-    if (!timesheetEmployeeId) {
+      // Show an alert indicating that the start date is required
+      Alert.alert(
+        t("validation_error"), // Title of the alert
+        t("timesheet_start_required_message"), // Message of the alert
+        [{ text: t("ok"), style: "cancel" }], // Button configuration
+        { cancelable: false } // Prevents closing the alert by tapping outside
+      );
+      return false; // Return false to prevent saving
     }
 
+    // Check if the timesheet end date is provided
+    if (!timesheetEnd) {
+      // Show an alert indicating that the end date is required
+      Alert.alert(
+        t("validation_error"),
+        t("timesheet_end_required_message"),
+        [{ text: t("ok"), style: "cancel" }],
+        { cancelable: false }
+      );
+      return false; // Return false to prevent saving
+    }
+
+    // Check if the company ID is provided
+    if (!timesheetCompanyId) {
+      // Show an alert indicating that the company ID is required
+      Alert.alert(
+        t("validation_error"),
+        t("timesheet_company_required_message"),
+        [{ text: t("ok"), style: "cancel" }],
+        { cancelable: false }
+      );
+      return false; // Return false to prevent saving
+    }
+
+    // Check if the employee ID is provided
+    if (!timesheetEmployeeId) {
+      // Show an alert indicating that the employee ID is required
+      Alert.alert(
+        t("validation_error"),
+        t("timesheet_employee_required_message"),
+        [{ text: t("ok"), style: "cancel" }],
+        { cancelable: false }
+      );
+      return false; // Return false to prevent saving
+    }
+
+    // Get the header remark text based on the provided timesheet remark and language settings
     const headerRemarkText = getRemarkText(
       timesheetRemark,
       lang,
       PREFERRED_LANGUAGES
     );
 
+    // Check if the header remark is required but missing
     if (!headerRemarkText) {
       if (headerCommentRequired === "E") {
+        // "E" stands for "Error"
+        // Show an alert indicating that the header remark is required
         Alert.alert(
           t("validation_error"),
           t("timesheet_header_remark_required_message"),
           [{ text: t("ok"), style: "cancel" }],
           { cancelable: false }
         );
-        return false;
+        return false; // Return false to prevent saving
       }
       if (headerCommentRequired === "W") {
+        // "W" stands for "Warning"
+        // Show a warning toast indicating that the header remark is recommended
         showToast(t("timesheet_header_remark_recommended_message"), "warning");
       }
     }
 
+    // If all validations pass, return true to proceed with saving
     return true;
   };
 
@@ -494,18 +619,7 @@ const TimesheetDetail = ({ route, navigation }) => {
     );
   };
 
-  const onCancel = () => {
-    if (!hasUnsavedChanges()) {
-      navigation.goBack(); // Simply navigate back (timesheet list)
-      return;
-    }
-
-    showUnsavedChangesAlert(() => {
-      navigation.goBack();
-    });
-  };
-
-  const onSave = async () => {
+  const handleSave = async () => {
     try {
       const isValidTimesheet = validateTimesheetOnSave();
 
@@ -571,12 +685,12 @@ const TimesheetDetail = ({ route, navigation }) => {
         }
 
         updateForceRefresh(true);
+
+        if (updateResponse.message) {
+          showToast(updateResponse.message);
+        }
       } else {
         showToast(t("update_failure"), "error");
-      }
-
-      if (updateResponse.message) {
-        showToast(updateResponse.message);
       }
     } catch (error) {
       console.error("Error in updateTimesheet of TimesheetDetail", error);
@@ -775,6 +889,7 @@ const TimesheetDetail = ({ route, navigation }) => {
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskTime`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID:Task-dates-actualFinish`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-department`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-department:BusUnit-extID`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-department:BusUnit-name-text`,
     ...getTimesheetTypeFields(), // Include the TimeConfType fields
   ];
@@ -1186,27 +1301,6 @@ const TimesheetDetail = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      "keyboardDidShow",
-      () => {
-        setKeyboardShown(true);
-      }
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      "keyboardDidHide",
-      () => {
-        setKeyboardShown(false);
-      }
-    );
-
-    // cleanup function
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
-  useEffect(() => {
     const beforeRemoveListener = navigation.addListener("beforeRemove", (e) => {
       if (!hasUnsavedChanges()) {
         // If we don't have unsaved changes, then we don't need to do anything
@@ -1259,11 +1353,26 @@ const TimesheetDetail = ({ route, navigation }) => {
               }}
               disabled={!isEditMode || loading || isLocked} // Disable delete button when not in edit mode, when loading, or when locked
             />
+            <CustomButton
+              onPress={handleSave}
+              label=""
+              icon={{
+                name: "content-save",
+                library: "MaterialCommunityIcons",
+                size: 24,
+              }}
+              disabled={
+                loading ||
+                isLocked ||
+                Object.keys(updatedValues).length === 0 ||
+                timesheetTasks.length === 0
+              } // Disable save button when loading, locked, or when there are no changes
+            />
           </View>
         );
       },
     });
-  }, [isEditMode, isLocked, loading]);
+  }, [isEditMode, isLocked, loading, updatedValues, timesheetTasks]);
 
   useEffect(() => {
     if (!loggedInUserInfo.workScheduleExtId) {
@@ -1321,6 +1430,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                       handleReload={handleReload}
                       loading={loading}
                       setLoading={setLoading}
+                      selectedDateInCreate={selectedDate}
                       onTimesheetDetailChange={handleTimesheetDetailChange}
                       timesheetTypeDetails={timesheetTypeDetails}
                       timesheetDetail={{
@@ -1368,16 +1478,6 @@ const TimesheetDetail = ({ route, navigation }) => {
                 )}
               </Tab.Screen>
             </Tab.Navigator>
-            {!keyboardShown && (
-              <SaveCancelBar
-                onSave={onSave}
-                onCancel={onCancel}
-                saveIcon="save"
-                cancelIcon="times"
-                saveDisable={loading || isLocked}
-                isFloating={true}
-              />
-            )}
           </>
         )
       )}
@@ -1390,7 +1490,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerRightContainer: {
-    width: screenDimension.width / 3,
+    width: screenDimension.width / 2.5,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",

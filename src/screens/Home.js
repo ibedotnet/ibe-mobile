@@ -165,7 +165,7 @@ const Home = ({ route, navigation }) => {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {t("timesheets")}
+                {`${t("timesheet")}s`}
               </Text>
             </View>
           </TouchableOpacity>
@@ -177,7 +177,7 @@ const Home = ({ route, navigation }) => {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {t("expenses")}
+                {`${t("expense")}s`}
               </Text>
             </View>
           </TouchableOpacity>
@@ -195,7 +195,7 @@ const Home = ({ route, navigation }) => {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {t("absences")}
+                {`${t("absence")}s`}
               </Text>
             </View>
           </TouchableOpacity>
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 1,
     maxWidth: screenDimension.width,
-    backgroundColor: "#fff",
+    backgroundColor: "#f0f8ff",
     padding: "16%",
     borderWidth: 0.5,
     borderColor: "#005eb8",
@@ -265,7 +265,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 5,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.8,
     shadowRadius: 2,

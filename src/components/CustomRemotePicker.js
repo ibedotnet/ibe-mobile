@@ -30,6 +30,7 @@ import CustomButton from "./CustomButton";
  * @param {Array} searchFields - Fields to search against.
  * @param {boolean} multiline - If true, allows multiple lines of input.
  * @param {Function} onValueChange - Callback function when a value is selected or changed.
+ * @param {boolean} disabled - If true, disables the entire component.
  */
 
 const CustomRemotePicker = ({
@@ -44,6 +45,7 @@ const CustomRemotePicker = ({
   searchFields = [],
   multiline = false,
   onValueChange,
+  disabled = false,
 }) => {
   const { t } = useTranslation();
 
@@ -255,13 +257,14 @@ const CustomRemotePicker = ({
             onChangeText={handleSearchInputChange}
             placeholder={`${t("search")}...`}
             editable={
+              !disabled &&
               !searchDataLoading &&
               (selectedLabel ? selectedLabel !== searchQuery : true)
             }
             showSearchIcon={!isSearchButtonHidden}
             onSearchPress={handleSearchButtonPress}
             searchButtonDisabled={searchDataLoading}
-            forceEnableClearButton={true}
+            forceEnableClearButton={!disabled}
             multiline={multiline}
           />
           {isSearchButtonHidden && (
@@ -277,7 +280,7 @@ const CustomRemotePicker = ({
                   size: 24,
                   color: "#000",
                 }}
-                disabled={searchDataLoading}
+                disabled={searchDataLoading || disabled}
               />
             </View>
           )}

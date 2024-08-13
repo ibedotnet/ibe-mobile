@@ -36,7 +36,8 @@
     },
     "owner": "ibe-2023",
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      "expo-secure-store"
     ]
   }
 }

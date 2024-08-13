@@ -25,11 +25,12 @@ const TimesheetDetailItemEditor = ({
   onConfirm,
   onCancel,
   isItemEditMode,
+  isParentLocked,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
-  const { itemCommentRequired } = timesheetTypeDetails;
+  const { defaultAsHomeDefault, itemCommentRequired } = timesheetTypeDetails;
 
   const [editedItem, setEditedItem] = useState({ ...item });
   const [initialItem, setInitialItem] = useState({ ...item });
@@ -125,6 +126,8 @@ const TimesheetDetailItemEditor = ({
   const validateChanges = () => {
     const validationErrorMessages = {
       task: t("task_required_message"),
+      department: t("department_required_message"),
+      departmentOrTask: t("department_or_task_required_message"),
       time: t("time_required_message"),
       remark: t("remark_required_message"),
     };
@@ -133,7 +136,46 @@ const TimesheetDetailItemEditor = ({
       remark: t("remark_recommended_message"),
     };
 
-    if (!editedItem.taskId) {
+    // Check for department or task requirement, ensuring only one is selected
+    if (defaultAsHomeDefault === ".") {
+      if (!editedItem.taskId && !editedItem.departmentId) {
+        Alert.alert(
+          t("validation_error"),
+          validationErrorMessages.departmentOrTask,
+          [{ text: t("ok"), style: "cancel" }],
+          { cancelable: false }
+        );
+        return false;
+      }
+
+      if (editedItem.taskId && editedItem.departmentId) {
+        Alert.alert(
+          t("validation_error"),
+          t("only_one_task_or_department_allowed"),
+          [{ text: t("ok"), style: "cancel" }],
+          { cancelable: false }
+        );
+        return false;
+      }
+    }
+
+    // Check for department requirement
+    if (defaultAsHomeDefault === "*" && !editedItem.departmentId) {
+      Alert.alert(
+        t("validation_error"),
+        validationErrorMessages.department,
+        [{ text: t("ok"), style: "cancel" }],
+        { cancelable: false }
+      );
+      return false;
+    }
+
+    // Check for task requirement
+    if (
+      defaultAsHomeDefault !== "*" &&
+      defaultAsHomeDefault !== "." &&
+      !editedItem.taskId
+    ) {
       Alert.alert(
         t("validation_error"),
         validationErrorMessages.task,
@@ -143,6 +185,7 @@ const TimesheetDetailItemEditor = ({
       return false;
     }
 
+    // Check for time requirement
     if (!editedItem.actualTime) {
       Alert.alert(
         t("validation_error"),
@@ -153,6 +196,7 @@ const TimesheetDetailItemEditor = ({
       return false;
     }
 
+    // Check for remark requirement conditionally
     if (!remarkText) {
       if (itemCommentRequired === "E") {
         Alert.alert(
@@ -366,7 +410,10 @@ const TimesheetDetailItemEditor = ({
           {
             fieldName: "Task-dates-actualFinish",
             operator: ">=",
-            value: timesheetDetail?.timesheetStart ?? new Date(),
+            value:
+              timesheetDetail.selectedDate ?? // Use `selectedDate` if it's available
+              timesheetDetail.timesheetStart ?? // Otherwise, use `timesheetStart`
+              new Date(), // Fall back to the current date and time if both are unavailable
           },
         ],
       },
@@ -378,6 +425,32 @@ const TimesheetDetailItemEditor = ({
       },
       {
         property: "Task-text:text",
+        direction: "ASC",
+      },
+    ],
+  };
+
+  const busUnitQueryParams = {
+    fields: [
+      "BusUnit-id",
+      "BusUnit-extID",
+      "BusUnit-type",
+      "BusUnit-name",
+      "BusUnit-name:text",
+      "BusUnit-inactive",
+      "BusUnit-busFunction",
+    ],
+    where: [
+      { fieldName: "BusUnit-busFunction", operator: "=", value: "Department" },
+      { fieldName: "BusUnit-inactive", operator: "!=", value: true },
+    ],
+    sort: [
+      {
+        property: "BUsUnit-changedOn",
+        direction: "DESC",
+      },
+      {
+        property: "BusUnit-name:text",
         direction: "ASC",
       },
     ],
@@ -435,6 +508,9 @@ const TimesheetDetailItemEditor = ({
       taskId: !value ? null : editedItem.taskId,
       taskText: !value ? "" : editedItem.taskText,
       taskExtId: !value ? "" : editedItem.taskExtId,
+      departmentId: "",
+      departmentText: "",
+      departmentExtId: "",
     });
   };
 
@@ -467,6 +543,9 @@ const TimesheetDetailItemEditor = ({
         !editedItem.customerExtId && additionalData.projectCustomerExtId
           ? additionalData.projectCustomerExtId
           : editedItem.customerExtId,
+      departmentId: "",
+      departmentText: "",
+      departmentExtId: "",
     });
   };
 
@@ -508,6 +587,34 @@ const TimesheetDetailItemEditor = ({
         !editedItem.projectExtId && additionalData.taskProjectWBSExtId
           ? additionalData.taskProjectWBSExtId
           : editedItem.projectExtId,
+      departmentId: "",
+      departmentText: "",
+      departmentExtId: "",
+    });
+  };
+
+  const handleDepartmentChange = ({ value, label, additionalData }) => {
+    const extID = additionalData.extID ?? "";
+
+    console.debug(
+      `Additonal data in department: ${JSON.stringify(additionalData)}`
+    );
+
+    setEditedItem({
+      ...editedItem,
+      billable: false,
+      departmentId: value ?? "",
+      departmentText: label ?? "",
+      departmentExtId: extID ?? "",
+      customerId: "",
+      customerText: "",
+      customerExtId: "",
+      projectId: "",
+      projectText: "",
+      projectExtId: "",
+      taskId: "",
+      taskText: "",
+      taskExtId: "",
     });
   };
 
@@ -544,83 +651,115 @@ const TimesheetDetailItemEditor = ({
             : t("timesheet_create_item")}
         </Text>
         <ScrollView contentContainerStyle={styles.modalContent}>
-          <View style={styles.modalInputContainer}>
-            <CustomRemotePicker
-              queryParams={{
-                queryFields: customerQueryParams,
-                commonQueryParams: commonQueryParams,
-              }}
-              pickerLabel={t("customer")}
-              initialAdditionalLabel={editedItem.customerExtId}
-              initialItemLabel={editedItem.customerText}
-              initialItemValue={editedItem.customerId}
-              labelItemField={"Customer-name:text"}
-              valueItemField={"Customer-id"}
-              additionalFields={[{ extID: "Customer-extID" }]}
-              searchFields={["Customer-name-text", "Customer-extID"]}
-              multiline={true}
-              onValueChange={handleCustomerChange}
-            />
-          </View>
-          <View style={styles.modalInputContainer}>
-            <CustomRemotePicker
-              queryParams={{
-                queryFields: projectQueryParams,
-                commonQueryParams: commonQueryParams,
-              }}
-              pickerLabel={t("project")}
-              initialAdditionalLabel={editedItem.projectExtId}
-              initialItemLabel={editedItem.projectText}
-              initialItemValue={editedItem.projectId}
-              labelItemField={"ProjectWBS-text:text"}
-              valueItemField={"ProjectWBS-id"}
-              additionalFields={[
-                {
-                  extID: "ProjectWBS-extID",
-                },
-                { projectCustomerId: "ProjectWBS-customerID" },
-                {
-                  projectCustomerExtId: "ProjectWBS-customerID:Customer-extID",
-                },
-                {
-                  projectCustomerText:
-                    "ProjectWBS-customerID:Customer-name-text",
-                },
-              ]}
-              searchFields={["ProjectWBS-text-text", "ProjectWBS-extID"]}
-              multiline={true}
-              onValueChange={handleProjectChange}
-            />
-          </View>
-          <View style={styles.modalInputContainer}>
-            <CustomRemotePicker
-              queryParams={{
-                queryFields: taskQueryParams,
-                commonQueryParams: commonQueryParams,
-              }}
-              pickerLabel={t("task")}
-              initialAdditionalLabel={editedItem.taskExtId}
-              initialItemLabel={editedItem.taskText}
-              initialItemValue={editedItem.taskId}
-              labelItemField={"Task-text:text"}
-              valueItemField={"Task-id"}
-              additionalFields={[
-                { extID: "Task-extID" },
-                { taskBillable: "Task-billable" },
-                { taskCustomerId: "Task-customerID" },
-                { taskCustomerExtId: "Task-customerID:Customer-extID" },
-                { taskCustomerText: "Task-customerID:Customer-name-text" },
-                { taskProjectWBSId: "Task-projectWbsID" },
-                { taskProjectWBSExtId: "Task-projectWbsID:ProjectWBS-extID" },
-                {
-                  taskProjectWBSText: "Task-projectWbsID:ProjectWBS-text-text",
-                },
-              ]}
-              searchFields={["Task-text-text", "Task-extID"]}
-              multiline={true}
-              onValueChange={handleTaskChange}
-            />
-          </View>
+          {defaultAsHomeDefault !== "*" && (
+            <View style={styles.modalInputContainer}>
+              <CustomRemotePicker
+                queryParams={{
+                  queryFields: customerQueryParams,
+                  commonQueryParams: commonQueryParams,
+                }}
+                pickerLabel={t("customer")}
+                initialAdditionalLabel={editedItem.customerExtId}
+                initialItemLabel={editedItem.customerText}
+                initialItemValue={editedItem.customerId}
+                labelItemField={"Customer-name:text"}
+                valueItemField={"Customer-id"}
+                additionalFields={[{ extID: "Customer-extID" }]}
+                searchFields={["Customer-name-text", "Customer-extID"]}
+                multiline={true}
+                onValueChange={handleCustomerChange}
+                disabled={isParentLocked || defaultAsHomeDefault === "*"}
+              />
+            </View>
+          )}
+          {defaultAsHomeDefault !== "*" && (
+            <View style={styles.modalInputContainer}>
+              <CustomRemotePicker
+                queryParams={{
+                  queryFields: projectQueryParams,
+                  commonQueryParams: commonQueryParams,
+                }}
+                pickerLabel={t("project")}
+                initialAdditionalLabel={editedItem.projectExtId}
+                initialItemLabel={editedItem.projectText}
+                initialItemValue={editedItem.projectId}
+                labelItemField={"ProjectWBS-text:text"}
+                valueItemField={"ProjectWBS-id"}
+                additionalFields={[
+                  {
+                    extID: "ProjectWBS-extID",
+                  },
+                  { projectCustomerId: "ProjectWBS-customerID" },
+                  {
+                    projectCustomerExtId:
+                      "ProjectWBS-customerID:Customer-extID",
+                  },
+                  {
+                    projectCustomerText:
+                      "ProjectWBS-customerID:Customer-name-text",
+                  },
+                ]}
+                searchFields={["ProjectWBS-text-text", "ProjectWBS-extID"]}
+                multiline={true}
+                onValueChange={handleProjectChange}
+                disabled={isParentLocked}
+              />
+            </View>
+          )}
+          {defaultAsHomeDefault !== "*" && (
+            <View style={styles.modalInputContainer}>
+              <CustomRemotePicker
+                queryParams={{
+                  queryFields: taskQueryParams,
+                  commonQueryParams: commonQueryParams,
+                }}
+                pickerLabel={t("task")}
+                initialAdditionalLabel={editedItem.taskExtId}
+                initialItemLabel={editedItem.taskText}
+                initialItemValue={editedItem.taskId}
+                labelItemField={"Task-text:text"}
+                valueItemField={"Task-id"}
+                additionalFields={[
+                  { extID: "Task-extID" },
+                  { taskBillable: "Task-billable" },
+                  { taskCustomerId: "Task-customerID" },
+                  { taskCustomerExtId: "Task-customerID:Customer-extID" },
+                  { taskCustomerText: "Task-customerID:Customer-name-text" },
+                  { taskProjectWBSId: "Task-projectWbsID" },
+                  { taskProjectWBSExtId: "Task-projectWbsID:ProjectWBS-extID" },
+                  {
+                    taskProjectWBSText:
+                      "Task-projectWbsID:ProjectWBS-text-text",
+                  },
+                ]}
+                searchFields={["Task-text-text", "Task-extID"]}
+                multiline={true}
+                onValueChange={handleTaskChange}
+                disabled={isParentLocked}
+              />
+            </View>
+          )}
+          {(defaultAsHomeDefault === "*" || defaultAsHomeDefault === ".") && (
+            <View style={styles.modalInputContainer}>
+              <CustomRemotePicker
+                queryParams={{
+                  queryFields: busUnitQueryParams,
+                  commonQueryParams: commonQueryParams,
+                }}
+                pickerLabel={t("department")}
+                initialAdditionalLabel={editedItem.departmentExtId}
+                initialItemLabel={editedItem.departmentText}
+                initialItemValue={editedItem.departmentId}
+                labelItemField={"BusUnit-name:text"}
+                valueItemField={"BusUnit-id"}
+                additionalFields={[{ extID: "BusUnit-extID" }]}
+                searchFields={["BusUnit-name-text", "BusUnit-extID"]}
+                multiline={true}
+                onValueChange={handleDepartmentChange}
+                disabled={isParentLocked}
+              />
+            </View>
+          )}
           <View style={styles.modalInputContainer}>
             <Text style={styles.modalInputLabel}>{t("remark")}</Text>
             <CustomTextInput
@@ -628,6 +767,7 @@ const TimesheetDetailItemEditor = ({
               onChangeText={handleRemarkChange}
               placeholder={`${t("placeholder_remark")}...`}
               multiline={true}
+              editable={!isParentLocked}
             />
           </View>
           <View style={styles.modalInputContainer}>
@@ -650,22 +790,25 @@ const TimesheetDetailItemEditor = ({
               searchFields={["TimeItemType-name", "TimeItemType-extID"]}
               multiline={true}
               onValueChange={handleTimeTypeChange}
+              disabled={isParentLocked}
             />
           </View>
           <View style={styles.rowContainer}>
-            <View>
-              <Text style={styles.modalInputLabel}>{t("billable")}</Text>
-              <Switch
-                trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
-                thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
-                ios_backgroundColor="#d3d3d3"
-                value={editedItem.billable}
-                onValueChange={(value) =>
-                  setEditedItem({ ...editedItem, billable: value })
-                }
-                disabled={true}
-              />
-            </View>
+            {defaultAsHomeDefault !== "*" && (
+              <View>
+                <Text style={styles.modalInputLabel}>{t("billable")}</Text>
+                <Switch
+                  trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
+                  thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
+                  ios_backgroundColor="#d3d3d3"
+                  value={editedItem.billable}
+                  onValueChange={(value) =>
+                    setEditedItem({ ...editedItem, billable: value })
+                  }
+                  disabled={true || defaultAsHomeDefault === "*"}
+                />
+              </View>
+            )}
             <View style={[styles.modalInputContainer, styles.flexContainer]}>
               <Text style={styles.modalInputLabel}>{t("time")}</Text>
               <View style={styles.hoursContainer}>
@@ -676,6 +819,7 @@ const TimesheetDetailItemEditor = ({
                   showClearButton={false}
                   keyboardType="numeric"
                   containerStyle={styles.hourInput}
+                  editable={!isParentLocked}
                 />
                 <CustomPicker
                   items={timeUnitOptions}
@@ -683,20 +827,40 @@ const TimesheetDetailItemEditor = ({
                   onFilter={handleTimeUnitChange}
                   hideSearchInput={true}
                   containerStyle={styles.unitPickerContainer}
+                  disabled={isParentLocked}
                 />
               </View>
             </View>
           </View>
           <Text style={styles.note}>{`${t("note")}:`}</Text>
-          <Text style={styles.note}>{`1. ${t(
-            "note_timesheet_item_project"
-          )}`}</Text>
-          <Text style={styles.note}>{`2. ${t(
-            "note_timesheet_item_task"
-          )}`}</Text>
+          {defaultAsHomeDefault === "*" && (
+            <Text style={styles.note}>{`\u2022 ${t(
+              "timesheet_type_department_only"
+            )}`}</Text>
+          )}
+          {defaultAsHomeDefault !== "*" && (
+            <View>
+              <Text style={styles.note}>{`\u2022 ${t(
+                "note_timesheet_item_project"
+              )}`}</Text>
+              <Text style={styles.note}>{`\u2022 ${t(
+                "note_timesheet_item_task"
+              )}`}</Text>
+              {defaultAsHomeDefault === "." && (
+                <Text style={styles.note}>{`\u2022 ${t(
+                  "only_one_task_or_department_allowed"
+                )}`}</Text>
+              )}
+            </View>
+          )}
+          <Text style={styles.note}>{`\u2022 ${t("remark_language_note")}`}</Text>
         </ScrollView>
         <View style={styles.modalButtonsContainer}>
-          <Button onPress={handleConfirm} title={t("confirm")} />
+          <Button
+            onPress={handleConfirm}
+            title={t("confirm")}
+            disabled={isParentLocked}
+          />
           <Button onPress={handleCancel} title={t("cancel")} />
         </View>
       </View>

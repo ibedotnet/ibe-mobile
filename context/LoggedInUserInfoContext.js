@@ -31,6 +31,7 @@ export const LoggedInUserInfoProvider = ({ children }) => {
     minWorkHours: null,
     maxWorkHours: null,
     workHoursInterval: null,
+    patterns: null,
   });
 
   return (

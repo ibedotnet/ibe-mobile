@@ -347,9 +347,9 @@ const getQueryFields = (busObjCat, extraFields = []) => {
 const getSortConditions = (busObjCat) => {
   switch (busObjCat) {
     case BUSOBJCAT.TIMESHEET:
-      return [{ property: "TimeConfirmation-changedOn", direction: "DESC" }];
+      return [{ property: "TimeConfirmation-start", direction: "DESC" }];
     case BUSOBJCAT.EXPENSE:
-      return [{ property: "ExpenseClaim-changedOn", direction: "DESC" }];
+      return [{ property: "ExpenseClaim-date", direction: "DESC" }];
     case BUSOBJCAT.ABSENCE:
       return [{ property: "Absence-start", direction: "DESC" }];
     default:
@@ -368,6 +368,7 @@ const getSortConditions = (busObjCat) => {
  * @param {Object} [queryFields={}] - (Optional) Query fields configuration object.
  * @param {Array<Object>} [whereConditions=[]] - (Optional) Array of where conditions for the query.
  * @param {Array<Object>} [orConditions=[]] - (Optional) Array of OR conditions for the query.
+ * @param {Array<Object>} [sortConditions=[]] - (Optional) Array of sort conditions for the query.
  * @returns {Promise<Object>} - A promise resolving to an object containing fetched data, page number, and limit.
  */
 const fetchBusObjCatData = async (
@@ -376,7 +377,8 @@ const fetchBusObjCatData = async (
   limit = PAGE_SIZE,
   queryFields = {},
   whereConditions = [],
-  orConditions = []
+  orConditions = [],
+  sortConditions = []
 ) => {
   try {
     // If query fields are not provided, get them based on the business object category
@@ -426,7 +428,10 @@ const fetchBusObjCatData = async (
       }
     }
 
-    if (getSortConditions(busObjCat)) {
+    // Use sortConditions if provided or fallback to getSortConditions
+    if (sortConditions.length > 0) {
+      commonQueryData.sort = JSON.stringify(sortConditions);
+    } else if (getSortConditions(busObjCat)) {
       commonQueryData.sort = JSON.stringify(getSortConditions(busObjCat));
     }
 

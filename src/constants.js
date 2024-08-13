@@ -27,7 +27,7 @@ const Environment = {
  * @type {Object.<string, string>}
  */
 const BASE_URL = {
-  [Environment.DEVELOPMENT]: "http://192.168.1.7",
+  [Environment.DEVELOPMENT]: "http://172.17.0.49",
   [Environment.TESTING]: "http://testserver.ibenv.net",
   [Environment.PRODUCTION]: "http://appnew.ibenv.net",
 };
