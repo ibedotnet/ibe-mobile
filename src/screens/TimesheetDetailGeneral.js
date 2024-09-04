@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -19,7 +18,6 @@ import TimesheetDetailItemEditor from "./TimesheetDetailItemEditor";
 
 import CollapsiblePanel from "../components/CollapsiblePanel";
 import CustomButton from "../components/CustomButton";
-import CustomDateTimePicker from "../components/CustomDateTimePicker";
 import CustomStatus from "../components/CustomStatus";
 import CustomTextInput from "../components/CustomTextInput";
 
@@ -52,6 +50,7 @@ const TimesheetDetailGeneral = ({
   setLoading,
   selectedDateInCreate,
   onTimesheetDetailChange,
+  OnFindingLeaveDates,
   timesheetTypeDetails,
   timesheetDetail,
 }) => {
@@ -64,7 +63,6 @@ const TimesheetDetailGeneral = ({
       termDate,
       nonWorkingDates,
       nonWorkingDays,
-      startOfWeek,
       dailyStdHours,
       patterns,
     },
@@ -109,6 +107,9 @@ const TimesheetDetailGeneral = ({
   const [start, setStart] = useState(timesheetStartDate);
   const [end, setEnd] = useState(convertToDateObject(timesheetEndDate));
   const [totalTime, setTotalTime] = useState(timesheetTotalTime || 0);
+  const [totalTimesheetTime, setTimesheetTotalTime] = useState(
+    timesheetTotalTime || 0
+  );
   const [billableTime, setBillableTime] = useState(timesheetBillableTime || 0);
   const [overTime, setOverTime] = useState(timesheetOverTime || 0);
   const [dayTotalTime, setDayTotalTime] = useState(0);
@@ -119,6 +120,58 @@ const TimesheetDetailGeneral = ({
   const [headerRemarkText, setHeaderRemarkText] = useState(
     getRemarkText(timesheetRemark, lang, PREFERRED_LANGUAGES)
   );
+
+  /**
+   * Sums the hours from the holiday and absence lists.
+   *
+   * - For holidays, it uses the daily standard hours.
+   * - For absences, it uses the corresponding absence hours.
+   *
+   * @returns {number} - The total sum of hours in milliseconds.
+   */
+  const sumHolidayAndAbsenceHours = () => {
+    let totalAbsenceHolidayTime = 0;
+
+    // Sum holiday hours using the daily standard hours
+    holidayList.forEach((holiday) => {
+      totalAbsenceHolidayTime += dailyStdHours;
+    });
+
+    // Sum absence hours
+    absenceList.forEach((absence) => {
+      totalAbsenceHolidayTime += absence.absenceHours;
+    });
+
+    return totalAbsenceHolidayTime;
+  };
+
+  useEffect(() => {
+    // Extract dates from a list
+    const extractDates = (list) => {
+      return list.map((item) => {
+        const date = new Date(item.date);
+        return date.toDateString(); // Convert date to a string format
+      });
+    };
+
+    // Extract and format dates
+    const holidayDates = extractDates(holidayList);
+    const absenceDates = extractDates(absenceList);
+
+    // Create a map for absence dates with corresponding absence hours
+    const absenceDateHoursMap = absenceList.reduce((map, item) => {
+      const date = new Date(item.date).toDateString(); // Format the date
+      map[date] = item.absenceHours; // Store the corresponding absence hours
+      return map;
+    }, {});
+
+    // Combine and deduplicate dates
+    const leaveDates = [...new Set([...holidayDates, ...absenceDates])]; // Combine and remove duplicates
+
+    if (OnFindingLeaveDates) {
+      OnFindingLeaveDates(leaveDates, absenceDateHoursMap);
+    }
+  }, [holidayList, absenceList]);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -174,6 +227,7 @@ const TimesheetDetailGeneral = ({
     holidayDayTotalMap,
     absenceDayTotalMap
   ) => {
+    let totalWorkTimeInMilli = 0;
     let totalTimeInMilli = 0;
     let totalBillableTime = 0;
 
@@ -195,6 +249,7 @@ const TimesheetDetailGeneral = ({
         if (item.billable) {
           totalBillableTime += item.actualTime;
         }
+        totalWorkTimeInMilli += item.actualTime;
       });
     });
 
@@ -242,13 +297,13 @@ const TimesheetDetailGeneral = ({
     // Update dayTotalMap state
     setDayTotalMap(new Map(updatedDayTotalMap));
 
-    // Calculate total time in milliseconds
+    // Calculate total time (including holidays and absence time) in milliseconds
     for (const timeInMilli of updatedDayTotalMap.values()) {
       totalTimeInMilli += timeInMilli;
     }
 
-    // Update total time state
-    setTotalTime(totalTimeInMilli);
+    setTotalTime(totalWorkTimeInMilli);
+    setTimesheetTotalTime(totalTimeInMilli);
     setBillableTime(totalBillableTime);
   };
 
@@ -277,6 +332,9 @@ const TimesheetDetailGeneral = ({
         billable,
         items,
         extStatus,
+        timeType,
+        "timeType:TimeItemType-id": timeItemTypeId,
+        "timeType:TimeItemType-name": timeItemTypeText,
       } = task;
 
       items.forEach((item) => {
@@ -315,6 +373,9 @@ const TimesheetDetailGeneral = ({
           remark: remark || [],
           extStatus: extStatus || {},
           statusLabel: itemStatusIDMap?.[extStatus?.statusID] || "",
+          timeItemTypeExtId: timeType || "",
+          timeItemTypeId: timeItemTypeId || "",
+          timeItemTypeText: timeItemTypeText || "",
         };
 
         if (!timesheetItemsMap.has(formattedStart)) {
@@ -364,6 +425,9 @@ const TimesheetDetailGeneral = ({
           remark,
           extStatus,
           statusLabel,
+          timeItemTypeExtId,
+          timeItemTypeId,
+          timeItemTypeText,
         } = item;
 
         // Convert date string back to the original format
@@ -396,6 +460,9 @@ const TimesheetDetailGeneral = ({
             billable: billable,
             items: [],
             extStatus: extStatus,
+            timeType: timeItemTypeExtId,
+            "timeType:TimeItemType-id": timeItemTypeId,
+            "timeType:TimeItemType-name": timeItemTypeText,
           };
           tasks.push(task);
         }
@@ -408,7 +475,7 @@ const TimesheetDetailGeneral = ({
           billableTime,
           start: start || normalizeDateToUTC(originalDate),
           end: end || normalizeDateToUTC(originalDate),
-          remark, 
+          remark,
           // TODO: The backend currently only processes remarks in the "en" language.
           // As a temporary workaround, we are sending the remark using "remark:text".
           // Once the backend supports multiple languages for remarks,
@@ -649,7 +716,7 @@ const TimesheetDetailGeneral = ({
         style={[
           styles.dateItem,
           isAbsence && { backgroundColor: "#ffcccb" },
-          isHoliday && { backgroundColor: "#ffeb3b" },
+          isHoliday && { backgroundColor: "#aaf0c9" },
           isWeekend && { backgroundColor: "#d3d3d3" },
           formattedItemDate === formattedSelectedDate &&
             styles.selectedDateItem,
@@ -748,7 +815,7 @@ const TimesheetDetailGeneral = ({
 
       pattern.details.forEach((detail) => {
         // Add to the map only if detail's intStatus is not 3
-        if (detail.intStatus !== 3) {
+        if (detail.intStatus !== 3 && detail.stdWorkHours > 0) {
           daySeqMap.set(detail.daySeq, detail.stdWorkHours);
         }
       });
@@ -1111,7 +1178,6 @@ const TimesheetDetailGeneral = ({
                 )}
               </View>
             </View>
-
             <View style={styles.itemsCardSeparator} />
             <View>
               <View style={styles.itemsCardFirstRow}>
@@ -1127,12 +1193,14 @@ const TimesheetDetailGeneral = ({
                 )}
                 <View>
                   <Text style={styles.itemsCardFirstRowLabel}>
-                    {item.actualQuantity?.quantity ? t("quantity") : t("hours")}
+                    {t("hours")}
                   </Text>
                   <Text style={styles.timeText}>
-                    {item.actualQuantity?.quantity ||
-                      convertMillisecondsToDuration(item.actualTime)}
+                    {convertMillisecondsToDuration(item.actualTime)}
                     {" h"}
+                    {item.actualQuantity?.quantity
+                      ? ` (Qty: ${item.actualQuantity?.quantity} ${item.actualQuantity?.unit})`
+                      : ""}
                   </Text>
                 </View>
                 <View>
@@ -1192,6 +1260,16 @@ const TimesheetDetailGeneral = ({
                   </Text>
                 </View>
               )}
+              <View style={styles.itemsCardRow}>
+                <Text style={styles.itemsCardRowLabel}>{t("time_type")}:</Text>
+                <Text
+                  style={styles.itemsCardRowValue}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {item.timeItemTypeText || t("standard_timesheet")}
+                </Text>
+              </View>
               {item.statusLabel && (
                 <View style={styles.itemsCardRow}>
                   <Text style={styles.itemsCardRowLabel}>{t("status")}:</Text>
@@ -1355,7 +1433,7 @@ const TimesheetDetailGeneral = ({
             <Text style={styles.hoursLabel}>{t("day_total")}:</Text>
             <Text style={styles.hoursValue}>
               {convertMillisecondsToDuration(dayTotalTime)} h (
-              {convertMillisecondsToDuration(totalTime)} h)
+              {convertMillisecondsToDuration(totalTimesheetTime)} h)
             </Text>
           </View>
           <View style={styles.statusContainer}>
@@ -1374,23 +1452,30 @@ const TimesheetDetailGeneral = ({
           </View>
         </ScrollView>
       </View>
-      <CollapsiblePanel title={t("summary")} initiallyCollapsed={true}>
+      <CollapsiblePanel title={t("overview")} initiallyCollapsed={true}>
+        <View style={styles.separator} />
         <View style={styles.rowContainer}>
           <View style={[styles.rowChilds, { marginRight: 5 }]}>
-            <Text style={styles.panelChildLabel}>{t("start")}</Text>
-            <CustomDateTimePicker
-              initialValue={start}
-              onFilter={setStart}
-              isDisabled={true}
-            />
+            <Text style={styles.panelChildLabel}>
+              {t("start")}:{" "}
+              <Text style={{ fontWeight: "normal" }}>
+                {format(
+                  start,
+                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                )}
+              </Text>
+            </Text>
           </View>
           <View style={styles.rowChilds}>
-            <Text style={styles.panelChildLabel}>{t("end")}</Text>
-            <CustomDateTimePicker
-              initialValue={end}
-              onFilter={setEnd}
-              isDisabled={true}
-            />
+            <Text style={styles.panelChildLabel}>
+              {t("end")}:{" "}
+              <Text style={{ fontWeight: "normal" }}>
+                {format(
+                  end,
+                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                )}
+              </Text>
+            </Text>
           </View>
         </View>
         <View style={styles.panelChild}>
@@ -1405,6 +1490,74 @@ const TimesheetDetailGeneral = ({
             editable={!isParentLocked}
           />
         </View>
+        <View style={styles.separator} />
+        <View style={styles.KPIDataContainer}>
+          <View style={styles.KPIData}>
+            <View style={styles.KPIDataLabelContainer}>
+              <Text
+                style={styles.KPIDataLabel}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("timesheet_work_time")}
+              </Text>
+            </View>
+            <View style={styles.KPIDataContainer}>
+              <Text style={styles.KPIDataValue}>
+                {convertMillisecondsToDuration(totalTime)} h
+              </Text>
+            </View>
+          </View>
+          <View style={styles.KPIData}>
+            <View style={styles.KPIDataLabelContainer}>
+              <Text
+                style={styles.KPIDataLabel}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("timesheet_billable_time")}
+              </Text>
+            </View>
+            <View style={styles.KPIDataContainer}>
+              <Text style={styles.KPIDataValue}>
+                {convertMillisecondsToDuration(billableTime)} h
+              </Text>
+            </View>
+          </View>
+          <View style={styles.KPIData}>
+            <View style={styles.KPIDataLabelContainer}>
+              <Text
+                style={styles.KPIDataLabel}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("timesheet_holiday_absence_time")}
+              </Text>
+            </View>
+            <View style={styles.KPIDataContainer}>
+              <Text style={styles.KPIDataValue}>
+                {convertMillisecondsToDuration(sumHolidayAndAbsenceHours())} h
+              </Text>
+            </View>
+          </View>
+          <View style={styles.KPIData}>
+            <View style={styles.KPIDataLabelContainer}>
+              <Text
+                style={styles.KPIDataLabel}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("timesheet_over_time")}
+              </Text>
+            </View>
+            <View style={styles.KPIDataContainer}>
+              <Text style={styles.KPIDataValue}>
+                {convertMillisecondsToDuration(overTime)} h
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.separator} />
         <View style={styles.indicatorContainer}>
           <View>
             <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
@@ -1572,7 +1725,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   selectedDateItem: {
-    backgroundColor: "#bdcff1",
+    backgroundColor: "#ffeb3b",
     borderWidth: 2,
     elevation: 6,
     shadowColor: "#000",
@@ -1623,7 +1776,7 @@ const styles = StyleSheet.create({
   },
   panelChildLabel: {
     marginBottom: "1%",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "bold",
   },
   itemsScrollViewContent: {
@@ -1751,13 +1904,13 @@ const styles = StyleSheet.create({
   selectedColorBox: {
     width: 20,
     height: 20,
-    backgroundColor: "#bdcff1",
+    backgroundColor: "#ffeb3b",
     borderWidth: 0.5,
   },
   holidayColorBox: {
     width: 20,
     height: 20,
-    backgroundColor: "#ffeb3b",
+    backgroundColor: "#aaf0c9",
     borderWidth: 0.5,
   },
   absenceColorBox: {
@@ -1788,6 +1941,39 @@ const styles = StyleSheet.create({
     borderColor: "#f00",
     borderWidth: 2,
   },
+  separator: {
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 2,
+    borderStyle: "dashed",
+    marginVertical: 10,
+  },
+  KPIDataContainer: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginTop: "2%",
+  },
+  KPIData: {
+    width: "50%",
+    height: "50%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  KPIDataLabelContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  KPIDataValueContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  KPIDataLabel: {
+    fontWeight: "bold",
+  },
+  KPIDataValue: {},
 });
 
 export default TimesheetDetailGeneral;

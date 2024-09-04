@@ -1,6 +1,6 @@
 import React from "react";
 import { TextInput, View, StyleSheet, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 /**
  * CustomTextInput Component
@@ -68,7 +68,7 @@ const CustomTextInput = ({
           onPress={handleClear}
           style={[styles.clearButton, clearButtonStyle]}
         >
-          <Ionicons name="close-circle" size={24} color="gray" />
+          <Ionicons name="close-circle" size={24} color="blue" />
         </TouchableOpacity>
       )}
 
@@ -83,7 +83,7 @@ const CustomTextInput = ({
           ]}
           disabled={searchButtonDisabled}
         >
-          <Ionicons name="search" size={24} color="gray" />
+          <MaterialCommunityIcons name="text-search" size={26} color="blue" />
         </TouchableOpacity>
       )}
     </View>
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   searchButton: {
-    padding: 5,
+    padding: 10,
   },
   disabledButton: {
     opacity: 0.6,

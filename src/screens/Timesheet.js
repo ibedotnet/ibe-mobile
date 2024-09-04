@@ -325,7 +325,7 @@ const Timesheet = ({ route, navigation }) => {
             billableTime >= 3600000 ? "hours" : "minutes"
           )?.displayTime || "";
 
-        const overTime = item?.["TimeConfirmation-overTime"] || 0;
+        const overTime = item?.["TimeConfirmation-totalOvertime"] || 0;
         const convertedOverTime =
           convertMillisecondsToUnit(
             overTime,

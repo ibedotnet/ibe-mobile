@@ -31,6 +31,7 @@ import CustomButton from "./CustomButton";
  * @param {boolean} multiline - If true, allows multiple lines of input.
  * @param {Function} onValueChange - Callback function when a value is selected or changed.
  * @param {boolean} disabled - If true, disables the entire component.
+ * @param {Array} clearSearchData - Clears the existing search data.
  */
 
 const CustomRemotePicker = ({
@@ -46,6 +47,7 @@ const CustomRemotePicker = ({
   multiline = false,
   onValueChange,
   disabled = false,
+  clearSearchData = false,
 }) => {
   const { t } = useTranslation();
 
@@ -83,6 +85,13 @@ const CustomRemotePicker = ({
     setSelectedValue(initialItemValue);
     setSelectedAdditionalLabel(initialAdditionalLabel);
   }, [initialItemLabel, initialItemValue, initialAdditionalLabel]);
+
+  useEffect(() => {
+    if (clearSearchData) {
+      setSearchData([]);
+      setChevronToggled(false);
+    }
+  }, [clearSearchData]);
 
   // Handles input change in the search field
   const handleSearchInputChange = (text) => {
@@ -278,7 +287,7 @@ const CustomRemotePicker = ({
                     : "chevron-down-circle",
                   library: "MaterialCommunityIcons",
                   size: 24,
-                  color: "#000",
+                  color: "blue",
                 }}
                 disabled={searchDataLoading || disabled}
               />

@@ -91,6 +91,8 @@ const TimesheetDetail = ({ route, navigation }) => {
   const [timesheetAbsences, setTimesheetAbsences] = useState(null);
   const [timesheetCompanyId, setTimesheetCompanyId] = useState("");
   const [timesheetEmployeeId, setTimesheetEmployeeId] = useState("");
+  const [leaveDates, setLeaveDates] = useState([]);
+  const [absenceDateHoursMap, setAbsenceDateHoursMap] = useState({});
 
   const [timesheetTypeDetails, setTimesheetTypeDetails] = useState({
     defaultAsHomeDefault: "",
@@ -101,7 +103,338 @@ const TimesheetDetail = ({ route, navigation }) => {
     nonBillableComments: false,
     overtimeAllowed: false,
     validateWorkSchedule: "",
+    validateIncrement: "",
+    minTimeIncrement: "",
   });
+
+  const {
+    loggedInUserInfo: {
+      patterns,
+      minWorkHours,
+      maxWorkHours,
+      workHoursInterval,
+      dailyStdHours,
+    },
+  } = useContext(LoggedInUserInfoContext);
+
+  // Callback function to handle data from child component (timesheet general)
+  const handleFindingLeaveDates = (leaveDates, absenceDateHoursMap) => {
+    setLeaveDates(leaveDates);
+    setAbsenceDateHoursMap(absenceDateHoursMap);
+  };
+
+  /**
+   * Validates the total actual hours worked on each day against the standard work hours defined in the patterns.
+   * This function accumulates the total actual hours for each day from the timesheet tasks and compares them
+   * with the corresponding standard work hours from the patterns. It returns `true` if the actual hours are
+   * greater than or equal to the standard work hours, or if validation is configured to suppress warnings/errors.
+   * Otherwise, it returns `false` and shows an error or warning based on the configuration.
+   *
+   * @param {string} validateWorkSchedule - Configuration for validation behavior:
+   *   - `"E"`: Show an error and return `false` if actual hours are less than standard work hours.
+   *   - `"W"`: Show a warning if actual hours are less than standard work hours, but return `true`.
+   *   - Any other value: No warning or error is shown, and `true` is returned.
+   *
+   * @returns {boolean} - Returns `true` if validation passes or if configured not to show warnings/errors, otherwise `false`.
+   */
+  const validateTimesheetHoursWithPatterns = (validateWorkSchedule) => {
+    const daySeqMap = new Map();
+
+    // Populate the map with standard work hours from valid pattern details.
+    patterns?.forEach((pattern) => {
+      if (pattern.intStatus === 3) return; // Skip patterns marked with intStatus 3.
+
+      pattern.details.forEach((detail) => {
+        if (detail.intStatus !== 3) {
+          daySeqMap.set(detail.daySeq, detail.stdWorkHours);
+        }
+      });
+    });
+
+    const millisecondsToHours = (ms) => ms / 3600000; // Utility function to convert milliseconds to hours.
+
+    // Map to accumulate total actual hours per day and store date for each day.
+    const totalHoursPerDay = new Map();
+
+    // Accumulate actual hours for each day by looping through the timesheet tasks.
+    timesheetTasks?.forEach((task) => {
+      task.items.forEach((item) => {
+        const actualDate = new Date(item.start);
+        const daySeq = actualDate.getUTCDay(); // Get day sequence as a number (0 = Sunday, 1 = Monday, etc.).
+        const formattedDate = actualDate.toDateString();
+
+        let actualHours = millisecondsToHours(item.actualTime);
+
+        // Check if the date is a leave date
+        if (leaveDates.includes(formattedDate)) {
+          const absenceHours = absenceDateHoursMap[formattedDate];
+
+          if (absenceHours) {
+            // If absence hours exist, convert them to hours and add to the actual hours.
+            actualHours += millisecondsToHours(absenceHours);
+          } else {
+            // If it's a holiday, use the daily standard hours.
+            actualHours += millisecondsToHours(dailyStdHours);
+          }
+        }
+
+        // Accumulate hours and store the date.
+        if (!totalHoursPerDay.has(daySeq)) {
+          totalHoursPerDay.set(daySeq, { hours: 0, date: actualDate });
+        }
+        totalHoursPerDay.get(daySeq).hours += actualHours;
+      });
+    });
+
+    // Compare the total actual hours with standard work hours for each day.
+    for (const [
+      daySeq,
+      { hours: totalActualHours, date },
+    ] of totalHoursPerDay.entries()) {
+      const stdWorkHours = daySeqMap.get(daySeq); // Get the standard work hours for the day.
+
+      // Proceed with validation only if standard work hours are defined for that day.
+      if (stdWorkHours !== undefined) {
+        const stdHours = millisecondsToHours(stdWorkHours);
+
+        // If actual hours are less than the standard work hours, handle based on the configuration.
+        if (totalActualHours < stdHours) {
+          const formattedDate = date.toDateString();
+
+          const message = t("timesheet_patterns_validation_message", {
+            actual: totalActualHours,
+            standard: stdHours,
+            date: formattedDate,
+          });
+
+          if (validateWorkSchedule === "E") {
+            // If configured to show an error, display it and return false.
+            showToast(message, "error");
+            return false;
+          } else if (validateWorkSchedule === "W") {
+            // If configured to show a warning, display it.
+            showToast(message, "warning");
+          }
+        }
+      }
+    }
+
+    return true; // Return true if validation passes or if configured not to show warnings/errors.
+  };
+
+  /**
+   * Validates the total actual hours worked on each day against the defined minimum and maximum hours.
+   * This function accumulates the total actual hours for each day from the timesheet tasks and compares them
+   * with the corresponding minimum and maximum hours. If the actual hours are within the allowed range,
+   * or if the validation is configured to suppress warnings/errors, the function returns `true`. Otherwise,
+   * it returns `false` and displays an error or warning based on the configuration.
+   *
+   * @param {string} validateWorkSchedule - Configuration for validation behavior:
+   *   - `"E"`: Show an error and return `false` if actual hours are outside the min/max range.
+   *   - `"W"`: Show a warning if actual hours are outside the min/max range, but return `true`.
+   *   - Any other value: No warning or error is shown, and `true` is returned.
+   *
+   * @returns {boolean} - Returns `true` if validation passes or if configured not to show warnings/errors, otherwise `false`.
+   */
+  const validateTimesheetDayHoursWithMinMax = (validateWorkSchedule) => {
+    const millisecondsToHours = (ms) => ms / 3600000; // Utility function to convert milliseconds to hours.
+
+    // Map to accumulate total actual hours per day and store date for each day.
+    const totalHoursPerDay = new Map();
+
+    // Accumulate actual hours for each day by looping through the timesheet tasks.
+    timesheetTasks?.forEach((task) => {
+      task.items.forEach((item) => {
+        const actualDate = new Date(item.start);
+        const daySeq = actualDate.getUTCDay(); // Get day sequence as a number (0 = Sunday, 1 = Monday, etc.).
+        const formattedDate = actualDate.toDateString();
+
+        // Initialize actual hours with the item's actual time converted to hours.
+        let actualHours = millisecondsToHours(item.actualTime);
+
+        // If the date is a leave date, check if it is in the absence map.
+        if (leaveDates.includes(formattedDate)) {
+          const absenceHours = absenceDateHoursMap[formattedDate];
+
+          if (absenceHours) {
+            // If absence hours exist, convert them to hours and add to the actual hours.
+            actualHours += millisecondsToHours(absenceHours);
+          } else {
+            // If it's a holiday (in leaveDates but not in absenceDateHoursMap), skip further validation for this day.
+            return;
+          }
+        }
+
+        // Accumulate hours and store the date.
+        if (!totalHoursPerDay.has(daySeq)) {
+          totalHoursPerDay.set(daySeq, { hours: 0, date: actualDate });
+        }
+        totalHoursPerDay.get(daySeq).hours += actualHours;
+      });
+    });
+
+    // Compare the total actual hours with the min/max hours for each day.
+    for (const [
+      daySeq,
+      { hours: totalActualHours, date },
+    ] of totalHoursPerDay.entries()) {
+      const formattedDate = date.toDateString();
+
+      const minHours = millisecondsToHours(minWorkHours);
+      const maxHours = millisecondsToHours(maxWorkHours);
+
+      if (totalActualHours < minHours) {
+        // If total hours are less than minimum hours, show message
+        const message = t("timesheet_min_hours_day_validation_message", {
+          actual: totalActualHours,
+          min: minHours,
+          date: formattedDate,
+        });
+
+        if (validateWorkSchedule === "E") {
+          showToast(message, "error");
+          return false;
+        } else if (validateWorkSchedule === "W") {
+          showToast(message, "warning");
+        }
+      }
+
+      if (totalActualHours > maxHours) {
+        // If total hours are more than maximum hours, show message
+        const message = t("timesheet_max_hours_day_validation_message", {
+          actual: totalActualHours,
+          max: maxHours,
+          date: formattedDate,
+        });
+
+        if (validateWorkSchedule === "E") {
+          showToast(message, "error");
+          return false;
+        } else if (validateWorkSchedule === "W") {
+          showToast(message, "warning");
+        }
+      }
+    }
+
+    return true; // Return true if validation passes or if configured not to show warnings/errors.
+  };
+
+  /**
+   * Validates the total actual hours worked in each period (week, bi-week, etc.) against the defined minimum and maximum hours.
+   * Accumulates the total actual hours for each period from the timesheet tasks and compares them
+   * with the corresponding minimum and maximum hours. Shows an error or warning if the total hours
+   * are outside the specified range, based on the configuration.
+   *
+   * @param {string} validateWorkSchedule - Configuration for validation behavior:
+   *   - `"E"`: Show an error and return `false` if actual hours are outside the min/max range.
+   *   - `"W"`: Show a warning if actual hours are outside the min/max range, but return `true`.
+   *   - Any other value: No warning or error is shown, and `true` is returned.
+   * @param {string} period - The period in days to validate (e.g., 7 for weekly, 14 for bi-weekly).
+   * @returns {boolean} - Returns `true` if validation passes or if configured not to show warnings/errors, otherwise `false`.
+   */
+  const validatePeriodTimesheetHours = (validateWorkSchedule, period) => {
+    const millisecondsToHours = (ms) => ms / 3600000; // Utility function to convert milliseconds to hours.
+    const periodMap = new Map(); // Map to accumulate total actual hours per date
+
+    // Convert timesheet start and end date strings to Date objects
+    const start = new Date(timesheetStart);
+    const end = new Date(timesheetEnd);
+
+    // Initialize periodMap with all dates between start and end, setting hours to 0 initially
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toDateString();
+      periodMap.set(dateKey, 0); // Initialize hours to 0 for each date
+    }
+
+    // Update periodMap based on leaveDates
+    leaveDates.forEach((leaveDate) => {
+      const formattedDate = new Date(leaveDate).toDateString();
+      const absenceHours = absenceDateHoursMap[formattedDate];
+
+      if (periodMap.has(formattedDate)) {
+        // If it's an absence date, set the corresponding absence hours
+        if (absenceHours) {
+          periodMap.set(formattedDate, millisecondsToHours(absenceHours));
+        } else {
+          // If it's a holiday, set the daily standard hours
+          periodMap.set(formattedDate, millisecondsToHours(dailyStdHours));
+        }
+      }
+    });
+
+    // Accumulate actual hours for each day by looping through the timesheet tasks
+    timesheetTasks?.forEach((task) => {
+      task.items.forEach((item) => {
+        const actualDate = new Date(item.start);
+        const actualHours = millisecondsToHours(item.actualTime);
+        const dateKey = actualDate.toDateString();
+
+        // Update periodMap if the date exists in the map
+        if (periodMap.has(dateKey)) {
+          periodMap.set(dateKey, periodMap.get(dateKey) + actualHours);
+        }
+      });
+    });
+
+    // Convert min and max work hours from milliseconds to hours
+    const minHours = millisecondsToHours(minWorkHours);
+    const maxHours = millisecondsToHours(maxWorkHours);
+
+    // Validate the accumulated hours for each period
+    let periodStart = new Date(start); // Initialize period start date
+
+    while (periodStart <= end) {
+      let periodHours = 0; // Initialize period hours to 0
+
+      // Accumulate hours for the current period
+      for (let i = 0; i < period; i++) {
+        const currentDay = new Date(periodStart);
+        currentDay.setDate(periodStart.getDate() + i);
+        if (currentDay > end) break;
+
+        const dateKey = currentDay.toDateString();
+        periodHours += periodMap.get(dateKey) || 0;
+      }
+
+      // Calculate the formatted periodStartDate for the current period
+      const periodStartDate = periodStart.toDateString();
+
+      // Check if the period hours are within the min and max range
+      if (periodHours < minHours || periodHours > maxHours) {
+        let message;
+        if (periodHours < minHours) {
+          message = t("timesheet_min_hours_period_validation_message", {
+            actual: periodHours,
+            min: minHours,
+            periodName: workHoursInterval,
+            periodStartDate,
+          });
+        } else if (periodHours > maxHours) {
+          message = t("timesheet_max_hours_period_validation_message", {
+            actual: periodHours,
+            max: maxHours,
+            periodName: workHoursInterval,
+            periodStartDate,
+          });
+        }
+
+        // Show error or warning based on the validateWorkSchedule configuration
+        if (message) {
+          if (validateWorkSchedule === "E") {
+            showToast(message, "error");
+            return false;
+          } else if (validateWorkSchedule === "W") {
+            showToast(message, "warning");
+          }
+        }
+      }
+
+      // Move to the next period
+      periodStart.setDate(periodStart.getDate() + period);
+    }
+
+    return true; // Return true if validation passes or if configured not to show warnings/errors
+  };
 
   /**
    * Fetches the selected date period from the timesheet type based on its external ID.
@@ -505,7 +838,8 @@ const TimesheetDetail = ({ route, navigation }) => {
 
   const validateTimesheetOnSave = () => {
     // Destructure the headerCommentRequired property from the timesheetTypeDetails object
-    const { headerCommentRequired } = timesheetTypeDetails;
+    const { headerCommentRequired, validateWorkSchedule } =
+      timesheetTypeDetails;
 
     // Check if the timesheet start date is provided
     if (!timesheetStart) {
@@ -579,6 +913,61 @@ const TimesheetDetail = ({ route, navigation }) => {
         // "W" stands for "Warning"
         // Show a warning toast indicating that the header remark is recommended
         showToast(t("timesheet_header_remark_recommended_message"), "warning");
+      }
+    }
+
+    if (validateWorkSchedule) {
+      console.debug(
+        "Validation work schedule is enabled:",
+        validateWorkSchedule
+      );
+
+      // Validate timesheet hours with patterns if patterns exist
+      if (patterns?.length > 0) {
+        console.debug(
+          "Patterns exist. Validating timesheet hours with patterns..."
+        );
+        const isValid =
+          validateTimesheetHoursWithPatterns(validateWorkSchedule);
+
+        if (!isValid) {
+          console.debug("Timesheet hours validation with patterns failed.");
+          return false; // Return false if validation fails
+        } else {
+          console.debug("Timesheet hours validation with patterns passed.");
+        }
+      } else {
+        console.debug(
+          "No patterns found. Proceeding to validate with min/max hours..."
+        );
+
+        if (workHoursInterval === "day") {
+          console.debug(
+            "Work hours interval is set to 'day'. Validating day hours with min/max..."
+          );
+          const isValid =
+            validateTimesheetDayHoursWithMinMax(validateWorkSchedule);
+
+          if (!isValid) {
+            console.debug("Day hours validation with min/max failed.");
+            return false; // Return false if validation fails
+          } else {
+            console.debug("Day hours validation with min/max passed.");
+          }
+        } else if (workHoursInterval === "week") {
+          console.debug(
+            "Work hours interval is set to 'week'. Validating week hours with min/max..."
+          );
+          // Validate the timesheet hours for a weekly period (7 days)
+          const isValid = validatePeriodTimesheetHours(validateWorkSchedule, 7);
+
+          if (!isValid) {
+            console.debug("Week hours validation with min/max failed.");
+            return false; // Return false if validation fails
+          } else {
+            console.debug("Week hours validation with min/max passed.");
+          }
+        }
       }
     }
 
@@ -828,6 +1217,8 @@ const TimesheetDetail = ({ route, navigation }) => {
     `${
       BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
     }-type:TimeConfType-validateWorkSchedule`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-type:TimeConfType-validateIncrement`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-type:TimeConfType-minTimeIncrement`,
   ];
 
   const getTimesheetFields = () => [
@@ -869,11 +1260,10 @@ const TimesheetDetail = ({ route, navigation }) => {
     `${
       BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
     }-tasks-taskID:Task-timeItemTypeNonEditable`,
-    `${
-      BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
-    }-tasks-taskID:Task-type:TaskType-quantityAllowed`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-billable`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-timeType`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-timeType:TimeItemType-id`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-timeType:TimeItemType-name`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-items`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-extStatus`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-extStatus-recipient`,
@@ -1109,6 +1499,18 @@ const TimesheetDetail = ({ route, navigation }) => {
               `${
                 BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
               }-type:TimeConfType-validateWorkSchedule`
+            ] || "",
+          validateIncrement:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
+              }-type:TimeConfType-validateIncrement`
+            ] || "",
+          minTimeIncrement:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
+              }-type:TimeConfType-minTimeIncrement`
             ] || "",
         });
 
@@ -1366,7 +1768,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                 isLocked ||
                 Object.keys(updatedValues).length === 0 ||
                 timesheetTasks.length === 0
-              } // Disable save button when loading, locked, or when there are no changes
+              } // Disable the button if loading, locked, no changes, or no entries/items are present
             />
           </View>
         );
@@ -1432,6 +1834,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                       setLoading={setLoading}
                       selectedDateInCreate={selectedDate}
                       onTimesheetDetailChange={handleTimesheetDetailChange}
+                      OnFindingLeaveDates={handleFindingLeaveDates}
                       timesheetTypeDetails={timesheetTypeDetails}
                       timesheetDetail={{
                         timesheetType,
@@ -1440,6 +1843,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                         timesheetEnd,
                         timesheetTotalTime,
                         timesheetBillableTime,
+                        timesheetOverTime,
                         timesheetRemark,
                         timesheetTasks,
                         timesheetAbsences,
