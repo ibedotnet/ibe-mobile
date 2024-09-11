@@ -63,6 +63,7 @@ const TimesheetDetailItemEditor = ({
   const [isQuantityAllowedTask, setIsQuantityAllowedTask] = useState(false);
   const [quantityToTimeUnit, setQuantityToTimeUnit] = useState(3600000);
   const [decimalsAllowedInUnit, setDecimalsAllowedInUnit] = useState(0);
+  const [taskBillable, setTaskBillable] = useState(false);
 
   const [clearCustomerSearchData, setClearCustomerSearchData] = useState(false);
   const [clearProjectSearchData, setClearProjectSearchData] = useState(false);
@@ -100,6 +101,7 @@ const TimesheetDetailItemEditor = ({
       // Define the fields and conditions for the API query
       const queryFields = {
         fields: [
+          "Task-billable",
           "Task-timeItemTypes",
           "Task-timeItemTypeNonEditable",
           "Task-type:TaskType-quantityAllowed",
@@ -155,6 +157,7 @@ const TimesheetDetailItemEditor = ({
         const data = response.data[0];
 
         // Set the states based on the fetched data
+        setTaskBillable(data["Task-billable"] || false);
         setTaskTimeItemTypes(data["Task-timeItemTypes"] || []);
         setTaskTimeItemTypeNonEditable(
           data["Task-timeItemTypeNonEditable"] || false
@@ -785,6 +788,7 @@ const TimesheetDetailItemEditor = ({
 
     setEditedItem({
       ...editedItem,
+      billable: false,
       customerId: value ?? "",
       customerText: label ?? "",
       customerExtId: extID ?? "",
@@ -801,6 +805,7 @@ const TimesheetDetailItemEditor = ({
       timeItemTypeExtId: "",
       timeItemTypeId: "",
       timeItemTypeText: "",
+      actualQuantity: { quantity: 0, unit: "" },
     });
 
     setIsQuantityAllowedTask(false);
@@ -810,6 +815,7 @@ const TimesheetDetailItemEditor = ({
     setDecimalsAllowedInUnit(0);
     setTaskTimeItemTypes([]);
     setTaskTimeItemTypeNonEditable(false);
+    setTaskBillable(false);
 
     setClearTaskSearchData([]);
     setClearProjectSearchData([]);
@@ -825,6 +831,7 @@ const TimesheetDetailItemEditor = ({
 
     setEditedItem({
       ...editedItem,
+      billable: false,
       projectId: value ?? "",
       projectText: label ?? "",
       projectExtId: extID ?? "",
@@ -851,6 +858,7 @@ const TimesheetDetailItemEditor = ({
       timeItemTypeExtId: "",
       timeItemTypeId: "",
       timeItemTypeText: "",
+      actualQuantity: { quantity: 0, unit: "" },
     });
 
     setIsQuantityAllowedTask(false);
@@ -860,6 +868,7 @@ const TimesheetDetailItemEditor = ({
     setDecimalsAllowedInUnit(0);
     setTaskTimeItemTypes([]);
     setTaskTimeItemTypeNonEditable(false);
+    setTaskBillable(false);
 
     setClearCustomerSearchData([]);
     setClearTaskSearchData([]);
@@ -884,7 +893,6 @@ const TimesheetDetailItemEditor = ({
       taskId: value,
       taskText: label,
       taskExtId: extID,
-      taskBillable: taskBillable,
       // If customer is blank, set the task's corresponding customer details
       customerId:
         !editedItem.customerId && additionalData.taskCustomerId
@@ -940,6 +948,7 @@ const TimesheetDetailItemEditor = ({
     setTaskTimeItemTypeNonEditable(
       additionalData.taskTimeItemTypeNonEditable || false
     );
+    setTaskBillable(taskBillable);
 
     setClearCustomerSearchData([]);
     setClearProjectSearchData([]);
@@ -1005,7 +1014,6 @@ const TimesheetDetailItemEditor = ({
       taskId: "",
       taskText: "",
       taskExtId: "",
-      taskBillable: false,
       timeItemTypeExtId: "",
       timeItemTypeId: "",
       timeItemTypeText: "",
@@ -1019,6 +1027,7 @@ const TimesheetDetailItemEditor = ({
     setDecimalsAllowedInUnit(0);
     setTaskTimeItemTypes([]);
     setTaskTimeItemTypeNonEditable(false);
+    setTaskBillable(false);
 
     setClearCustomerSearchData([]);
     setClearProjectSearchData([]);
@@ -1045,7 +1054,7 @@ const TimesheetDetailItemEditor = ({
       Alert.alert("Error", t("select_task_first"));
       return false;
     }
-    if (!editedItem.taskBillable) {
+    if (!taskBillable && !editedItem.billable) {
       Alert.alert("Error", t("selected_task_not_billable"));
       return false;
     }
@@ -1331,13 +1340,18 @@ const TimesheetDetailItemEditor = ({
                           editable={!isParentLocked}
                         />
                         <View style={styles.quantityUnitContainer}>
-                          <Text>
+                          <Text numberOfLines={1} ellipsizeMode="tail">
                             {t("unit_label")}: {quantityUnitName}
                           </Text>
+                          {quantityToTimeUnit > 0 && (
+                            <Text numberOfLines={1} ellipsizeMode="tail">
+                              {t("unit_time")}: {quantityToTimeUnit / 3600000} h
+                            </Text>
+                          )}
                           {quantityValue &&
                             parseFloat(quantityValue) !== NaN &&
                             quantityToTimeUnit > 0 && (
-                              <Text>
+                              <Text numberOfLines={1} ellipsizeMode="tail">
                                 {t("equiv_time")}:{" "}
                                 {(parseFloat(quantityValue) *
                                   quantityToTimeUnit) /
@@ -1345,13 +1359,19 @@ const TimesheetDetailItemEditor = ({
                                 h
                               </Text>
                             )}
-                          {quantityToTimeUnit > 0 && (
-                            <Text>
-                              {t("unit_time")}: {quantityToTimeUnit / 3600000} h
-                            </Text>
-                          )}
                         </View>
                       </View>
+                      <Text
+                        style={styles.smallText}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {"*"}
+                        {t("allowed_decimal_places", {
+                          unit: quantityUnitName,
+                          decimalPlaces: decimalsAllowedInUnit,
+                        })}
+                      </Text>
                     </View>
                   )}
                 </>
@@ -1379,6 +1399,9 @@ const TimesheetDetailItemEditor = ({
               )}
             </View>
           )}
+          <Text style={styles.note}>{`\u2022 ${t(
+            "billable_status_note"
+          )}`}</Text>
           <Text style={styles.note}>{`\u2022 ${t(
             "remark_language_note"
           )}`}</Text>
@@ -1484,11 +1507,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     paddingVertical: 20,
   },
-  note: {
-    fontSize: 12,
-    color: "#00f",
-    marginTop: 5,
-  },
   quantityUnitContainer: {
     flex: 3,
     justifyContent: "center",
@@ -1499,6 +1517,14 @@ const styles = StyleSheet.create({
     borderBottomStartRadius: 0,
     borderBottomEndRadius: 8,
     paddingLeft: "4%",
+  },
+  note: {
+    fontSize: 12,
+    color: "#00f",
+    marginTop: 5,
+  },
+  smallText: {
+    fontSize: 12,
   },
 });
 

@@ -22,7 +22,6 @@ import {
   convertToDateFNSFormat,
 } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
-import { screenDimension } from "../utils/ScreenUtils";
 import updateFields from "../utils/UpdateUtils";
 
 import {
@@ -290,7 +289,7 @@ const File = ({
       }
     } catch (error) {
       // Handle errors that occur during the file update process.
-      console.error("Error in updateBusObjCat:", error);
+      console.error("Error in updateBusObjCat(files):", error);
       showToast(t("failed_upload_file"), "error"); // Show error message for failed file update
     }
   };
@@ -542,114 +541,120 @@ const File = ({
    */
   const fetchInitialFiles = async () => {
     try {
-      setLoading(true);
-
-      const fetchedFiles = []; // Initialize an array to store all fetched files
-
-      // Iterate over each file ID in the initialFilesIdList
-      for (const fileId of initialFilesIdList) {
-        // Define query fields to fetch file metadata
-        const queryFields = {
-          fields: [
-            "Attachment-id",
-            "Attachment-type",
-            "Attachment-type:AttachmentType-name",
-            "Attachment-thumbnail",
-            "Attachment-original",
-            "Attachment-sourceFile",
-            "Attachment-mIMEtype",
-            "Attachment-createdOn",
-            "Attachment-original:BinaryResource-length",
-          ],
-          where: [
-            {
-              fieldName: "Attachment-id",
-              operator: "=",
-              value: fileId, // Use the current file ID from the list
-            },
-          ],
-          sort: [
-            { property: "Attachment-createdOn", direction: "DESC" },
-            { property: "Attachment-sourceFile", direction: "ASC" },
-          ],
-        };
-
-        // Define common query parameters
-        const commonQueryParams = {
-          testMode: TEST_MODE,
-          client: parseInt(APP.LOGIN_USER_CLIENT),
-          user: APP.LOGIN_USER_ID,
-          userID: APP.LOGIN_USER_ID,
-          language: APP.LOGIN_USER_LANGUAGE,
-          intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
-        };
-
-        // Construct form data for the request
-        const formData = {
-          query: JSON.stringify(queryFields),
-          ...commonQueryParams,
-        };
-
-        // Fetch data from the server
-        const response = await fetchData(
-          API_ENDPOINTS.QUERY,
-          "POST",
-          {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          },
-          new URLSearchParams(formData).toString()
-        );
-
-        // Process the response if successful and data is available
-        if (
-          response.success === true &&
-          response.data &&
-          response.data instanceof Array &&
-          response.data.length > 0
-        ) {
-          // Map fetched files metadata to desired format
-          const fetchedFile = response.data.map((file) => {
-            const id = file["Attachment-id"];
-            const attachmentType = file["Attachment-type"];
-            const attachmentTypeName =
-              file["Attachment-type:AttachmentType-name"];
-            const mimeType =
-              file["Attachment-mIMEtype"] &&
-              file["Attachment-mIMEtype"].length < 30
-                ? file["Attachment-mIMEtype"]
-                : "image/png";
-            const name = file["Attachment-sourceFile"];
-            const original = file["Attachment-original"];
-            const thumbnail = file["Attachment-thumbnail"];
-            const unFormattedCreatedOn = new Date(file["Attachment-createdOn"]);
-            const createdOn = isValid(unFormattedCreatedOn)
-              ? format(
-                  unFormattedCreatedOn,
-                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                )
-              : "";
-            const size = file["Attachment-original:BinaryResource-length"];
-
-            return {
-              id,
-              attachmentType,
-              attachmentTypeName,
-              mimeType,
-              name,
-              original,
-              thumbnail,
-              createdOn,
-              size,
-            };
-          });
-
-          // Append fetched files to the array
-          fetchedFiles.push(...fetchedFile);
-        }
+      if (initialFilesIdList?.length === 0) {
+        return;
       }
 
-      // Update the state once with all fetched files
-      setFiles(fetchedFiles);
+      setLoading(true);
+
+      // Define query fields to fetch file metadata
+      const queryFields = {
+        fields: [
+          "Attachment-id",
+          "Attachment-type",
+          "Attachment-type:AttachmentType-name",
+          "Attachment-thumbnail",
+          "Attachment-original",
+          "Attachment-sourceFile",
+          "Attachment-mIMEtype",
+          "Attachment-createdOn",
+          "Attachment-original:BinaryResource-length",
+        ],
+        where: [
+          {
+            fieldName: "Attachment-id",
+            operator: "in",
+            value: initialFilesIdList, // Use the initialFilesIdList array as the value
+          },
+        ],
+        sort: [
+          { property: "Attachment-createdOn", direction: "DESC" },
+          { property: "Attachment-sourceFile", direction: "ASC" },
+        ],
+      };
+
+      // Define common query parameters
+      const commonQueryParams = {
+        testMode: TEST_MODE,
+        client: parseInt(APP.LOGIN_USER_CLIENT),
+        user: APP.LOGIN_USER_ID,
+        userID: APP.LOGIN_USER_ID,
+        language: APP.LOGIN_USER_LANGUAGE,
+        intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+      };
+
+      // Construct form data for the request
+      const formData = {
+        query: JSON.stringify(queryFields),
+        ...commonQueryParams,
+      };
+
+      // Fetch data from the server
+      const response = await fetchData(
+        API_ENDPOINTS.QUERY,
+        "POST",
+        {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        new URLSearchParams(formData).toString()
+      );
+
+      // Process the response if successful and data is available
+      if (
+        response.success === true &&
+        response.data &&
+        response.data instanceof Array &&
+        response.data.length > 0
+      ) {
+        // Map fetched files metadata to the desired format
+        const fetchedFiles = response.data.map((file) => {
+          const id = file["Attachment-id"];
+          const attachmentType = file["Attachment-type"];
+          const attachmentTypeName =
+            file["Attachment-type:AttachmentType-name"];
+          const mimeType =
+            file["Attachment-mIMEtype"] &&
+            file["Attachment-mIMEtype"].length < 30
+              ? file["Attachment-mIMEtype"]
+              : "image/png";
+          const name = file["Attachment-sourceFile"];
+          const original = file["Attachment-original"];
+          const thumbnail = file["Attachment-thumbnail"];
+          const unFormattedCreatedOn = new Date(file["Attachment-createdOn"]);
+          const createdOn = isValid(unFormattedCreatedOn)
+            ? format(
+                unFormattedCreatedOn,
+                `${convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)} HH:mm:ss`
+              )
+            : "";
+          const size = file["Attachment-original:BinaryResource-length"];
+
+          return {
+            id,
+            attachmentType,
+            attachmentTypeName,
+            mimeType,
+            name,
+            original,
+            thumbnail,
+            createdOn,
+            unFormattedCreatedOn,
+            size,
+          };
+        });
+
+        // Sort fetched files by createdOn date in descending order
+        const sortedFiles = fetchedFiles.sort((a, b) => {
+          const dateA = new Date(a.unFormattedCreatedOn);
+          const dateB = new Date(b.unFormattedCreatedOn);
+
+          // Descending order, change to `dateA - dateB` for ascending
+          return dateB - dateA;
+        });
+
+        // Update the state once with all fetched and sorted files
+        setFiles(sortedFiles);
+      }
     } catch (error) {
       console.error("Error fetching initial files: ", error);
       setError(error);
@@ -945,9 +950,6 @@ const styles = StyleSheet.create({
   },
   addFileContainer: {
     justifyContent: "flex-end",
-  },
-  flatList: {
-    paddingBottom: screenDimension.height / 2,
   },
   fileItem: {
     padding: "2%",

@@ -65,6 +65,7 @@ const TimesheetDetailGeneral = ({
       nonWorkingDays,
       dailyStdHours,
       patterns,
+      workScheduleName,
     },
   } = useContext(LoggedInUserInfoContext);
 
@@ -120,6 +121,194 @@ const TimesheetDetailGeneral = ({
   const [headerRemarkText, setHeaderRemarkText] = useState(
     getRemarkText(timesheetRemark, lang, PREFERRED_LANGUAGES)
   );
+  const [timesheetDateRange, setTimesheetDateRange] = useState([]);
+  const [isOverviewCollapsed, setIsOverviewCollapsed] = useState(true);
+
+  /**
+   * Handles the collapse state change for the overview panel.
+   *
+   * @param {boolean} newCollapsedState - The new collapsed state.
+   */
+  const handleOverviewCollapseChange = (newCollapsedState) => {
+    // Update the state based on the new collapsed state
+    setIsOverviewCollapsed(newCollapsedState);
+  };
+
+  /**
+   * Generates an array of dates formatted as "YYYY-MM-DD" between the start and end dates defined in the surrounding scope.
+   *
+   * Assumes `timesheetStart` and `timesheetEnd` are defined in the surrounding scope.
+   *
+   * @returns {string[]} - An array of date strings formatted as "YYYY-MM-DD" between the start and end dates.
+   */
+  const generateTableDateRange = () => {
+    // Initialize an empty array to store the formatted date strings
+    const dates = [];
+
+    // Convert the `timesheetStart` and `timesheetEnd` from strings to Date objects
+    const start = new Date(timesheetStart);
+    const end = new Date(timesheetEnd);
+
+    // Iterate from the start date to the end date
+    while (start <= end) {
+      // Format the current date as "YYYY-MM-DD"
+      const formattedDate = format(new Date(start), "yyyy-MM-dd");
+
+      // Add the formatted date to the array
+      dates.push(formattedDate);
+
+      // Move to the next day
+      start.setDate(start.getDate() + 1);
+    }
+
+    // Return the array of formatted date strings
+    return dates;
+  };
+
+  /**
+   * Generates an array of values for each date based on the provided map.
+   * Converts values from milliseconds to hours and handles both single numeric values and arrays of objects with an `actualTime` property.
+   * Additionally, calculates the total hours for the entire date range.
+   *
+   * @param {Map<string, number|Object[]>} map - A map where:
+   *   - Keys are date strings in "YYYY-MM-DD" format.
+   *   - Values are either:
+   *     - A number representing total time in milliseconds for the given date, or
+   *     - An array of objects where each object contains an `actualTime` property in milliseconds.
+   * @param {number} [defaultValue=0] - The default value to return if no data is found for a particular date in the map.
+   * @returns {Object} - An object containing:
+   *   - `data` {string[]} - An array of strings where each string represents the total hours for the corresponding date.
+   *   - `totalHours` {string} - A string representing the total hours for all dates in the range.
+   */
+  const generateTableRowData = (map, defaultValue = 0) => {
+    let totalHours = 0; // Initialize total hours to zero
+
+    // Map over the date range and generate the data for each date
+    const data = timesheetDateRange.map((date) => {
+      const value = map.get(date); // Get the value from the map for the current date
+
+      let hours = 0; // Initialize hours to zero
+
+      if (Array.isArray(value)) {
+        // If the value is an array of objects, sum up the `actualTime` values in milliseconds
+        const totalMilliseconds = value.reduce(
+          (acc, item) => acc + (item?.actualTime ?? 0),
+          0
+        );
+        hours = totalMilliseconds / 3600000; // Convert milliseconds to hours
+      } else if (typeof value === "number") {
+        // If the value is a single number, convert milliseconds to hours
+        hours = value / 3600000;
+      }
+
+      if (hours > 0) {
+        // If hours are greater than zero, add to totalHours and format the value
+        totalHours += hours;
+        return hours.toFixed(2).replace(/\.?0+$/, "") + " h"; // Format hours to two decimal places and remove trailing zeros
+      }
+
+      // If hours are zero, return default value or "0" if defaultValue is not provided
+      return defaultValue === 0 ? "" : defaultValue + " h";
+    });
+
+    // Return the generated data and total hours formatted as a string
+    return {
+      data,
+      totalHours: totalHours.toFixed(2).replace(/\.?0+$/, "") + " h",
+    };
+  };
+
+  /**
+   * Retrieves a list of unique tasks based on task IDs from the timesheet items map.
+   * Keeps a mapping of task IDs to task names for display purposes.
+   *
+   * Iterates through the `timesheetItemsMap` to collect unique `taskId` values from each item.
+   * Maintains a mapping of `taskId` to `taskText` for later use in displaying task names.
+   *
+   * @returns {Object} - An object containing:
+   *   - `taskIds`: An array of unique task IDs.
+   *   - `taskNames`: An object mapping task IDs to task names for display purposes.
+   */
+  const getTableTasks = () => {
+    // Create a Set to store unique task IDs
+    const taskIds = new Set();
+    // Create an object to map task IDs to task names
+    const taskNames = {};
+
+    // Iterate over each entry in the timesheetItemsMap
+    timesheetItemsMap.forEach((items) => {
+      items.forEach((item) => {
+        // Add each item's taskId to the Set
+        taskIds.add(item.taskId);
+        // Keep a mapping of taskId to taskText
+        taskNames[item.taskId] = item.taskText;
+      });
+    });
+
+    // Convert the Set of task IDs to an array
+    const taskIdArray = Array.from(taskIds);
+
+    // Return an object containing the task IDs and their names
+    return { taskIds: taskIdArray, taskNames };
+  };
+
+  // Retrieve unique tasks and their corresponding names
+  const { taskIds, taskNames } = getTableTasks();
+
+  // Create rows for each task using task names for display
+  const taskRows = taskIds.map((taskId) => ({
+    // Set the title of the row to the task name retrieved from taskNames mapping
+    title: taskNames[taskId],
+
+    // Generate data for the row by creating a map from the timesheetItemsMap
+    data: generateTableRowData(
+      new Map(
+        // Transform timesheetItemsMap entries into the format required by generateTableRowData
+        Array.from(timesheetItemsMap.entries()).map(([date, items]) => [
+          date,
+          // Find the item for the given taskId and extract actualTime
+          items.find((item) => item.taskId === taskId)?.actualTime ?? 0,
+        ])
+      )
+    ),
+  }));
+
+  // Create a row for holidays with a title and data
+  const holidayRow = {
+    title: t("holiday"),
+    // Generate data for the holiday row using the holidayDayTotalMap
+    data: generateTableRowData(holidayDayTotalMap),
+  };
+
+  // Create a row for absences with a title and data
+  const absenceRow = {
+    title: t("absence"),
+    // Generate data for the absence row using the absenceDayTotalMap
+    data: generateTableRowData(absenceDayTotalMap),
+  };
+
+  // Calculate total hours for each column
+  const totalColumnData = timesheetDateRange.map((date) => {
+    const total =
+      taskRows.reduce(
+        (sum, row) =>
+          sum +
+          parseFloat(row.data.data[timesheetDateRange.indexOf(date)] || 0),
+        0
+      ) +
+      parseFloat(holidayRow.data.data[timesheetDateRange.indexOf(date)] || 0) +
+      parseFloat(absenceRow.data.data[timesheetDateRange.indexOf(date)] || 0);
+    return total.toFixed(2).replace(/\.?0+$/, "") + " h";
+  });
+
+  // Calculate total hours for each row
+  const totalRowData =
+    taskRows.reduce(
+      (sum, row) => sum + parseFloat(row.data.totalHours || 0),
+      0
+    ) +
+    parseFloat(holidayRow.data.totalHours || 0) +
+    parseFloat(absenceRow.data.totalHours || 0);
 
   /**
    * Sums the hours from the holiday and absence lists.
@@ -230,6 +419,7 @@ const TimesheetDetailGeneral = ({
     let totalWorkTimeInMilli = 0;
     let totalTimeInMilli = 0;
     let totalBillableTime = 0;
+    let totalOverTime = 0;
 
     console.debug("holidayDayTotalMap:");
     holidayDayTotalMap.forEach((value, key) => {
@@ -242,12 +432,16 @@ const TimesheetDetailGeneral = ({
     });
 
     console.debug("updatedTimesheetItemsMap:");
+
     updatedTimesheetItemsMap.forEach((value, key) => {
       console.debug(`Key: ${key}, time (in hours):`);
       value.forEach((item, index) => {
         console.debug(`  Item ${index}:`, item.actualTime / 3600000);
         if (item.billable) {
           totalBillableTime += item.actualTime;
+        }
+        if (item.timeItemTypeExtId) {
+          totalOverTime += item.actualTime;
         }
         totalWorkTimeInMilli += item.actualTime;
       });
@@ -305,6 +499,7 @@ const TimesheetDetailGeneral = ({
     setTotalTime(totalWorkTimeInMilli);
     setTimesheetTotalTime(totalTimeInMilli);
     setBillableTime(totalBillableTime);
+    setOverTime(totalOverTime);
   };
 
   const generateTimesheetItemsMap = (tasks) => {
@@ -1381,6 +1576,9 @@ const TimesheetDetailGeneral = ({
 
     setTimesheetItemsMap(newTimesheetItemsMap);
 
+    const dates = generateTableDateRange();
+    setTimesheetDateRange(dates);
+
     // On opening the timesheet detail use the date selected at the time of timesheet creation
     // Otherwise, set the selected date to the start date if it's valid
     if (!selectedDate && isValid(start)) {
@@ -1424,35 +1622,11 @@ const TimesheetDetailGeneral = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <ScrollView
-          horizontal
-          contentContainerStyle={styles.horizontalScrollContent}
-        >
-          <View style={styles.hoursContainer}>
-            <Text style={styles.hoursLabel}>{t("day_total")}:</Text>
-            <Text style={styles.hoursValue}>
-              {convertMillisecondsToDuration(dayTotalTime)} h (
-              {convertMillisecondsToDuration(totalTimesheetTime)} h)
-            </Text>
-          </View>
-          <View style={styles.statusContainer}>
-            <CustomStatus
-              busObjCat={BUSOBJCATMAP[busObjCat]}
-              busObjId={busObjId}
-              busObjType={type}
-              busObjExtStatus={headerExtStatus}
-              isParentLocked={isParentLocked}
-              isEditMode={isEditMode}
-              currentStatus={currentStatus}
-              listOfNextStatus={listOfNextStatus}
-              handleReload={handleReload}
-              loading={loading}
-            />
-          </View>
-        </ScrollView>
-      </View>
-      <CollapsiblePanel title={t("overview")} initiallyCollapsed={true}>
+      <CollapsiblePanel
+        title={t("overview")}
+        initiallyCollapsed={isOverviewCollapsed}
+        onCollapseChange={handleOverviewCollapseChange}
+      >
         <View style={styles.separator} />
         <View style={styles.rowContainer}>
           <View style={[styles.rowChilds, { marginRight: 5 }]}>
@@ -1489,6 +1663,10 @@ const TimesheetDetailGeneral = ({
             onChangeText={handleHeaderRemarkChange} // Set header remark
             editable={!isParentLocked}
           />
+        </View>
+        <View style={styles.panelChild}>
+          <Text style={styles.panelChildLabel}>{t("workschedule")}</Text>
+          <Text style={{ fontWeight: "normal" }}>{workScheduleName}</Text>
         </View>
         <View style={styles.separator} />
         <View style={styles.KPIDataContainer}>
@@ -1558,6 +1736,204 @@ const TimesheetDetailGeneral = ({
           </View>
         </View>
         <View style={styles.separator} />
+        <View style={styles.tableContainer}>
+          <View style={styles.tableContent}>
+            {/* Fixed Part: Task Column */}
+            <View style={styles.fixedColumnContainer}>
+              <View style={styles.tableHeaderRow}>
+                <Text
+                  style={[
+                    styles.fixedColumn,
+                    styles.boldText,
+                    styles.smallText,
+                  ]}
+                >
+                  {t("task")}
+                </Text>
+              </View>
+
+              {/* Absence Row */}
+              <View style={styles.tableRow}>
+                <Text
+                  style={[styles.fixedColumn, styles.smallText]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {absenceRow.title}
+                </Text>
+              </View>
+
+              {/* Holiday Row */}
+              <View style={styles.tableRow}>
+                <Text
+                  style={[styles.fixedColumn, styles.smallText]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {holidayRow.title}
+                </Text>
+              </View>
+
+              {/* Task Data Rows */}
+              {taskRows.map((row, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text
+                    style={[styles.fixedColumn, styles.smallText]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {row.title}
+                  </Text>
+                </View>
+              ))}
+
+              {/* Total Row */}
+              <View style={styles.tableRow}>
+                <Text
+                  style={[
+                    styles.fixedColumn,
+                    styles.boldText,
+                    styles.smallText,
+                  ]}
+                >
+                  {t("total")}
+                </Text>
+              </View>
+            </View>
+
+            {/* Scrollable Part: Date Headers and Data */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View>
+                {/* Date Header Row */}
+                <View style={styles.tableHeaderRow}>
+                  {timesheetDateRange.map((date, index) => (
+                    <View key={index} style={styles.tableCellContainer}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.boldText,
+                          styles.smallText,
+                        ]}
+                      >
+                        {new Date(date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                        })}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.boldText,
+                          styles.smallText,
+                        ]}
+                      >
+                        {new Date(date).toLocaleDateString("en-US", {
+                          month: "2-digit",
+                          day: "2-digit",
+                        })}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={styles.tableCellContainer}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.boldText,
+                        styles.smallText,
+                      ]}
+                    >
+                      {t("total")}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Absence Data Row */}
+                <View style={styles.tableRow}>
+                  {absenceRow.data.data.map((value, i) => (
+                    <Text key={i} style={[styles.tableCell, styles.smallText]}>
+                      {value}
+                    </Text>
+                  ))}
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      styles.boldText,
+                      styles.smallText,
+                    ]}
+                  >
+                    {absenceRow.data.totalHours}
+                  </Text>
+                </View>
+
+                {/* Holiday Data Row */}
+                <View style={styles.tableRow}>
+                  {holidayRow.data.data.map((value, i) => (
+                    <Text key={i} style={[styles.tableCell, styles.smallText]}>
+                      {value}
+                    </Text>
+                  ))}
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      styles.boldText,
+                      styles.smallText,
+                    ]}
+                  >
+                    {holidayRow.data.totalHours}
+                  </Text>
+                </View>
+
+                {/* Task Data Rows */}
+                {taskRows.map((row, index) => (
+                  <View key={index} style={styles.tableRow}>
+                    {row.data.data.map((value, i) => (
+                      <Text
+                        key={i}
+                        style={[styles.tableCell, styles.smallText]}
+                      >
+                        {value}
+                      </Text>
+                    ))}
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.boldText,
+                        styles.smallText,
+                      ]}
+                    >
+                      {row.data.totalHours}
+                    </Text>
+                  </View>
+                ))}
+
+                {/* Total Data Row */}
+                <View style={styles.tableRow}>
+                  {totalColumnData.map((value, i) => (
+                    <Text
+                      key={i}
+                      style={[
+                        styles.tableCell,
+                        styles.boldText,
+                        styles.smallText,
+                      ]}
+                    >
+                      {value}
+                    </Text>
+                  ))}
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      styles.boldText,
+                      styles.smallText,
+                    ]}
+                  >
+                    {totalRowData} {" h"}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+        <View style={styles.separator} />
         <View style={styles.indicatorContainer}>
           <View>
             <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
@@ -1584,72 +1960,108 @@ const TimesheetDetailGeneral = ({
             </View>
           </View>
         </View>
+        <View style={styles.separator} />
+        <Text style={styles.note}>{`${t("note")}: ${t(
+          "hours_modification_note"
+        )}`}</Text>
       </CollapsiblePanel>
-      <View style={styles.dateListContainer}>
-        <Pressable
-          style={styles.dateArrow}
-          onPress={fetchPreviousDates}
-          disabled={true}
-        >
-          <MaterialCommunityIcons
-            name="chevron-left"
-            size={36}
-            color="#005eb8"
-          />
-        </Pressable>
-        <FlatList
-          ref={dateListRef}
-          getItemLayout={getDateListItemLayout}
-          onScrollToIndexFailed={handleDateListScrollToIndexFailed}
-          data={visibleDates}
-          renderItem={renderDateItem}
-          keyExtractor={(item, index) => index.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateList}
-        />
-        <Pressable
-          style={styles.dateArrow}
-          onPress={fetchNextDates}
-          disabled={true}
-        >
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={36}
-            color="#005eb8"
-          />
-        </Pressable>
-      </View>
-      {renderTimesheetItems()}
-      {!loading && !keyboardShown && (
-        <View style={styles.floatingContainer}>
-          <CustomButton
-            onPress={() => handleCreateItemClick()}
-            label=""
-            icon={{
-              name: "plus",
-              library: "MaterialCommunityIcons",
-              size: 40,
-              color: "#fff",
-            }}
-            disabled={isParentLocked}
-            style={styles.floatingButton}
-          />
-        </View>
-      )}
-      {isEditingItem && (
-        <TimesheetDetailItemEditor
-          item={currentItem}
-          timesheetDetail={{
-            timesheetStart: start,
-            selectedDate: selectedDate,
-          }}
-          timesheetTypeDetails={timesheetTypeDetails}
-          onConfirm={handleConfirmCreateOrEditItem}
-          onCancel={handleCancelEditItem}
-          isItemEditMode={isItemEditMode}
-          isParentLocked={isParentLocked}
-        />
+      {isOverviewCollapsed && (
+        <>
+          <View style={styles.header}>
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              <View style={styles.hoursContainer}>
+                <Text style={styles.hoursLabel}>{t("day_total")}:</Text>
+                <Text style={styles.hoursValue}>
+                  {convertMillisecondsToDuration(dayTotalTime)} h (
+                  {convertMillisecondsToDuration(totalTimesheetTime)} h)
+                </Text>
+              </View>
+              <View style={styles.statusContainer}>
+                <CustomStatus
+                  busObjCat={BUSOBJCATMAP[busObjCat]}
+                  busObjId={busObjId}
+                  busObjType={type}
+                  busObjExtStatus={headerExtStatus}
+                  isParentLocked={isParentLocked}
+                  isEditMode={isEditMode}
+                  currentStatus={currentStatus}
+                  listOfNextStatus={listOfNextStatus}
+                  handleReload={handleReload}
+                  loading={loading}
+                />
+              </View>
+            </ScrollView>
+          </View>
+          <View style={styles.dateListContainer}>
+            <Pressable
+              style={styles.dateArrow}
+              onPress={fetchPreviousDates}
+              disabled={true}
+            >
+              <MaterialCommunityIcons
+                name="chevron-left"
+                size={36}
+                color="#005eb8"
+              />
+            </Pressable>
+            <FlatList
+              ref={dateListRef}
+              getItemLayout={getDateListItemLayout}
+              onScrollToIndexFailed={handleDateListScrollToIndexFailed}
+              data={visibleDates}
+              renderItem={renderDateItem}
+              keyExtractor={(item, index) => index.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dateList}
+            />
+            <Pressable
+              style={styles.dateArrow}
+              onPress={fetchNextDates}
+              disabled={true}
+            >
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={36}
+                color="#005eb8"
+              />
+            </Pressable>
+          </View>
+          {renderTimesheetItems()}
+          {!loading && !keyboardShown && (
+            <View style={styles.floatingContainer}>
+              <CustomButton
+                onPress={() => handleCreateItemClick()}
+                label=""
+                icon={{
+                  name: "plus",
+                  library: "MaterialCommunityIcons",
+                  size: 40,
+                  color: "#fff",
+                }}
+                disabled={isParentLocked}
+                style={styles.floatingButton}
+              />
+            </View>
+          )}
+          {isEditingItem && (
+            <TimesheetDetailItemEditor
+              item={currentItem}
+              timesheetDetail={{
+                timesheetStart: start,
+                selectedDate: selectedDate,
+              }}
+              timesheetTypeDetails={timesheetTypeDetails}
+              onConfirm={handleConfirmCreateOrEditItem}
+              onCancel={handleCancelEditItem}
+              isItemEditMode={isItemEditMode}
+              isParentLocked={isParentLocked}
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -1974,6 +2386,61 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   KPIDataValue: {},
+  note: {
+    fontSize: 12,
+    color: "#00f",
+    marginTop: 10,
+  },
+  smallText: {
+    fontSize: 12,
+  },
+  boldText: {
+    fontWeight: "bold",
+  },
+  tableContainer: {
+    flex: 1,
+    paddingVertical: 10,
+  },
+  tableContent: {
+    flexDirection: "row", // Organize content side by side (fixed and scrollable)
+  },
+  fixedColumnContainer: {
+    width: 100,
+  },
+  tableHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    height: 50,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  fixedColumn: {
+    width: 100,
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+    paddingLeft: 5,
+  },
+  scrollableRow: {
+    flexDirection: "row",
+  },
+  tableCellContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tableCell: {
+    flex: 1,
+    minWidth: 50,
+    textAlign: "right",
+    paddingRight: 5,
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+  },
 });
 
 export default TimesheetDetailGeneral;

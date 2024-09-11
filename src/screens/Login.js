@@ -143,6 +143,7 @@ const Login = ({ navigation }) => {
       data?.User?.[0]?.["Resource-core-termDate"] ?? null;
     loggedInUserInfo.companyId = data?.User?.[0]?.["Resource-companyID"] ?? "";
     loggedInUserInfo.workScheduleExtId = data?.empWorkSchedue?.extID ?? "";
+    loggedInUserInfo.workScheduleName = data?.empWorkSchedue?.name ?? "";
     loggedInUserInfo.dailyStdHours =
       data?.empWorkSchedue?.dailyStdHours ?? 28800000;
     loggedInUserInfo.stdWorkHours =

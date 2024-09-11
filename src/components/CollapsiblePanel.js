@@ -17,6 +17,7 @@ import { screenDimension } from "../utils/ScreenUtils";
  * @param {JSX.Element} props.children - The content of the panel.
  * @param {boolean} [props.disabled] - Whether the panel is disabled or not.
  * @param {boolean} [props.initiallyCollapsed=true] - Whether the panel is initially collapsed or expanded.
+ * @param {function(boolean): void} [props.onCollapseChange] - Callback function to notify the parent about the collapsed state change.
  * @returns {JSX.Element} - Rendered component.
  */
 const CollapsiblePanel = ({
@@ -24,6 +25,7 @@ const CollapsiblePanel = ({
   children,
   disabled,
   initiallyCollapsed = true,
+  onCollapseChange,
 }) => {
   // State to manage the collapsed state of the panel
   const [collapsed, setCollapsed] = useState(initiallyCollapsed);
@@ -34,7 +36,13 @@ const CollapsiblePanel = ({
   const toggleCollapsed = () => {
     // Toggle the collapsed state only if the panel is not disabled
     if (!disabled) {
-      setCollapsed(!collapsed);
+      const newCollapsedState = !collapsed;
+      setCollapsed(newCollapsedState);
+
+      // Notify the parent component about the state change
+      if (onCollapseChange) {
+        onCollapseChange(newCollapsedState);
+      }
     }
   };
 
@@ -87,7 +95,7 @@ const styles = StyleSheet.create({
   },
   panelContent: {
     marginTop: "4%",
-    maxHeight: screenDimension.height / 2,
+    maxHeight: (screenDimension.height * 3) / 4,
   },
 });
 

@@ -29,7 +29,7 @@ const updateFields = async (formData, queryStringParams) => {
       JSON.stringify(formData)
     );
 
-    console.debug(JSON.stringify(updateResponse));
+    console.debug("Response from updateFields:", JSON.stringify(updateResponse));
 
     // Extract message text from the response
     const messageText =
@@ -41,7 +41,11 @@ const updateFields = async (formData, queryStringParams) => {
     }
 
     // Return success status and message
-    return { success: updateResponse.success, message: messageText, response: updateResponse };
+    return {
+      success: updateResponse.success,
+      message: messageText,
+      response: updateResponse,
+    };
   } catch (error) {
     // Log and display error message
     console.error("Error in updateFields:", error);

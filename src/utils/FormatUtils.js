@@ -535,11 +535,19 @@ const makeFirstLetterLowercase = (str) => {
  */
 const stripHTMLTags = (content, htmlToReplace, replaceWith = "") => {
   try {
+    // Ensure content is a string to avoid replace method errors
+    if (typeof content !== "string") {
+      return content; // Return unchanged content if it's not a string
+    }
+
+    // Ensure htmlToReplace is valid for regex
     const regex = new RegExp(htmlToReplace, "g");
+
+    // Perform the replacement
     return content.replace(regex, replaceWith);
   } catch (error) {
     console.error("Error stripping HTML tags:", error);
-    return content;
+    return content; // Return unchanged content if an error occurs
   }
 };
 

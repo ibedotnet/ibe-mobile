@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useTranslation } from "react-i18next";
@@ -7,17 +7,28 @@ import { format, isValid } from "date-fns";
 
 import { RichEditor } from "react-native-pell-rich-editor";
 
-import { fetchData } from "../utils/APIUtils";
+import {
+  fetchData,
+  getAppName,
+  isDoNotReplaceAnyList,
+} from "../utils/APIUtils";
 import { convertToDateFNSFormat, stripHTMLTags } from "../utils/FormatUtils";
+import { showToast } from "../utils/MessageUtils";
+import updateFields from "../utils/UpdateUtils";
 
 import ConfirmationDialog from "../components/dialogs/ConfimationDialog";
 import CustomButton from "../components/CustomButton";
 import EditDialog from "../components/dialogs/EditDialog";
 
-import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants";
+import {
+  API_ENDPOINTS,
+  APP,
+  BUSOBJCATMAP,
+  INTSTATUS,
+  TEST_MODE,
+} from "../constants";
 
 import { common, disableOpacity } from "../styles/common";
-import { screenDimension } from "../utils/ScreenUtils";
 
 const Comment = ({
   busObjCat,
@@ -29,20 +40,247 @@ const Comment = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-
   const [selectedComment, setSelectedComment] = useState(null);
   const [isDeleteConfirmationVisible, setIsDeleteConfirmationVisible] =
     useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
-  const handleAddPress = () => {
+  /**
+   * Handles the creation of a new comment.
+   * @param {Object} comment - The comment object to be added.
+   * @returns {Object|null} - The updated comment object with an ID, or null if there was an error.
+   */
+  const handleNewCommentOperation = async (comment) => {
+    let updateParams = {
+      [`MessageLog-text:text`]: comment.content,
+      [`MessageLog-busObjID-busObjCat`]: busObjCat,
+      [`MessageLog-busObjID-iD`]: busObjId,
+      [`MessageLog-intStatus`]: 0, // Set status to active
+      [`MessageLog-publishedOn`]: new Date(),
+      [`MessageLog-publishedBy`]: APP.LOGIN_USER_ID,
+      [`MessageLog-type`]: "comment",
+      [`MessageLog-isPrivate`]: false,
+      [`MessageLog-type`]: false,
+    };
+
+    const newlyAddedComment = await handleCommentsUpdate(null, updateParams);
+
+    if (!newlyAddedComment || !newlyAddedComment.id) {
+      return null; // Return null if the comment was not successfully added
+    }
+
+    comment.id = newlyAddedComment.id;
+    return comment;
+  };
+
+  /**
+   * Handles the update of an existing comment.
+   * @param {Object} comment - The comment object to be updated.
+   * @returns {Object} - The updated comment object.
+   */
+  const handleUpdateCommentOperation = async (comment) => {
+    let updateParams = {
+      [`MessageLog-text:text`]: comment.content,
+    };
+
+    await handleCommentsUpdate(comment.id, updateParams);
+    return comment;
+  };
+
+  /**
+   * Handles the deletion of a comment.
+   * @param {Object} comment - The comment object to be deleted.
+   * @returns {Object|null} - The deleted comment object, or null if there was an error.
+   */
+  const handleDeleteCommentOperation = async (comment) => {
+    let updateParams = {
+      [`MessageLog-intStatus`]: 3, // Set status to deleted
+    };
+
+    const deletedComment = await handleCommentsUpdate(comment.id, updateParams);
+    return deletedComment;
+  };
+
+  /**
+   * Processes a list of comments, applying the appropriate operations based on their status.
+   * @param {Array} comments - An array of comment objects to be processed.
+   */
+  const processComments = async (comments) => {
+    // Create a copy of the comments array to avoid mutation issues while iterating
+    let commentsToProcess = [...comments];
+
+    for (const comment of commentsToProcess) {
+      try {
+        setIsUpdating(true);
+
+        if (comment.isNewlyAdded) {
+          // Handle newly added comment
+          const result = await handleNewCommentOperation(comment);
+          if (result) {
+            setComments((prevComments) =>
+              prevComments.map((c) =>
+                c.id === result.id ? { ...c, isNewlyAdded: false } : c
+              )
+            );
+            await updateBusObjCat(); // Update related objects or categories
+          } else {
+            // Remove comment from the list if addition failed
+            setComments((prevComments) =>
+              prevComments.filter((c) => c.id !== comment.id)
+            );
+          }
+        } else if (comment.isUpdated) {
+          // Handle updated comment
+          const result = await handleUpdateCommentOperation(comment);
+          setComments((prevComments) =>
+            prevComments.map((c) =>
+              c.id === result.id ? { ...c, isUpdated: false } : c
+            )
+          );
+        } else if (comment.isDeleted) {
+          // Handle deleted comment
+          const result = await handleDeleteCommentOperation(comment);
+          if (result && result.id) {
+            setComments((prevComments) =>
+              prevComments.filter((c) => c.id !== result.id)
+            );
+            await updateBusObjCat(); // Update related objects or categories
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing comment (${comment.content}):`, error);
+      } finally {
+        setIsUpdating(false);
+      }
+    }
+  };
+
+  /**
+   * Asynchronous function to handle MessageLog update in database
+   * @param {string} commentId - ID of the MessageLog entry to be updated
+   * @param {Object} updateParams - Parameters for updating the MessageLog
+   * @param {boolean} skipBusObjCatUpdate - Optional flag to skip business object category update (default: false)
+   */
+  const handleCommentsUpdate = async (commentId, updateParams) => {
+    try {
+      // Prepare form data for the MessageLog update
+      let formData = {
+        data: {
+          ...(commentId && { "MessageLog-id": commentId }), // Add only if commentId exists
+          ...updateParams, // Additional fields to be updated
+        },
+      };
+
+      // Prepare query string parameters for the update request
+      const queryStringParams = {
+        userID: APP.LOGIN_USER_ID,
+        client: APP.LOGIN_USER_CLIENT,
+        language: APP.LOGIN_USER_LANGUAGE,
+        testMode: TEST_MODE,
+        component: "platform",
+        doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
+        appName: JSON.stringify(getAppName(busObjCat)),
+      };
+
+      // Call the updateFields function to perform the MessageLog update
+      const updateResponse = await updateFields(formData, queryStringParams);
+
+      // Handle the response based on its structure
+      if (updateResponse && updateResponse.success) {
+        // Process successful response
+        if (
+          updateResponse.response &&
+          Array.isArray(updateResponse.response.details) &&
+          updateResponse.response.details.length > 0
+        ) {
+          const detail = updateResponse.response.details[0];
+          if (
+            detail.success &&
+            detail.data &&
+            Array.isArray(detail.data.ids) &&
+            detail.data.ids.length > 0
+          ) {
+            // Show success message and return the comment ID
+            if (Array.isArray(detail.messages) && detail.messages.length > 0) {
+              showToast(detail.messages[0].message_text);
+            }
+
+            return { id: detail.data.ids[0] }; // Return the first ID from the response
+          }
+        }
+      } else {
+        console.error(
+          "Update response is either undefined or not successful:",
+          updateResponse
+        );
+      }
+
+      showToast(t("update_failure"), "error");
+      return null;
+    } catch (error) {
+      // Handle unexpected errors
+      console.error("Error in handleCommentsUpdate:", error);
+      showToast(t("failed_update_comments"), "error");
+      return null; // Return null on error
+    }
+  };
+
+  /**
+   * Asynchronous function to update the business object category with comments.
+   *
+   * @async
+   * @function
+   * @param {Array} [comments=[]] - List of comments to be included in the update. Each comment should have an `id` property.
+   * @throws {Error} Throws an error if the update process fails.
+   */
+  const updateBusObjCat = async () => {
+    try {
+      // Collect comment IDs into an array. Defaults to an empty array if no comments are provided.
+      const commentIds =
+        comments.length > 0 ? comments.map((comment) => comment.id) : [];
+
+      // Prepare form data for the update request.
+      let formData = {
+        data: {
+          [`${BUSOBJCATMAP[busObjCat]}-id`]: busObjId, // Business object ID to be updated
+          [`${BUSOBJCATMAP[busObjCat]}-comments`]: commentIds, // Array of comment IDs to be associated with the business object
+        },
+      };
+
+      // Prepare query string parameters for the update request.
+      const queryStringParams = {
+        userID: APP.LOGIN_USER_ID,
+        client: APP.LOGIN_USER_CLIENT,
+        language: APP.LOGIN_USER_LANGUAGE,
+        component: "platform",
+      };
+
+      // Call the updateFields function to perform the update request.
+      const updateResponse = await updateFields(formData, queryStringParams);
+
+      if (!updateResponse.success) {
+        showToast(t("update_failure"), "error"); // Show error message if the update fails
+      }
+
+      if (updateResponse.message) {
+        showToast(updateResponse.message); // Show success or informational message
+      }
+    } catch (error) {
+      // Handle errors that occur during the comment update process.
+      console.error("Error in updateBusObjCat(comments):", error);
+      showToast(t("failed_update_comments"), "error"); // Show error message for failed comments update
+    }
+  };
+
+  const handleAddPress = useCallback(() => {
     setNewComment("");
     setSelectedComment(null);
     setIsEditModalVisible(true);
-  };
+  }, []);
 
   const handleEditPress = (comment) => {
     setNewComment(comment.content);
@@ -88,13 +326,11 @@ const Comment = ({
   // Function to confirm comment deletion
   const confirmDelete = () => {
     // Mark the selected comment as 'isDeleted: true' and filter it out
-    const updatedComments = comments
-      .map((comment) =>
-        comment.id === selectedComment.id
-          ? { ...comment, isDeleted: true }
-          : comment
-      )
-      .filter((comment) => comment.id !== selectedComment.id);
+    const updatedComments = comments.map((comment) =>
+      comment.id === selectedComment.id
+        ? { ...comment, isDeleted: true }
+        : comment
+    );
 
     // Update the 'comments' state with the updated comments array
     setComments(updatedComments);
@@ -112,101 +348,94 @@ const Comment = ({
    */
   const fetchInitialComments = async () => {
     try {
-      setLoading(true);
-
-      const fetchedComments = []; // Initialize an array to store all fetched comments
-
-      // Iterate over each comment ID in the initialComments
-      for (const commentId of initialComments) {
-        // Define query fields to fetch comment (Message Log)
-        const queryFields = {
-          fields: [
-            "MessageLog-id",
-            "MessageLog-text:text",
-            "MessageLog-publishedBy:User-personID:Person-name-knownAs",
-            "MessageLog-publishedOn",
-          ],
-          where: [
-            {
-              fieldName: "MessageLog-id",
-              operator: "=",
-              value: commentId, // Use the current comment ID from the list
-            },
-          ],
-          sort: [{ property: "MessageLog-publishedOn", direction: "DESC" }],
-        };
-
-        // Define common query parameters
-        const commonQueryParams = {
-          testMode: TEST_MODE,
-          client: parseInt(APP.LOGIN_USER_CLIENT),
-          user: APP.LOGIN_USER_ID,
-          userID: APP.LOGIN_USER_ID,
-          language: APP.LOGIN_USER_LANGUAGE,
-          intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
-        };
-
-        // Construct form data for the request
-        const formData = {
-          query: JSON.stringify(queryFields),
-          ...commonQueryParams,
-        };
-
-        // Fetch data from the server
-        const response = await fetchData(
-          API_ENDPOINTS.QUERY,
-          "POST",
-          {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          },
-          new URLSearchParams(formData).toString()
-        );
-
-        // Process the response if successful and data is available
-        if (
-          response.success === true &&
-          response.data &&
-          response.data instanceof Array &&
-          response.data.length > 0
-        ) {
-          // Map fetched comments to desired format
-          const fetchedComment = response.data.map((comment) => {
-            const id = comment["MessageLog-id"];
-            // This paragraph ("<p>&nbsp;</p>") is added in the web application,
-            // so we have to strip it; otherwise, it adds unwanted space.
-            const content = stripHTMLTags(
-              comment["MessageLog-text:text"],
-              "<p>&nbsp;</p>"
-            );
-            const publishedBy =
-              comment[
-                "MessageLog-publishedBy:User-personID:Person-name-knownAs"
-              ];
-            const unFormattedPublishedOn = new Date(
-              comment["MessageLog-publishedOn"]
-            );
-            const publishedOn = isValid(unFormattedPublishedOn)
-              ? format(
-                  unFormattedPublishedOn,
-                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                )
-              : "";
-
-            return {
-              id,
-              content,
-              publishedBy,
-              publishedOn,
-            };
-          });
-
-          // Append fetched comments to the array
-          fetchedComments.push(...fetchedComment);
-        }
+      if (initialComments?.length === 0) {
+        return;
       }
 
-      // Update the state once with all fetched comments
-      setComments(fetchedComments);
+      setLoading(true);
+
+      // Define query fields to fetch comments (Message Log)
+      const queryFields = {
+        fields: [
+          "MessageLog-id",
+          "MessageLog-text:text",
+          "MessageLog-publishedBy:User-personID:Person-name-knownAs",
+          "MessageLog-publishedOn",
+        ],
+        where: [
+          {
+            fieldName: "MessageLog-id",
+            operator: "in",
+            value: initialComments, // Use the initialComments array as the value
+          },
+        ],
+        sort: [{ property: "MessageLog-publishedOn", direction: "DESC" }],
+      };
+
+      // Define common query parameters
+      const commonQueryParams = {
+        testMode: TEST_MODE,
+        client: parseInt(APP.LOGIN_USER_CLIENT),
+        user: APP.LOGIN_USER_ID,
+        userID: APP.LOGIN_USER_ID,
+        language: APP.LOGIN_USER_LANGUAGE,
+        intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+      };
+
+      // Construct form data for the request
+      const formData = {
+        query: JSON.stringify(queryFields),
+        ...commonQueryParams,
+      };
+
+      // Fetch data from the server
+      const response = await fetchData(
+        API_ENDPOINTS.QUERY,
+        "POST",
+        {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        new URLSearchParams(formData).toString()
+      );
+
+      // Process the response if successful and data is available
+      if (
+        response.success === true &&
+        response.data &&
+        response.data instanceof Array &&
+        response.data.length > 0
+      ) {
+        // Map fetched comments to the desired format
+        const fetchedComments = response.data.map((comment) => {
+          const id = comment["MessageLog-id"];
+          // Strip unwanted HTML tags
+          const content = stripHTMLTags(
+            comment["MessageLog-text:text"],
+            "<p>&nbsp;</p>"
+          );
+          const publishedBy =
+            comment["MessageLog-publishedBy:User-personID:Person-name-knownAs"];
+          const unFormattedPublishedOn = new Date(
+            comment["MessageLog-publishedOn"]
+          );
+          const publishedOn = isValid(unFormattedPublishedOn)
+            ? format(
+                unFormattedPublishedOn,
+                convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+              )
+            : "";
+
+          return {
+            id,
+            content,
+            publishedBy,
+            publishedOn,
+          };
+        });
+
+        // Update the state once with all fetched comments
+        setComments(fetchedComments);
+      }
     } catch (error) {
       console.error("Error fetching initial comments: ", error);
       setError(error);
@@ -219,6 +448,11 @@ const Comment = ({
     // Fetch initial comments when component mounts
     fetchInitialComments();
   }, [initialComments]);
+
+  // Effect to handle comments processing
+  useEffect(() => {
+    processComments(comments);
+  }, [comments]);
 
   return (
     <View style={styles.tabContainer}>
@@ -265,9 +499,14 @@ const Comment = ({
         </View>
       </View>
       {loading && (
-        <View style={styles.loaderErrorContainer}>
+        <View style={styles.progressMessageContainer}>
           <Text style={common.loadingText}>{t("loading")}...</Text>
           {error && <Text>Error: {error.message}</Text>}
+        </View>
+      )}
+      {isUpdating && (
+        <View style={styles.progressMessageContainer}>
+          <Text style={common.loadingText}>{t("update_in_progress")}...</Text>
         </View>
       )}
       <ScrollView contentContainerStyle={styles.scrollView}>
@@ -373,15 +612,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  loaderErrorContainer: {
+  progressMessageContainer: {
     paddingVertical: "4%",
     alignItems: "center",
   },
   addCommentContainer: {
     justifyContent: "flex-end",
-  },
-  scrollView: {
-    paddingBottom: screenDimension.height / 2,
   },
   commentItem: {
     borderBottomWidth: 1,

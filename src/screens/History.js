@@ -23,12 +23,12 @@ import {
   stripHTMLTags,
 } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
-import { screenDimension } from "../utils/ScreenUtils";
 
 import CollapsiblePanel from "../components/CollapsiblePanel";
+import CustomButton from "../components/CustomButton";
 import CustomPicker from "../components/CustomPicker";
 
-import { common } from "../styles/common";
+import { common, disableOpacity } from "../styles/common";
 
 /**
  * History Component
@@ -51,7 +51,7 @@ const History = ({ busObjCat, busObjID }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [from, setFrom] = useState(0);
-  const [timeLineSize, setTimeLineSize] = useState(20);
+  const [timeLineSize, setTimeLineSize] = useState(10);
   const [pageParam, setPageParam] = useState(1);
   const [dateEvent, setDateEvent] = useState("");
   const [typeFilterValue, setTypeFilterValue] = useState("");
@@ -59,26 +59,6 @@ const History = ({ busObjCat, busObjID }) => {
   const [typePickerData, setTypePickerData] = useState([]);
   const [userPickerData, setUserPickerData] = useState([]);
   const [fetchingFilterData, setFetchingFilterData] = useState(true);
-
-  /**
-   * Handles the scroll event of the timeline ScrollView.
-   * Checks if the end of the timeline content is reached and triggers loading more data if so.
-   * @param {Object} event - The scroll event object containing information about the scroll position.
-   * @returns {void}
-   */
-  const handleScroll = ({ nativeEvent }) => {
-    // Extracting relevant properties from the scroll event
-    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-
-    // Calculating whether the end of the timeline content is reached
-    const isEndReached =
-      layoutMeasurement.height + contentOffset.y >= contentSize.height;
-
-    // If the end is reached, trigger loading more data
-    if (isEndReached) {
-      fetchMoreTimelineData(); // Call the function to load more timeline data
-    }
-  };
 
   /**
    * Function to get the icon component based on the event type.
@@ -172,17 +152,27 @@ const History = ({ busObjCat, busObjID }) => {
    * @returns {void}
    */
   const fetchMoreTimelineData = async () => {
-    if (!timelineData) return;
+    if (!timelineData) {
+      setLoading(false);
+      return;
+    }
 
     const { timelineEvents } = timelineData;
-    // Check if the current data already contains all the items for the current page
-    if (timelineEvents.length < pageParam * timeLineSize) {
+
+    // Check if there are no more events to load
+    if (
+      !timelineEvents ||
+      !Array.isArray(timelineEvents) ||
+      timelineEvents.length === 0
+    ) {
       showToast(t("no_more_data"), "warning");
       return;
     }
 
     if (!loading && !error) {
       try {
+        setLoading(true);
+
         const nextPageParam = pageParam + 1; // Increment pageParam to fetch next page of data
 
         const endpoint = API_ENDPOINTS.INVOKE;
@@ -195,22 +185,40 @@ const History = ({ busObjCat, busObjID }) => {
           JSON.stringify(payload)
         );
 
-        if (response.success !== true) {
+        if (
+          response.success !== true ||
+          !response.retVal ||
+          !Array.isArray(response.retVal.timelineEvents)
+        ) {
           showToast(t("unexpected_error"), "error");
         } else {
-          // Concatenate new timeline events with existing events
-          setTimelineData((prevData) => ({
-            ...prevData,
-            timelineEvents: [
-              ...prevData.timelineEvents,
-              ...response.retVal.timelineEvents,
-            ],
-          }));
-          setPageParam(nextPageParam); // Update pageParam
+          const newEvents = response.retVal.timelineEvents;
+
+          // Check if new events were returned from the API
+          if (newEvents.length === 0) {
+            showToast(t("no_more_data"), "warning");
+          } else {
+            // Use a functional update to preserve previous timeline data and append new events
+            setTimelineData((prevData) => {
+              const updatedEvents = [
+                ...(prevData.timelineEvents || []),
+                ...newEvents,
+              ];
+
+              return {
+                ...prevData,
+                timelineEvents: updatedEvents,
+              };
+            });
+
+            setPageParam(nextPageParam); // Update pageParam
+          }
         }
       } catch (error) {
         console.error("Error in fetch more timeline data:", error);
         setError(error);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -241,8 +249,6 @@ const History = ({ busObjCat, busObjID }) => {
       <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollViewContent}
-        onScroll={handleScroll}
-        scrollEventThrottle={400}
       >
         {/* Display header with creation information */}
         <Text numberOfLines={1} ellipsizeMode="tail" style={styles.header}>
@@ -252,7 +258,11 @@ const History = ({ busObjCat, busObjID }) => {
         </Text>
         {/* Map through each timeline event and render */}
         {timelineEvents.map((event, index) => (
-          <View key={index} style={styles.cardContainer}>
+          <View
+            // By combining with changedOn and changedBy, we ensure that each event has a unique key across all pages.
+            key={`${event.changedOn}-${event.changedBy}-${index}`}
+            style={styles.cardContainer}
+          >
             <View style={styles.cardHeader}>
               {/* Display information about the event */}
               <View style={styles.changedInfo}>
@@ -294,6 +304,21 @@ const History = ({ busObjCat, busObjID }) => {
             )}
           </View>
         ))}
+        {timelineEvents.length > 0 && (
+          <CustomButton
+            // Event handler for button press; triggers fetching more timeline data
+            onPress={fetchMoreTimelineData}
+            // Label for the button, translated using the 't' function
+            label={t("show_more")}
+            icon={{}}
+            labelStyle={{
+              color: loading ? `#b0c4de${disableOpacity}` : "#005eb8",
+            }}
+            backgroundColor={false}
+            // Disables the button if loading is true
+            disabled={loading}
+          />
+        )}
       </ScrollView>
     );
   };
@@ -469,14 +494,7 @@ const History = ({ busObjCat, busObjID }) => {
   useEffect(() => {
     fetchFilterData();
     fetchTimelineData();
-  }, [
-    from,
-    timeLineSize,
-    pageParam,
-    typeFilterValue,
-    dateEvent,
-    userFilterValue,
-  ]);
+  }, [from, timeLineSize, typeFilterValue, dateEvent, userFilterValue]);
 
   return (
     <View style={styles.container}>
@@ -510,7 +528,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     paddingHorizontal: "2%",
-    paddingBottom: screenDimension.height / 2,
   },
   header: {
     textAlign: "center",

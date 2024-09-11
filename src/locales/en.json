@@ -68,8 +68,9 @@
   "failed_upload_photo": "Failed to upload the photo.",
   "failed_upload_file": "Failed to upload the file.",
   "failed_update_file": "Failed to update the file.",
-  "timesheets_show_more": "show more...",
-  "timesheets_show_less": "show less",
+  "failed_update_comments": "Failed to update the comment.",
+  "show_more": "show more...",
+  "show_less": "show less",
   "no_more_data": "No more data to load",
   "apply": "Apply",
   "reset": "Reset",
@@ -134,6 +135,7 @@
   "work_schedule": "Work schedule",
   "user_preference_info_1": "The data you're seeing is retrieved from our databases and cannot be modified here. To update these values, please use the web version of this application. If you modify anything in the web version, you must log out and then log back in to view the updated values.",
   "user_preference_info_2": "This information is stored in the cache of your device and will be reset when you log out or clear the cache.",
+  "total": "Total",
   "day_total": "Day's Total",
   "project": "Project",
   "customer": "Customer",
@@ -146,6 +148,7 @@
   "placeholder_time": "Enter time here",
   "summary": "Summary",
   "overview": "Overview",
+  "workschedule": "Work Schedule",
   "no_workschedule_assigned": "No work schedule assigned",
   "weekend": "Weekend",
   "selected": "Selected",
@@ -230,5 +233,9 @@
   "standard_timesheet": "Standard Timesheet",
   "select_task_first": "Please select task first",
   "selected_task_not_billable": "Selected task is not billable",
-  "time_allocated_to_department": "Time is allocated to the department, so it is not billable"
+  "time_allocated_to_department": "Time is allocated to the department, so it is not billable",
+  "hours_modification_note": "The hours shown include any modifications, but they are not considered final until they are saved.",
+  "billable_status_note": "The billable status is determined by the task's billable setting. However, after a timesheet item is saved, any changes to the task's billable setting will not automatically update the billable status unless the task is reselected or the billable field is manually updated.",
+  "allowed_decimal_places": "Allowed decimal places for unit {{unit}} is {{decimalPlaces}}",
+  "no_changes_detected": "No changes detected."
 }

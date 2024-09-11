@@ -67,6 +67,7 @@
   "photo_updated_success": "Foto actualizada correctamente.",
   "failed_upload_photo": "Error al subir la foto.",
   "failed_upload_file": "No se pudo cargar el archivo.",
+  "failed_update_comments": "Error al actualizar el comentario.",
   "failed_update_file": "Error al actualizar el archivo.",
   "timesheets_show_more": "ver más...",
   "timesheets_show_less": "ver menos",
@@ -146,6 +147,7 @@
   "placeholder_time": "Ingrese el tiempo aquí",
   "summary": "Resumen",
   "overview": "Resumen",
+  "workschedule": "Horario de Trabajo",
   "no_workschedule_assigned": "No hay horario de trabajo asignado",
   "weekend": "Fin de semana",
   "selected": "Seleccionado",
@@ -229,5 +231,9 @@
   "standard_timesheet": "Hoja de Tiempo Estándar",
   "select_task_first": "Por favor seleccione la tarea primero",
   "selected_task_not_billable": "La tarea seleccionada no es facturable",
-  "time_allocated_to_department": "El tiempo está asignado al departamento, por lo que no es facturable"
+  "time_allocated_to_department": "El tiempo está asignado al departamento, por lo que no es facturable",
+  "hours_modification_note": "Las horas mostradas incluyen cualquier modificación, pero no se consideran finales hasta que se guarden.",
+  "billable_status_note": "El estado facturable está determinado por la configuración de facturación de la tarea. Sin embargo, después de guardar un elemento de la hoja de tiempo, cualquier cambio en la configuración de facturación de la tarea no actualizará automáticamente el estado facturable a menos que se vuelva a seleccionar la tarea o se actualice manualmente el campo facturable.",
+  "allowed_decimal_places": "Los lugares decimales permitidos para la unidad {{unit}} son {{decimalPlaces}}",
+  "no_changes_detected": "No se detectaron cambios."
 }

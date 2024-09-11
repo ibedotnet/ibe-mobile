@@ -690,8 +690,8 @@ const Timesheet = ({ route, navigation }) => {
                         >
                           <Text style={styles.showMoreButtonText}>
                             {expandedItems[timesheetId]
-                              ? t("timesheets_show_less")
-                              : t("timesheets_show_more")}
+                              ? t("show_less")
+                              : t("show_more")}
                           </Text>
                         </TouchableOpacity>
                       </View>

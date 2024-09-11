@@ -40,6 +40,7 @@ const EditDialog = ({
       return acc;
     }, {})
   );
+  const [initialValues, setInitialValues] = useState(values); // Track initial values
   const [error, setError] = useState(null);
 
   // Use useRef to store editor references
@@ -59,9 +60,18 @@ const EditDialog = ({
 
   /**
    * Function to handle confirm action.
-   * Validates the input values, invokes the onConfirm function with the current values, and closes the dialog.
+   * Validates the input values, checks if any changes occurred, invokes the onConfirm function with the current values, and closes the dialog.
    */
   const handleConfirm = () => {
+    const hasChanges = Object.keys(values).some(
+      (key) => values[key] !== initialValues[key]
+    );
+
+    if (!hasChanges) {
+      setError(t("no_changes_detected"));
+      return;
+    }
+
     // Function to validate input values if allowBlank is false
     const emptyValidation = (values) => {
       for (const value of Object.values(values)) {
@@ -102,15 +112,15 @@ const EditDialog = ({
     onClose();
   };
 
-  // Update values state when inputsConfigs prop changes or when the component becomes visible
+  // Update values and initialValues state when inputsConfigs prop changes or when the component becomes visible
   useEffect(() => {
     if (isVisible) {
-      setValues(
-        inputsConfigs.reduce((acc, config) => {
-          acc[config.id] = config.initialValue || "";
-          return acc;
-        }, {})
-      );
+      const initial = inputsConfigs.reduce((acc, config) => {
+        acc[config.id] = config.initialValue || "";
+        return acc;
+      }, {});
+      setValues(initial);
+      setInitialValues(initial); // Update initial values when dialog becomes visible
     }
   }, [isVisible, inputsConfigs]);
 
