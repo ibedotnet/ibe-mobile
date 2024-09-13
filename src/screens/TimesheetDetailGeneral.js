@@ -10,7 +10,14 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FlatList } from "react-native-gesture-handler";
-import { addDays, format, eachDayOfInterval, isValid, parse } from "date-fns";
+import {
+  addDays,
+  format,
+  eachDayOfInterval,
+  isValid,
+  parse,
+  set,
+} from "date-fns";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -30,6 +37,7 @@ import {
   setRemarkText,
 } from "../utils/FormatUtils";
 import { screenDimension } from "../utils/ScreenUtils";
+import { checkTimesheetExistsForDate } from "../utils/TimesheetUtils";
 import {
   APP,
   BUSOBJCAT,
@@ -37,8 +45,10 @@ import {
   PREFERRED_LANGUAGES,
 } from "../constants";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
+import { showToast } from "../utils/MessageUtils";
 
 const TimesheetDetailGeneral = ({
+  navigation,
   busObjCat,
   busObjId,
   isParentLocked,
@@ -121,6 +131,7 @@ const TimesheetDetailGeneral = ({
   const [headerRemarkText, setHeaderRemarkText] = useState(
     getRemarkText(timesheetRemark, lang, PREFERRED_LANGUAGES)
   );
+  const [isEditingHeaderRemark, setIsEditingHeaderRemark] = useState(false);
   const [timesheetDateRange, setTimesheetDateRange] = useState([]);
   const [isOverviewCollapsed, setIsOverviewCollapsed] = useState(true);
 
@@ -785,40 +796,114 @@ const TimesheetDetailGeneral = ({
     }));
   };
 
-  const fetchPreviousDates = () => {
-    // Extract and convert the fullDate of the first visible date
+  /**
+   * handleCheckTimesheetExists
+   *
+   * This function checks whether a timesheet exists for a given date.
+   * If a timesheet exists, it navigates to the TimesheetDetail screen with the relevant timesheet data.
+   * If a timesheet does not exist, it navigates to the TimesheetDetail screen with the selected date.
+   * It also displays a toast message informing the user about the result.
+   *
+   * @param {Date} date - The date for which the timesheet existence check is performed.
+   * @returns {Promise<void>} - A promise that resolves after the navigation or error handling completes.
+   * @throws {Error} - Throws an error if the check for timesheet existence fails.
+   */
+  const handleCheckTimesheetExists = async (date) => {
+    try {
+      setLoading(true);
+
+      // Make network call to check if a timesheet exists for the provided date
+      const response = await checkTimesheetExistsForDate(date, null, t);
+
+      if (response.exists) {
+        // Timesheet exists, navigate to the TimesheetDetail screen with timesheet data
+        navigation.goBack(); // Navigate back to the previous screen
+        navigation.navigate("TimesheetDetail", {
+          timesheetId: response.data[0].id,
+          statusTemplateExtId: response.data[0].statusTemplateExtId,
+        });
+      } else {
+        // Timesheet does not exist, navigate with the selected date
+        navigation.goBack(); // Navigate back to the previous screen
+        navigation.navigate("TimesheetDetail", {
+          selectedDate: date.toISOString(),
+        });
+      }
+    } catch (error) {
+      // Log error in console and show an error toast message to the user
+      console.error("Error checking timesheet existence:", error);
+      showToast(t("error_checking_timesheet"), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * fetchPreviousDates
+   *
+   * This function calculates the new date range for the previous period and updates
+   * the state with the new start and end dates. It also checks if a timesheet exists
+   * for the new start date using the `handleCheckTimesheetExists` function.
+   * After updating the date range and checking for the timesheet, it scrolls the date
+   * list to the left to show the new dates.
+   *
+   * @returns {Promise<void>} - A promise that resolves once the date range is updated,
+   *                            the timesheet existence is checked, and scrolling is complete.
+   */
+  const fetchPreviousDates = async () => {
+    // Extract the first visible date from the visibleDates array
     const firstVisibleDate = new Date(visibleDates[0].fullDate);
 
-    // Calculate new end and start dates using the period
+    // Calculate the new end date by subtracting one day from the first visible date
     const newEnd = addDays(firstVisibleDate, -1);
-    const newStart = addDays(newEnd, -(period - 1)); // period - 1 to cover the entire period
 
-    setStart(newStart);
-    setEnd(newEnd);
+    // Calculate the new start date by subtracting the period length (minus one) from the new end date
+    const newStart = addDays(newEnd, -(period - 1));
 
-    // Scroll to the left
+    if (!newStart) {
+      return;
+    }
+
+    // Check if a timesheet exists for the new start date
+    await handleCheckTimesheetExists(newStart);
+
+    // Scroll to the left to show the new date range
     dateListRef?.current?.scrollToIndex({
       index: 0,
       animated: true,
     });
   };
 
-  const fetchNextDates = () => {
-    // Extract and convert the fullDate of the last visible date
+  /**
+   * fetchNextDates
+   *
+   * This function calculates the new date range for the next period and updates
+   * the state with the new start and end dates. It also checks if a timesheet exists
+   * for the new start date using the `handleCheckTimesheetExists` function.
+   * After updating the date range and checking for the timesheet, it scrolls the date
+   * list to the left to show the new dates.
+   *
+   * @returns {Promise<void>} - A promise that resolves once the date range is updated,
+   *                            the timesheet existence is checked, and scrolling is complete.
+   */
+  const fetchNextDates = async () => {
+    // Extract the last visible date from the visibleDates array
     const lastVisibleDate = new Date(
       visibleDates[visibleDates.length - 1].fullDate
     );
 
-    // Calculate new start and end dates using the period
+    // Calculate the new start date by adding one day to the last visible date
     const newStart = addDays(lastVisibleDate, 1);
-    const newEnd = addDays(newStart, period - 1); // period - 1 to cover the entire period
 
-    setStart(newStart);
-    setEnd(newEnd);
+    // Ensure the new start date is valid before proceeding
+    if (!newStart) return;
 
-    // Scroll to the right
+    // Check if a timesheet exists for the new start date
+    await handleCheckTimesheetExists(newStart);
+
+    // Scroll to the right to show the new date range
     dateListRef?.current?.scrollToIndex({
-      index: dateListRef.current.scrollWidth,
+      index: 0,
       animated: true,
     });
   };
@@ -1632,7 +1717,7 @@ const TimesheetDetailGeneral = ({
           <View style={[styles.rowChilds, { marginRight: 5 }]}>
             <Text style={styles.panelChildLabel}>
               {t("start")}:{" "}
-              <Text style={{ fontWeight: "normal" }}>
+              <Text style={styles.normalText}>
                 {format(
                   start,
                   convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
@@ -1643,7 +1728,7 @@ const TimesheetDetailGeneral = ({
           <View style={styles.rowChilds}>
             <Text style={styles.panelChildLabel}>
               {t("end")}:{" "}
-              <Text style={{ fontWeight: "normal" }}>
+              <Text style={styles.normalText}>
                 {format(
                   end,
                   convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
@@ -1653,16 +1738,38 @@ const TimesheetDetailGeneral = ({
           </View>
         </View>
         <View style={styles.panelChild}>
-          <Text style={styles.panelChildLabel}>{t("remark")}</Text>
-          <CustomTextInput
-            containerStyle={{
-              borderColor: isParentLocked && "rgba(0, 0, 0, 0.5)",
-            }}
-            value={headerRemarkText}
-            placeholder={`${t("placeholder_remark")}...`}
-            onChangeText={handleHeaderRemarkChange} // Set header remark
-            editable={!isParentLocked}
-          />
+          <View style={styles.panelChildLabelContainer}>
+            <Text style={styles.panelChildLabel}>{t("remark")}</Text>
+            <CustomButton
+              onPress={() => setIsEditingHeaderRemark((prev) => !prev)} // Directly toggle isEditing state
+              label=""
+              icon={{
+                name: isEditingHeaderRemark ? "pencil-off" : "pencil",
+                library: "MaterialCommunityIcons",
+                size: 24,
+                color: "blue",
+              }}
+              background={false}
+              disabled={isParentLocked}
+              style={{
+                paddingHorizontal: 0,
+                paddingVertical: isEditingHeaderRemark ? 5 : 0,
+              }}
+            />
+          </View>
+          {isEditingHeaderRemark ? (
+            <CustomTextInput
+              containerStyle={{
+                borderColor: isParentLocked && "rgba(0, 0, 0, 0.5)",
+              }}
+              value={headerRemarkText}
+              placeholder={`${t("placeholder_remark")}...`}
+              onChangeText={handleHeaderRemarkChange}
+              editable={!isParentLocked}
+            />
+          ) : (
+            <Text style={styles.normalText}>{headerRemarkText}</Text>
+          )}
         </View>
         <View style={styles.panelChild}>
           <Text style={styles.panelChildLabel}>{t("workschedule")}</Text>
@@ -1936,28 +2043,28 @@ const TimesheetDetailGeneral = ({
         <View style={styles.separator} />
         <View style={styles.indicatorContainer}>
           <View>
-            <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
             <View style={styles.weekendIndicator}>
               <View style={styles.weekendColorBox} />
             </View>
+            <Text style={styles.panelChildLabel}>{t("weekend")}</Text>
           </View>
           <View>
-            <Text style={styles.panelChildLabel}>{t("selected")}</Text>
             <View style={styles.selectedIndicator}>
               <View style={styles.selectedColorBox} />
             </View>
+            <Text style={styles.panelChildLabel}>{t("selected")}</Text>
           </View>
           <View>
-            <Text style={styles.panelChildLabel}>{t("holiday")}</Text>
             <View style={styles.holidayIndicator}>
               <View style={styles.holidayColorBox} />
             </View>
+            <Text style={styles.panelChildLabel}>{t("holiday")}</Text>
           </View>
           <View>
-            <Text style={styles.panelChildLabel}>{t("absence")}</Text>
             <View style={styles.absenceIndicator}>
               <View style={styles.absenceColorBox} />
             </View>
+            <Text style={styles.panelChildLabel}>{t("absence")}</Text>
           </View>
         </View>
         <View style={styles.separator} />
@@ -1996,11 +2103,7 @@ const TimesheetDetailGeneral = ({
             </ScrollView>
           </View>
           <View style={styles.dateListContainer}>
-            <Pressable
-              style={styles.dateArrow}
-              onPress={fetchPreviousDates}
-              disabled={true}
-            >
+            <Pressable style={styles.dateArrow} onPress={fetchPreviousDates}>
               <MaterialCommunityIcons
                 name="chevron-left"
                 size={36}
@@ -2018,11 +2121,7 @@ const TimesheetDetailGeneral = ({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.dateList}
             />
-            <Pressable
-              style={styles.dateArrow}
-              onPress={fetchNextDates}
-              disabled={true}
-            >
+            <Pressable style={styles.dateArrow} onPress={fetchNextDates}>
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={36}
@@ -2186,6 +2285,11 @@ const styles = StyleSheet.create({
   panelChild: {
     marginBottom: "2%",
   },
+  panelChildLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   panelChildLabel: {
     marginBottom: "1%",
     fontSize: 14,
@@ -2288,24 +2392,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: "2%",
+    marginVertical: "2%",
     paddingHorizontal: "1%",
   },
   weekendIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   selectedIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   holidayIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   absenceIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   weekendColorBox: {
     width: 20,
@@ -2396,6 +2504,9 @@ const styles = StyleSheet.create({
   },
   boldText: {
     fontWeight: "bold",
+  },
+  normalText: {
+    fontWeight: "normal",
   },
   tableContainer: {
     flex: 1,

@@ -56,6 +56,11 @@ const displayNextToast = () => {
       duration = Toast.durations.LONG; // Longer duration for errors
     }
 
+    // Adjust the duration if the message is longer than 100 characters
+    if (message.length > 100) {
+      duration = 5000; // Show for 10 seconds if the message is long
+    }
+
     // Display the toast
     Toast.show(message, {
       backgroundColor,

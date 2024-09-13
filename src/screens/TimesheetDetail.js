@@ -1823,6 +1823,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                 {() => (
                   <GestureHandlerRootView>
                     <TimesheetDetailGeneral
+                      navigation={navigation}
                       busObjCat={BUSOBJCAT.TIMESHEET}
                       busObjId={timesheetId}
                       isParentLocked={isLocked}

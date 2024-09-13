@@ -112,9 +112,10 @@ const History = ({ busObjCat, busObjID }) => {
   /**
    * Fetches timeline data from the API.
    * Sets the fetched data to the 'timelineData' state.
+   * @param {number} [page=pageParam] - The page number to fetch (defaults to pageParam).
    * @returns {void}
    */
-  const fetchTimelineData = async () => {
+  const fetchTimelineData = async (page = pageParam) => {
     if (!busObjID) {
       setLoading(false);
       return;
@@ -124,7 +125,7 @@ const History = ({ busObjCat, busObjID }) => {
       setLoading(true);
 
       const endpoint = API_ENDPOINTS.INVOKE;
-      const payload = createTimelinePayload();
+      const payload = createTimelinePayload(page); // Pass page to the payload
 
       const response = await fetchData(
         endpoint,
@@ -493,8 +494,13 @@ const History = ({ busObjCat, busObjID }) => {
 
   useEffect(() => {
     fetchFilterData();
-    fetchTimelineData();
-  }, [from, timeLineSize, typeFilterValue, dateEvent, userFilterValue]);
+  }, []);
+
+  useEffect(() => {
+    // Reset pageParam when filters change
+    setPageParam(1);
+    fetchTimelineData(1);
+  }, [typeFilterValue, userFilterValue]);
 
   return (
     <View style={styles.container}>
