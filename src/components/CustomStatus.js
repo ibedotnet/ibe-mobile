@@ -135,7 +135,7 @@ const CustomStatus = ({
       if (response.success) {
         updateForceRefresh(true);
         handleReload();
-        console.debug(`Workflow status successfully updated in ${busObjId}`);
+        console.log(`Workflow status successfully updated in ${busObjId}`);
       }
     } catch (error) {
       console.error("Error in updating document status:", error);
@@ -176,9 +176,9 @@ const CustomStatus = ({
     if (updateResponse.success) {
       updateForceRefresh(true);
       handleReload();
-      console.debug(`Workflow status successfully updated in ${busObjId}`);
+      console.log(`Workflow status successfully updated in ${busObjId}`);
     } else {
-      console.debug(`Workflow status update failed in ${busObjId}`);
+      console.log(`Workflow status update failed in ${busObjId}`);
     }
   };
 

@@ -5,6 +5,7 @@ import {
   FlatList,
   Modal,
   RefreshControl,
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -38,6 +39,7 @@ import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
 import Sort from "../components/filters/Sort";
+import CustomBackButton from "../components/CustomBackButton";
 
 /**
  * Timesheet component displays a list of timesheets with the ability to refresh
@@ -73,7 +75,7 @@ const Timesheet = ({ route, navigation }) => {
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
   const [lastPress, setLastPress] = useState(0);
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
-
+  const [totalCount, setTotalCount] = useState(0);
   const [isModalVisibleInCreate, setModalVisibleInCreate] = useState(false);
   const [selectedDateInCreate, setSelectedDateInCreate] = useState(new Date()); // Default to today's date
   const [isLoadingInCreate, setIsLoadingInCreate] = useState(false); // To track if a network call is in progress
@@ -276,13 +278,16 @@ const Timesheet = ({ route, navigation }) => {
         console.error("Error refreshing data:", response.error);
       } else {
         // Update timesheets state with new data if response is not null
-        setTimesheets(response?.data ?? []);
+        setTimesheets(response?.data || []);
+        setTotalCount(response?.totalCount || 0);
       }
     } catch (error) {
       console.error("Error refreshing data:", error);
     } finally {
       // Set refreshing state back to false after data refreshing is complete
-      setRefreshing(false);
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 100);
     }
   }, [setTimesheets, whereConditions, orConditions, sortConditions, limit]);
 
@@ -400,30 +405,38 @@ const Timesheet = ({ route, navigation }) => {
 
   /**
    * Rendered component for the left side of the header.
+   * Displays the count of timesheets and total count.
    */
-  const headerLeft = () => {
+  const headerLeft = useCallback(() => {
+    // Calculate the current timesheet count
     let timesheetCount = timesheets.length;
+
     return (
-      <View>
+      <View style={styles.headerLeftContainer}>
+        <CustomBackButton navigation={navigation} t={t} />
         <Text
           style={styles.recordCountText}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
+          {/* Display timesheet count, pluralize as necessary, and show totalCount if available */}
           {`${t("timesheet")}${timesheetCount !== 1 ? t("s") : ""}: ${
             timesheetCount > 0 ? timesheetCount : 0
-          }`}
+          }${totalCount > 0 ? ` / ${totalCount}` : ""}`}
         </Text>
       </View>
     );
-  };
+    // Dependencies: re-render only when timesheets or totalCount changes
+  }, [timesheets, totalCount]);
 
   /**
    * Rendered component for the right side of the header.
+   * Contains buttons for creating a timesheet, filtering, and sorting.
    */
-  const headerRight = () => {
+  const headerRight = useCallback(() => {
     return (
       <View style={styles.headerRightContainer}>
+        {/* Button for creating a new timesheet */}
         <CustomButton
           onPress={showCreateTimesheetPopup}
           label=""
@@ -433,8 +446,10 @@ const Timesheet = ({ route, navigation }) => {
             size: 30,
             color: "white",
           }}
+          disabled={refreshing}
         />
         <View style={styles.headerIconsContainer}>
+          {/* Button for applying filters */}
           <CustomButton
             onPress={navigateToFilters}
             label=""
@@ -444,7 +459,9 @@ const Timesheet = ({ route, navigation }) => {
               size: 30,
               color: "white",
             }}
+            disabled={refreshing}
           />
+          {/* Show filter count if filters are applied */}
           {appliedFiltersCount > 0 && (
             <View style={styles.headerIconsCountContainer}>
               <Text style={styles.headerIconsCountText}>
@@ -454,6 +471,7 @@ const Timesheet = ({ route, navigation }) => {
           )}
         </View>
         <View style={styles.headerIconsContainer}>
+          {/* Button for sorting timesheets */}
           <CustomButton
             onPress={openSortingModal}
             label=""
@@ -463,7 +481,9 @@ const Timesheet = ({ route, navigation }) => {
               size: 30,
               color: "white",
             }}
+            disabled={refreshing}
           />
+          {/* Show the number of sort conditions applied */}
           {sortConditions.length > 0 && (
             <View style={styles.headerIconsCountContainer}>
               <Text style={styles.headerIconsCountText}>
@@ -474,224 +494,257 @@ const Timesheet = ({ route, navigation }) => {
         </View>
       </View>
     );
-  };
+    // Dependencies: re-render only when appliedFiltersCount or sortConditions changes
+  }, [appliedFiltersCount, sortConditions, refreshing]);
 
-  // Set header options with custom components
+  /**
+   * useEffect hook to set the header options (left and right components) when the component is mounted
+   * or when timesheets, totalCount, appliedFiltersCount, or sortConditions change.
+   */
   useEffect(() => {
+    // Set custom header components
     navigation.setOptions({
-      headerTitle: headerLeft,
+      headerTitle: "",
+      gestureEnabled: false,
+      headerLeft: headerLeft,
       headerRight: headerRight,
     });
-  }, [timesheets]);
+    // Dependencies: ensure the header updates when these values change
+  }, [
+    headerLeft,
+    headerRight,
+    timesheets,
+    totalCount,
+    appliedFiltersCount,
+    sortConditions,
+  ]);
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={timesheets}
-        keyExtractor={(item) => item["TimeConfirmation-id"]}
-        renderItem={({ item, index }) => {
-          try {
-            // Extracting and formatting data for each timesheet item
-            const timesheetId = item?.["TimeConfirmation-id"];
+    <SafeAreaView style={styles.container}>
+      <View>
+        <FlatList
+          data={timesheets}
+          keyExtractor={(item) => item["TimeConfirmation-id"]}
+          renderItem={({ item, index }) => {
+            try {
+              // Extracting and formatting data for each timesheet item
+              const timesheetId = item?.["TimeConfirmation-id"];
 
-            const startDate = new Date(item["TimeConfirmation-start"]);
-            const formattedStartDate = isValid(startDate)
-              ? format(
-                  startDate,
-                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                )
-              : "Invalid start date";
+              const startDate = new Date(item["TimeConfirmation-start"]);
+              const formattedStartDate = isValid(startDate)
+                ? format(
+                    startDate,
+                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                  )
+                : "Invalid start date";
 
-            const endDate = new Date(item["TimeConfirmation-end"]);
-            const formattedEndDate = isValid(endDate)
-              ? format(
-                  endDate,
-                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                )
-              : "Invalid end date";
+              const endDate = new Date(item["TimeConfirmation-end"]);
+              const formattedEndDate = isValid(endDate)
+                ? format(
+                    endDate,
+                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                  )
+                : "Invalid end date";
 
-            const statusTemplateExtId =
-              item?.["TimeConfirmation-extStatus-processTemplateID"] || "";
+              const statusTemplateExtId =
+                item?.["TimeConfirmation-extStatus-processTemplateID"] || "";
 
-            const statusLabel =
-              item?.[
-                "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel"
-              ] || "";
+              const statusSteps =
+                item?.[
+                  "TimeConfirmation-extStatus-processTemplateID:ProcessTemplate-steps"
+                ] || [];
 
-            let remark = item?.["TimeConfirmation-remark:text"] || "";
+              const statusExtId =
+                item?.["TimeConfirmation-extStatus-statusID"] || "";
 
-            const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
-            const convertedTotalTime =
-              convertMillisecondsToUnit(
-                totalTime,
-                totalTime >= 3600000 ? "hours" : "minutes"
-              )?.displayTime || "";
+              const matchingStep =
+                statusExtId && statusSteps && statusSteps instanceof Array
+                  ? statusSteps.find((step) => step.extID === statusExtId)
+                  : null;
 
-            const itemStyle = {
-              backgroundColor:
-                formattedStartDate.includes("Invalid") ||
-                formattedEndDate.includes("Invalid") ||
-                statusLabel.includes("Invalid")
-                  ? "lightcoral"
-                  : "white",
-            };
+              const statusLabel = matchingStep ? matchingStep.statusLabel : "";
 
-            const handlePress = () => {
-              const currentTime = new Date().getTime();
-              const delta = currentTime - lastPress;
+              let remark = item?.["TimeConfirmation-remark:text"] || "";
 
-              if (delta < DOUBLE_CLICK_DELTA) {
-                // Double click threshold
-                // Double click detected, navigate to add timesheet screen
-                navigation.navigate("TimesheetDetail", {
-                  timesheetId,
-                  statusTemplateExtId,
-                });
-              }
+              const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
+              const convertedTotalTime =
+                convertMillisecondsToUnit(
+                  totalTime,
+                  totalTime >= 3600000 ? "hours" : "minutes"
+                )?.displayTime || "";
 
-              // Update last press timestamp and timesheet ID pressed
-              setLastPress(currentTime);
-            };
+              const itemStyle = {
+                backgroundColor:
+                  formattedStartDate.includes("Invalid") ||
+                  formattedEndDate.includes("Invalid") ||
+                  statusLabel.includes("Invalid")
+                    ? "lightcoral"
+                    : "white",
+              };
 
-            return (
-              <TouchableOpacity onPress={handlePress}>
-                <View style={[styles.row, itemStyle]}>
-                  <View style={styles.firstColumn}>
-                    <Text
-                      style={styles.firstColumnText}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                    >
-                      {statusLabel}
-                    </Text>
-                  </View>
-                  <View style={styles.secondColumn}>
-                    <Text style={styles.secondColumnFirstRowText}>
-                      {formattedStartDate}
-                      {" - "}
-                      {formattedEndDate}
-                    </Text>
-                    <Text
-                      style={styles.secondColumnSecondRowText}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {remark}
-                    </Text>
-                    {item && (
-                      <View style={styles.showMoreButtonContainer}>
-                        <TouchableOpacity
-                          onPress={() => toggleItemExpansion(timesheetId)}
-                        >
-                          <Text style={styles.showMoreButtonText}>
-                            {expandedItems[timesheetId]
-                              ? t("show_less")
-                              : t("show_more")}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {expandedItems[timesheetId] && (
-                      <>
-                        {additionalData[timesheetId] ? (
-                          <>
-                            {/* Render additional data components here */}
-                            <View style={styles.additionalDataContainer}>
-                              <View style={styles.additionalDataItem}>
-                                <View
-                                  style={styles.additionalDataLabelContainer}
-                                >
-                                  <Text style={styles.additionalDataLabel}>
-                                    {t("timesheet_work_time")}
-                                  </Text>
+              const handlePress = () => {
+                const currentTime = new Date().getTime();
+                const delta = currentTime - lastPress;
+
+                if (delta < DOUBLE_CLICK_DELTA) {
+                  // Double click threshold
+                  // Double click detected, navigate to add timesheet screen
+                  navigation.navigate("TimesheetDetail", {
+                    timesheetId,
+                    statusTemplateExtId,
+                  });
+                }
+
+                // Update last press timestamp and timesheet ID pressed
+                setLastPress(currentTime);
+              };
+
+              return (
+                <TouchableOpacity onPress={handlePress}>
+                  <View style={[styles.row, itemStyle]}>
+                    <View style={styles.firstColumn}>
+                      <Text
+                        style={styles.firstColumnText}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
+                        {statusLabel}
+                      </Text>
+                    </View>
+                    <View style={styles.secondColumn}>
+                      <Text style={styles.secondColumnFirstRowText}>
+                        {formattedStartDate}
+                        {" - "}
+                        {formattedEndDate}
+                      </Text>
+                      <Text
+                        style={styles.secondColumnSecondRowText}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {remark}
+                      </Text>
+                      {item && (
+                        <View style={styles.showMoreButtonContainer}>
+                          <TouchableOpacity
+                            onPress={() => toggleItemExpansion(timesheetId)}
+                          >
+                            <Text style={styles.showMoreButtonText}>
+                              {expandedItems[timesheetId]
+                                ? t("show_less")
+                                : t("show_more")}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {expandedItems[timesheetId] && (
+                        <>
+                          {additionalData[timesheetId] ? (
+                            <>
+                              {/* Render additional data components here */}
+                              <View style={styles.additionalDataContainer}>
+                                <View style={styles.additionalDataItem}>
+                                  <View
+                                    style={styles.additionalDataLabelContainer}
+                                  >
+                                    <Text style={styles.additionalDataLabel}>
+                                      {t("timesheet_work_time")}
+                                    </Text>
+                                  </View>
+                                  <View
+                                    style={styles.additionalDataValueContainer}
+                                  >
+                                    <Text style={styles.additionalDataValue}>
+                                      {additionalData[timesheetId]["totalTime"]}
+                                    </Text>
+                                  </View>
                                 </View>
-                                <View
-                                  style={styles.additionalDataValueContainer}
-                                >
-                                  <Text style={styles.additionalDataValue}>
-                                    {additionalData[timesheetId]["totalTime"]}
-                                  </Text>
+                                <View style={styles.additionalDataItem}>
+                                  <View
+                                    style={styles.additionalDataLabelContainer}
+                                  >
+                                    <Text style={styles.additionalDataLabel}>
+                                      {t("timesheet_billable_time")}
+                                    </Text>
+                                  </View>
+                                  <View
+                                    style={styles.additionalDataValueContainer}
+                                  >
+                                    <Text style={styles.additionalDataValue}>
+                                      {
+                                        additionalData[timesheetId][
+                                          "billableTime"
+                                        ]
+                                      }
+                                    </Text>
+                                  </View>
+                                </View>
+                                <View style={styles.additionalDataItem}>
+                                  <View
+                                    style={styles.additionalDataLabelContainer}
+                                  >
+                                    <Text style={styles.additionalDataLabel}>
+                                      {t("timesheet_over_time")}
+                                    </Text>
+                                  </View>
+                                  <View
+                                    style={styles.additionalDataValueContainer}
+                                  >
+                                    <Text style={styles.additionalDataValue}>
+                                      {additionalData[timesheetId]["overTime"]}
+                                    </Text>
+                                  </View>
                                 </View>
                               </View>
-                              <View style={styles.additionalDataItem}>
-                                <View
-                                  style={styles.additionalDataLabelContainer}
-                                >
-                                  <Text style={styles.additionalDataLabel}>
-                                    {t("timesheet_billable_time")}
-                                  </Text>
-                                </View>
-                                <View
-                                  style={styles.additionalDataValueContainer}
-                                >
-                                  <Text style={styles.additionalDataValue}>
-                                    {
-                                      additionalData[timesheetId][
-                                        "billableTime"
-                                      ]
-                                    }
-                                  </Text>
-                                </View>
-                              </View>
-                              <View style={styles.additionalDataItem}>
-                                <View
-                                  style={styles.additionalDataLabelContainer}
-                                >
-                                  <Text style={styles.additionalDataLabel}>
-                                    {t("timesheet_over_time")}
-                                  </Text>
-                                </View>
-                                <View
-                                  style={styles.additionalDataValueContainer}
-                                >
-                                  <Text style={styles.additionalDataValue}>
-                                    {additionalData[timesheetId]["overTime"]}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          </>
-                        ) : (
-                          // Loading indicator while fetching additional data
-                          <Loader size={"small"} />
-                        )}
-                      </>
-                    )}
+                            </>
+                          ) : (
+                            // Loading indicator while fetching additional data
+                            <Loader size={"small"} />
+                          )}
+                        </>
+                      )}
+                    </View>
+                    <View style={styles.thirdColumn}>
+                      <Text
+                        style={[
+                          styles.thirdColumnText,
+                          {
+                            color: totalTime === 0 ? "red" : "green",
+                          },
+                        ]}
+                      >
+                        {convertedTotalTime}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.thirdColumn}>
-                    <Text
-                      style={[
-                        styles.thirdColumnText,
-                        {
-                          color: totalTime === 0 ? "red" : "green",
-                        },
-                      ]}
-                    >
-                      {convertedTotalTime}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          } catch (error) {
-            console.error("Error rendering item:", error);
-            return (
-              <Text style={{ color: "red" }}>
-                {item?.["TimeConfirmation-id"]}
-              </Text>
-            );
+                </TouchableOpacity>
+              );
+            } catch (error) {
+              console.error("Error rendering item:", error);
+              return (
+                <Text style={{ color: "red" }}>
+                  {item?.["TimeConfirmation-id"]}
+                </Text>
+              );
+            }
+          }}
+          onEndReached={handleLoadMoreData}
+          onEndReachedThreshold={1}
+          refreshing={isLoading}
+          ListFooterComponent={() => {
+            return isLoading ? <Loader /> : null;
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor="#0000ff"
+              title={t("pull_to_refresh")}
+              titleColor="#0000ff"
+              onRefresh={onRefresh}
+            />
           }
-        }}
-        onEndReached={handleLoadMoreData}
-        onEndReachedThreshold={1}
-        refreshing={isLoading}
-        ListFooterComponent={() => {
-          return isLoading ? <Loader /> : null;
-        }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
+        />
+      </View>
       {/* Modal for date selection on creating timesheet*/}
       <Modal
         transparent={true}
@@ -750,16 +803,11 @@ const Timesheet = ({ route, navigation }) => {
           previousSortRows={sortConditions}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  recordCountText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
-  },
   container: {
     flex: 1,
   },
@@ -799,11 +847,18 @@ const styles = StyleSheet.create({
     color: "blue",
     fontSize: 16,
   },
-  headerRightContainer: {
-    width: screenDimension.width / 3,
+  headerLeftContainer: {
+    maxWidth: screenDimension.width / 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "flex-start",
+  },
+  headerRightContainer: {
+    maxWidth: screenDimension.width / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    columnGap: 18,
   },
   headerIconsContainer: {
     position: "relative",
@@ -865,6 +920,11 @@ const styles = StyleSheet.create({
     padding: "4%",
     borderRadius: 5,
     alignItems: "center",
+  },
+  recordCountText: {
+    fontSize: screenDimension.width > 400 ? 18 : 16,
+    fontWeight: "bold",
+    color: "white",
   },
   instructionTextInCreate: {
     fontSize: 16,

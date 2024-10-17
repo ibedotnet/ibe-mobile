@@ -432,22 +432,22 @@ const TimesheetDetailGeneral = ({
     let totalBillableTime = 0;
     let totalOverTime = 0;
 
-    console.debug("holidayDayTotalMap:");
+    console.log("holidayDayTotalMap:");
     holidayDayTotalMap.forEach((value, key) => {
-      console.debug(`date: ${key}, time: ${value / 3600000} h`);
+      console.log(`date: ${key}, time: ${value / 3600000} h`);
     });
 
-    console.debug("absenceDayTotalMap:");
+    console.log("absenceDayTotalMap:");
     absenceDayTotalMap.forEach((value, key) => {
-      console.debug(`date: ${key}, time: ${value / 3600000} h`);
+      console.log(`date: ${key}, time: ${value / 3600000} h`);
     });
 
-    console.debug("updatedTimesheetItemsMap:");
+    console.log("updatedTimesheetItemsMap:");
 
     updatedTimesheetItemsMap.forEach((value, key) => {
-      console.debug(`Key: ${key}, time (in hours):`);
+      console.log(`Key: ${key}, time (in hours):`);
       value.forEach((item, index) => {
-        console.debug(`  Item ${index}:`, item.actualTime / 3600000);
+        console.log(`  Item ${index}:`, item.actualTime / 3600000);
         if (item.billable) {
           totalBillableTime += item.actualTime;
         }
@@ -494,9 +494,9 @@ const TimesheetDetailGeneral = ({
       );
     });
 
-    console.debug("updatedDayTotalMap:");
+    console.log("updatedDayTotalMap:");
     updatedDayTotalMap.forEach((value, key) => {
-      console.debug(`date: ${key}, total time: ${value / 3600000} h`);
+      console.log(`date: ${key}, total time: ${value / 3600000} h`);
     });
 
     // Update dayTotalMap state
@@ -514,7 +514,7 @@ const TimesheetDetailGeneral = ({
   };
 
   const generateTimesheetItemsMap = (tasks) => {
-    console.debug(
+    console.log(
       "Tasks (or timesheet items) before converting to timesheetItemsMap:",
       JSON.stringify(tasks)
     );
@@ -592,7 +592,7 @@ const TimesheetDetailGeneral = ({
       });
     });
 
-    console.debug(
+    console.log(
       "Timesheet items map after conversion:",
       Array.from(timesheetItemsMap.entries()).map(([key, value]) => ({
         date: key,
@@ -698,7 +698,7 @@ const TimesheetDetailGeneral = ({
       delete task.uniqueKey;
     });
 
-    console.debug(
+    console.log(
       "Updated tasks (or timesheet items) after converting from timesheetItemsMap:",
       JSON.stringify(tasks)
     );
@@ -1222,7 +1222,7 @@ const TimesheetDetailGeneral = ({
         updatedTimesheetItemsMap.set(selectedDateFormatted, items);
       }
 
-      console.debug(
+      console.log(
         `On delete the items remaining on date ${selectedDateFormatted} is/are ${JSON.stringify(
           items
         )}`
@@ -1300,7 +1300,7 @@ const TimesheetDetailGeneral = ({
     const updatedTimesheetItemsMap = new Map(timesheetItemsMap);
     updatedTimesheetItemsMap.set(selectedDateFormatted, items);
 
-    console.debug(
+    console.log(
       `On confirm, the items going to be updated on date ${selectedDateFormatted} are ${JSON.stringify(
         items
       )}`
@@ -1697,7 +1697,7 @@ const TimesheetDetailGeneral = ({
     );
   }, [holidayDayTotalMap, absenceDayTotalMap, timesheetItemsMap]);
 
-  console.debug(
+  console.log(
     `Weekend list: ${JSON.stringify(
       weekendList
     )}, Holiday list: ${JSON.stringify(
@@ -1772,7 +1772,7 @@ const TimesheetDetailGeneral = ({
           )}
         </View>
         <View style={styles.panelChild}>
-          <Text style={styles.panelChildLabel}>{t("workschedule")}</Text>
+          <Text style={styles.panelChildLabel}>{t("work_schedule")}</Text>
           <Text style={{ fontWeight: "normal" }}>{workScheduleName}</Text>
         </View>
         <View style={styles.separator} />
@@ -2180,7 +2180,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.6,
     shadowRadius: 2,
     marginBottom: 10,
   },
@@ -2220,7 +2220,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.6,
     shadowRadius: 2,
     marginBottom: 10,
   },
@@ -2241,7 +2241,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.6,
     shadowRadius: 2,
   },
   dayText: {
@@ -2312,7 +2312,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.6,
     shadowRadius: 2,
   },
   itemsCardHeader: {
@@ -2385,7 +2385,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.6,
     shadowRadius: 2,
   },
   indicatorContainer: {

@@ -190,6 +190,7 @@ const CustomRemotePicker = ({
         if (newData.length === 0) {
           setNoResults(true);
           setChevronToggled(false); // Reset chevron toggle on no results
+          setSearchQuery(""); // Clear the search query when no results are found
           setTimeout(() => {
             setNoResults(false);
           }, 1000);
@@ -198,6 +199,7 @@ const CustomRemotePicker = ({
         setSearchData([]);
         setNoResults(true);
         setChevronToggled(false); // Reset chevron toggle on no results
+        setSearchQuery(""); // Clear the search query when no results are found
         setTimeout(() => {
           setNoResults(false);
         }, 1000);

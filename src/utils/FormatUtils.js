@@ -64,7 +64,7 @@ const convertDurationToMilliseconds = (
   try {
     // Ensure duration is a valid number
     if ((!duration && duration !== 0) || isNaN(duration) || duration < 0) {
-      console.debug(`Invalid duration value ${duration}. Returning null.`);
+      console.log(`Invalid duration value ${duration}. Returning null.`);
       return null;
     }
 
@@ -93,7 +93,7 @@ const convertMillisecondsToDuration = (milliseconds, unit = "hours") => {
       isNaN(milliseconds) ||
       milliseconds < 0
     ) {
-      console.debug(
+      console.log(
         `Invalid milliseconds value ${milliseconds}. Returning null.`
       );
       return null;
@@ -476,6 +476,11 @@ const setRemarkText = (remarks = [], language = "en", newText) => {
  * @returns {boolean} True if the values are equal, false otherwise.
  */
 const isEqual = (value1, value2) => {
+  // Check for null or undefined values
+  if (value1 === null || value2 === null) {
+    return value1 === value2;
+  }
+
   // If both values are arrays
   if (Array.isArray(value1) && Array.isArray(value2)) {
     // Check if arrays have the same length
@@ -490,7 +495,8 @@ const isEqual = (value1, value2) => {
       isEqual(element, sortedValue2[index])
     );
   }
-  // If both values are objects
+
+  // If both values are objects (but not null)
   else if (typeof value1 === "object" && typeof value2 === "object") {
     // Get the keys of both objects
     const keys1 = Object.keys(value1);
@@ -505,6 +511,7 @@ const isEqual = (value1, value2) => {
     // Compare each key-value pair of the objects recursively
     return keys1.every((key) => isEqual(value1[key], value2[key]));
   }
+
   // If both values are primitive types, perform a simple comparison
   else {
     return value1 === value2;

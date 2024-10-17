@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  Modal,
+  StyleSheet,
+  View,
+  Button,
+  FlatList,
+  TouchableOpacity,
+  Platform,
+  Text,
+  SafeAreaView,
+} from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useTranslation } from "react-i18next";
 import { isEqual } from "../utils/FormatUtils";
@@ -18,11 +28,15 @@ import CustomTextInput from "./CustomTextInput";
  * @param {Object} props.containerStyle - Custom style for the container of the picker and search input.
  * @param {Object} props.pickerStyle - Custom style for the Picker component.
  * @param {Object} props.inputStyle - Custom style for the TextInput component.
+ * @param {boolean} props.useModalInIOS - Boolean indicating whether to use the modal picker on iOS.
+ * @param {string} [props.accessibilityLabel] - Optional accessibility label for the picker for screen readers.
+ * @param {string} [props.accessibilityRole] - Optional accessibility role for the picker, which helps define its purpose to assistive technologies.
+ * @param {string} [props.testID] - Optional test identifier for targeting the picker in tests.
  * @returns {JSX.Element} CustomPicker component JSX.
  */
 const CustomPicker = ({
   placeholder,
-  items,
+  items = [],
   initialValue,
   onFilter,
   clearValue = false,
@@ -31,6 +45,10 @@ const CustomPicker = ({
   containerStyle = {},
   pickerStyle = {},
   inputStyle = {},
+  useModalInIOS = true,
+  accessibilityLabel,
+  accessibilityRole,
+  testID,
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -43,6 +61,7 @@ const CustomPicker = ({
   const [selectedValue, setSelectedValue] = useState(initialValue || null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredItems, setFilteredItems] = useState(items);
+  const [isModalVisible, setModalVisible] = useState(false);
 
   /**
    * Function to handle value change in the picker.
@@ -55,6 +74,10 @@ const CustomPicker = ({
     if (onFilter) {
       onFilter(itemValue);
     }
+
+    if (Platform.OS === "ios") {
+      toggleModal();
+    }
   };
 
   // Reset selectedValue when clearValue changes
@@ -65,21 +88,30 @@ const CustomPicker = ({
   }, [clearValue]);
 
   useEffect(() => {
+    // If searchTerm is empty, reset filteredItems to the original items
     if (searchTerm.trim() === "") {
       setFilteredItems(items);
     } else {
-      const filtered = items.filter((item) =>
+      // Filter items based on the search term
+      const filtered = items?.filter((item) =>
         item.label.toLowerCase().includes(searchTerm.toLowerCase())
       );
+
       setFilteredItems(filtered);
     }
-  }, [searchTerm, items]);
+  }, [searchTerm]);
 
   useEffect(() => {
-    // Effect to set the selected value based on the initial value
+    console.log(
+      "Initial value in custom picker: ",
+      JSON.stringify(initialValue)
+    );
+
+    let selectedItem = null;
+
     if (initialValue && items.length > 0) {
       // Find the item in the items array that matches the initial value
-      const selectedItem = items.find((item) => {
+      selectedItem = items.find((item) => {
         // Compare values based on their types
         if (typeof item.value === typeof initialValue) {
           // If both values are arrays, compare them element-wise
@@ -99,37 +131,87 @@ const CustomPicker = ({
         // Return false if types are different
         return false;
       });
-
-      // If a matching item is found, set it as the selected value
-      if (selectedItem) {
-        setSelectedValue(selectedItem.value);
-      }
     }
+
+    // If a matching item is found, set it as the selected value
+    setSelectedValue(selectedItem ? selectedItem.value : initialValue);
   }, [initialValue]);
 
-  return (
-    <View style={[styles.container, containerStyle]}>
-      {/* Picker component */}
-      <View style={[styles.picker, pickerStyle]}>
-        <Picker
-          selectedValue={selectedValue}
-          onValueChange={handleValueChange}
-          enabled={!disabled}
-        >
-          {/* Render default/placeholder option */}
-          <Picker.Item label={placeholder} value={null} />
+  const toggleModal = () => {
+    setModalVisible(!isModalVisible);
+  };
 
-          {/* Render filtered picker items */}
-          {filteredItems.map((item, index) => (
-            <Picker.Item key={index} label={item.label} value={item.value} />
-          ))}
-        </Picker>
-      </View>
+  return (
+    <View
+      style={[styles.container, containerStyle]}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      testID={testID}
+    >
+      {/* Picker component */}
+      {Platform.OS === "ios" && useModalInIOS ? (
+        <>
+          <TouchableOpacity
+            onPress={toggleModal}
+            style={[styles.iOSPicker, pickerStyle]}
+            disabled={disabled}
+          >
+            <View style={styles.iOSInput}>
+              <Text>
+                {selectedValue
+                  ? items.find((item) => isEqual(item.value, selectedValue))
+                      ?.label || placeholder
+                  : placeholder}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <Modal
+            visible={isModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={toggleModal}
+          >
+            <SafeAreaView style={styles.modalContainer}>
+              <FlatList
+                data={[{ label: placeholder, value: null }, ...filteredItems]}
+                keyExtractor={(item, index) => `${item.value}-${index}`}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.itemContainer}
+                    onPress={() => handleValueChange(item.value)}
+                  >
+                    <Text style={styles.itemText}>{item.label}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+              <Button title={t("close")} onPress={toggleModal} />
+            </SafeAreaView>
+          </Modal>
+        </>
+      ) : (
+        <SafeAreaView style={[styles.androidPicker, pickerStyle]}>
+          <Picker
+            selectedValue={selectedValue}
+            onValueChange={handleValueChange}
+            enabled={!disabled}
+          >
+            {/* Render default/placeholder option */}
+            <Picker.Item label={placeholder} value={null} />
+
+            {/* Render filtered picker items */}
+            {filteredItems.map((item, index) => (
+              <Picker.Item key={index} label={item.label} value={item.value} />
+            ))}
+          </Picker>
+        </SafeAreaView>
+      )}
       {/* Search input */}
       {!hideSearchInput && (
         <CustomTextInput
-          containerStyle={[styles.input, inputStyle]}
+          containerStyle={[styles.androidInput, inputStyle]}
           placeholder={`${t("placeholder_type_to_search")}...`}
+          placeholderTextColor={"gray"}
           value={searchTerm}
           onChangeText={setSearchTerm}
           editable={!disabled}
@@ -147,14 +229,39 @@ const styles = StyleSheet.create({
     borderColor: "black",
     marginBottom: "4%",
   },
-  picker: {
+  androidPicker: {
     width: "100%",
   },
-  input: {
+  iOSPicker: {
+    width: "100%",
+    justifyContent: "center",
+    flex: 1,
+  },
+  androidInput: {
     borderWidth: 0,
     borderTopWidth: 1,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
+  },
+  iOSInput: {
+    padding: "5%",
+    borderWidth: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  itemContainer: {
+    padding: "4%",
+    borderBottomColor: "#ccc",
+    borderBottomWidth: 0.5,
+  },
+  itemText: {
+    fontSize: 16,
+    color: "#000",
   },
 });
 

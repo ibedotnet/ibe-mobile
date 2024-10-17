@@ -9,7 +9,7 @@ import NetInfo from "@react-native-community/netinfo";
  */
 export const addToRequestQueue = async (requestData, requestQueue = []) => {
   try {
-    console.debug(
+    console.log(
       `Adding request to the queue: ${JSON.stringify(requestData)}`
     );
 
@@ -17,7 +17,7 @@ export const addToRequestQueue = async (requestData, requestQueue = []) => {
     const queue = [...requestQueue, requestData];
     await AsyncStorage.setItem("requestQueue", JSON.stringify(queue));
 
-    console.debug(`After addition queue: ${JSON.stringify(queue)}`);
+    console.log(`After addition queue: ${JSON.stringify(queue)}`);
     return true;
   } catch (error) {
     console.error("Error adding to request queue:", error);
@@ -87,11 +87,11 @@ const handleOfflineRequest = async (requestData, isRequestQueueEnabled) => {
  */
 const processRequest = async (request) => {
   // Process the request (e.g., send it to the server)
-  console.debug("Processing request:", request);
+  console.log("Processing request:", request);
   try {
     // Simulate sending request to the server
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.debug("Request processed successfully");
+    console.log("Request processed successfully");
   } catch (error) {
     console.error("Error processing request:", error);
   }

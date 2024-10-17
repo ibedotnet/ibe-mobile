@@ -4,7 +4,7 @@
  * @returns {string} - The current environment (e.g., "development", "testing", "production").
  */
 const determineEnvironment = () => {
-  return "production"; // Default environment for demonstration purposes
+  return "testing"; // Default environment for demonstration purposes
 };
 
 /**
@@ -154,6 +154,8 @@ const BUSOBJCAT = {
   ABSENCE: "Absence",
   /** Business object category for inbox. */
   INBOX: "Inbox",
+  /** Business object category for employee. */
+  EMPLOYEE: "Employee",
 };
 
 /**
@@ -165,6 +167,7 @@ const BUSOBJCATMAP = {
   [BUSOBJCAT.TIMESHEET]: "TimeConfirmation",
   [BUSOBJCAT.EXPENSE]: "ExpenseClaim",
   [BUSOBJCAT.ABSENCE]: "Absence",
+  [BUSOBJCAT.EMPLOYEE]: "Resource",
 };
 
 /**
@@ -174,6 +177,15 @@ const BUSOBJCATMAP = {
  * @type {number}
  */
 const DOUBLE_CLICK_DELTA = 400;
+
+/**
+ * This constant defines the maximum allowed size for images in bytes.
+ * The application will reject image uploads that exceed this size limit
+ * to prevent errors related to payload size during the upload process.
+ *
+ * @constant {number}
+ */
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 MB
 
 /**
  * Object containing internal status codes.
@@ -266,6 +278,7 @@ export {
   BUSOBJCAT,
   BUSOBJCATMAP,
   DOUBLE_CLICK_DELTA,
+  MAX_IMAGE_SIZE,
   INTSTATUS,
   LOGIN_INPUTS_MAXLENGTH,
   MAX_UPLOAD_FILE_SIZE,

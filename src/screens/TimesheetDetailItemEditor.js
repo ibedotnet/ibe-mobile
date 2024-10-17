@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Modal,
+  SafeAreaView,
   StyleSheet,
   Switch,
   Text,
@@ -267,7 +268,7 @@ const TimesheetDetailItemEditor = ({
 
     // If unit is "hours" and value is less than 1, suggest using minutes instead
     if (unit === "hours" && parsedValue < 1) {
-      console.debug(
+      console.log(
         "Value is less than 1 hour. Converting to minutes and updating unit."
       );
       // Convert the value to minutes
@@ -514,7 +515,7 @@ const TimesheetDetailItemEditor = ({
     setEditedItem(updatedItem);
     onConfirm(updatedItem);
 
-    console.debug(`After edit item: ${JSON.stringify(updatedItem)}`);
+    console.log(`After edit item: ${JSON.stringify(updatedItem)}`);
   };
 
   const handleCancel = () => {
@@ -780,7 +781,7 @@ const TimesheetDetailItemEditor = ({
   }
 
   const handleCustomerChange = ({ value, label, additionalData }) => {
-    console.debug(
+    console.log(
       `Additonal data in customer: ${JSON.stringify(additionalData)}`
     );
 
@@ -823,9 +824,7 @@ const TimesheetDetailItemEditor = ({
   };
 
   const handleProjectChange = ({ value, label, additionalData }) => {
-    console.debug(
-      `Additonal data in project: ${JSON.stringify(additionalData)}`
-    );
+    console.log(`Additonal data in project: ${JSON.stringify(additionalData)}`);
 
     const extID = additionalData.extID ?? "";
 
@@ -876,7 +875,7 @@ const TimesheetDetailItemEditor = ({
   };
 
   const handleTaskChange = ({ value, label, additionalData }) => {
-    console.debug(`Additonal data in task: ${JSON.stringify(additionalData)}`);
+    console.log(`Additonal data in task: ${JSON.stringify(additionalData)}`);
 
     const extID = additionalData.extID || "";
     const taskBillable = additionalData.taskBillable || false;
@@ -970,18 +969,18 @@ const TimesheetDetailItemEditor = ({
   ) => {
     // Return true if the task is quantity-based and allowed.
     if (taskQuantityAllowed) {
-      console.debug("Task is quantity allowed, so booked time is billable.");
+      console.log("Task is quantity allowed, so booked time is billable.");
       return true;
     }
 
     // If the task is not billable by default, return false.
     if (!taskBillable) {
-      console.debug("Task is not billable by default.");
+      console.log("Task is not billable by default.");
       return false;
     }
 
     // Log the task resources for debugging purposes.
-    console.debug("Checking task resources:", taskResources);
+    console.log("Checking task resources:", taskResources);
 
     // Find the resource matching the logged-in person.
     const resource = taskResources?.find(
@@ -993,7 +992,7 @@ const TimesheetDetailItemEditor = ({
   };
 
   const handleDepartmentChange = ({ value, label, additionalData }) => {
-    console.debug(
+    console.log(
       `Additonal data in department: ${JSON.stringify(additionalData)}`
     );
 
@@ -1084,7 +1083,7 @@ const TimesheetDetailItemEditor = ({
       animationType="slide"
       onRequestClose={onCancel}
     >
-      <View style={styles.modalContainer}>
+      <SafeAreaView style={styles.modalContainer}>
         <Text style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
           {isItemEditMode
             ? t("timesheet_edit_item")
@@ -1408,13 +1407,13 @@ const TimesheetDetailItemEditor = ({
         </ScrollView>
         <View style={styles.modalButtonsContainer}>
           <Button
-            onPress={handleConfirm}
             title={t("confirm")}
+            onPress={handleConfirm}
             disabled={isParentLocked}
           />
           <Button onPress={handleCancel} title={t("cancel")} />
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -1443,7 +1442,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: "4%",
     textAlign: "center",
   },
   modalInputContainer: {

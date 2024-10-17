@@ -22,7 +22,7 @@ const handleDownload = async (
   setDownloadProgressMap
 ) => {
   try {
-    console.debug("Starting download process for item with id: ", item.id);
+    console.log("Starting download process for item with id: ", item.id);
 
     // Set the isDownloading flag to true for the item
     item.isDownloading = true;
@@ -30,11 +30,11 @@ const handleDownload = async (
 
     // Get the URI of the file to download
     const fileUri = `${API_ENDPOINTS.RESOURCE}/${item.original}?client=${APP.LOGIN_USER_CLIENT}`;
-    console.debug("File URI: ", fileUri);
+    console.log("File URI: ", fileUri);
 
     // Create download path
     downloadPath = await createDownloadPath(item, false);
-    console.debug("Download path: ", downloadPath);
+    console.log("Download path: ", downloadPath);
 
     // Download the file
     const downloadResult = await downloadFile(
@@ -44,7 +44,7 @@ const handleDownload = async (
       item.id, // Pass item ID to identify the download progress
       item.size // Pass item size to provide the download total size
     );
-    console.debug("Download result: ", JSON.stringify(downloadResult));
+    console.log("Download result: ", JSON.stringify(downloadResult));
 
     // Reset download progress for the item ID
     resetDownloadProgress(setDownloadProgressMap, item.id);
@@ -56,7 +56,7 @@ const handleDownload = async (
     ) {
       const mediaPath = await handleMediaLibraryAccess(downloadPath);
       if (mediaPath) {
-        console.debug(`File added to media at path: ${mediaPath}`);
+        console.log(`File added to media at path: ${mediaPath}`);
 
         // Show a message indicating successful download with the actual media path
         showToast(
@@ -65,7 +65,7 @@ const handleDownload = async (
 
         // Delete the file from the download path
         await FileSystem.deleteAsync(downloadPath);
-        console.debug("File deleted successfully: ", downloadPath);
+        console.log("File deleted successfully: ", downloadPath);
       } else {
         // Show error message
         showToast(
@@ -236,7 +236,7 @@ const handleMediaLibraryAccess = async (downloadPath) => {
     // Add the downloaded file to the media library
     const asset = await MediaLibrary.createAssetAsync(encodedPath);
 
-    console.debug("Asset created successfully:", JSON.stringify(asset));
+    console.log("Asset created successfully:", JSON.stringify(asset));
 
     return asset.uri; // Return the media path
   } catch (error) {
@@ -258,13 +258,13 @@ const shareAndDelete = async (originalFilePath, item, translation) => {
   try {
     // Check platform for special handling
     if (Platform.OS === "android") {
-      console.debug("Android platform detected.");
+      console.log("Android platform detected.");
 
       const permissions =
         await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
 
       if (permissions.granted) {
-        console.debug("Directory permissions granted.");
+        console.log("Directory permissions granted.");
 
         // Read the downloaded file from the cache directory
         const downloadedFileContent = await FileSystem.readAsStringAsync(
@@ -285,11 +285,9 @@ const shareAndDelete = async (originalFilePath, item, translation) => {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        console.debug("File copied successfully using SAF.");
+        console.log("File copied successfully using SAF.");
       } else {
-        console.debug(
-          "Directory permissions not granted. Fallback to sharing."
-        );
+        console.log("Directory permissions not granted. Fallback to sharing.");
 
         // Permissions not granted, fallback to sharing the downloaded file
         await Sharing.shareAsync(originalFilePath, {
@@ -297,27 +295,27 @@ const shareAndDelete = async (originalFilePath, item, translation) => {
         });
       }
     } else if (Platform.OS === "ios") {
-      console.debug("iOS platform detected.");
+      console.log("iOS platform detected.");
 
       // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
 
       if (isAvailable) {
-        console.debug("Sharing is available. Sharing file.");
+        console.log("Sharing is available. Sharing file.");
 
         // Share the file using Expo's Sharing module
         await Sharing.shareAsync(originalFilePath, {
           dialogTitle: translation("choose_destination"),
         });
       } else {
-        console.debug("Sharing is not available on this device");
+        console.log("Sharing is not available on this device");
         return false;
       }
     }
 
     // Delete the original file
     await FileSystem.deleteAsync(originalFilePath);
-    console.debug("Original file deleted successfully: ", originalFilePath);
+    console.log("Original file deleted successfully: ", originalFilePath);
 
     return true; // Both sharing and deletion were successful
   } catch (error) {
@@ -357,7 +355,7 @@ const handlePreview = async (
   translation
 ) => {
   try {
-    console.debug("Starting preview process for item with id: ", item.id);
+    console.log("Starting preview process for item with id: ", item.id);
 
     // Determine the file type based on MIME type
     if (item.mimeType.startsWith("image/")) {
@@ -385,7 +383,7 @@ const handlePreview = async (
     }
 
     const cachedPath = await fetchAndCacheResource(item.original);
-    console.debug(`Preview file path: ${cachedPath}`);
+    console.log(`Preview file path: ${cachedPath}`);
 
     // Set the URI for preview
     setPreviewFileUri(cachedPath);

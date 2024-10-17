@@ -153,7 +153,7 @@ const setOrClearLock = async (
       // If the operation was not successful, show a toast with the message
       showToast(msg, "error");
     }
-    console.debug(
+    console.log(
       `${
         action === "set" ? "Set" : "Clear"
       } lock message of TimeConfirmation (${resourceId}): ${msg}`

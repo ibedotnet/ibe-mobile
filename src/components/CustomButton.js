@@ -24,6 +24,9 @@ import { disableOpacity } from "../styles/common";
  * @param {Object} [props.style] - Additional styles to be applied to the button.
  * @param {Object} [props.labelStyle] - Additional styles to be applied to the button label.
  * @param {function} [props.onLongPress] - Callback function invoked when the button is long-pressed.
+ * @param {string} [props.accessibilityLabel] - A descriptive label for screen readers, enhancing accessibility for users with visual impairments.
+ * @param {string} [props.accessibilityRole] - Defines the role of the button for accessibility purposes (e.g., "button"), allowing assistive technologies to convey its function to users.
+ * @param {string} [props.testID] - Unique identifier for testing, enabling easy querying of this component in tests.
  * @returns {JSX.Element} - Rendered component.
  */
 const CustomButton = ({
@@ -34,7 +37,10 @@ const CustomButton = ({
   disabled = false,
   style = {}, // Default value to ensure it's always an object
   labelStyle,
-  onLongPress, // New prop for long press functionality
+  onLongPress,
+  accessibilityLabel,
+  accessibilityRole,
+  testID,
 }) => {
   const [pressed, setPressed] = useState(false);
 
@@ -100,6 +106,9 @@ const CustomButton = ({
       onPress={handlePress}
       onLongPress={handleLongPress} // Add onLongPress handler
       disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      testID={testID}
     >
       {/* Icon component */}
       {icon.name && (

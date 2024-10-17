@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useConnectivityContext } from "../../../context/ConnectivityContext";
+
+import { Image } from "expo-image";
 
 /**
  * Component to display an offline notice when the device loses internet connectivity.
@@ -19,12 +21,15 @@ const OfflineView = () => {
   // Render the offline notice if the device is offline
   if (isOffline)
     return (
-      <View style={styles.container}>
+      <View style={styles.container} testID="offline-view">
         <Image
           style={styles.image}
           source={require("../../assets/images/offline.png")}
+          testID="offline-image"
         />
-        <Text style={styles.text}>No Internet Connection</Text>
+        <Text style={styles.text} testID="offline-text">
+          No Internet Connection
+        </Text>
       </View>
     );
 

@@ -305,13 +305,13 @@ const File = ({
       });
 
       // Log the document picker result
-      console.debug(
+      console.log(
         "Document picker result: " + JSON.stringify(documentPickerResult)
       );
 
       // Check if the file picking was cancelled by the user
       if (documentPickerResult.canceled === true) {
-        console.debug("File picking cancelled");
+        console.log("File picking cancelled");
       } else if (
         documentPickerResult.canceled === false &&
         documentPickerResult.assets &&
@@ -348,7 +348,7 @@ const File = ({
         }));
 
         // Log the picked files
-        console.debug("Picked files:", pickedFiles);
+        console.log("Picked files:", pickedFiles);
 
         // Add the picked files to the top of existing files list
         setFiles([...pickedFiles, ...files]);
@@ -383,7 +383,7 @@ const File = ({
         setIsFilesDirty(true);
       } else {
         // File picking failed for some reason
-        console.debug("File picking failed");
+        console.log("File picking failed");
       }
     } catch (error) {
       // Handle any errors that occur during file picking

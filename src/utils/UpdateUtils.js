@@ -1,3 +1,5 @@
+import { Alert } from "react-native";
+
 import { API_ENDPOINTS } from "../constants";
 
 import { convertToQueryString, fetchData } from "./APIUtils";
@@ -29,7 +31,7 @@ const updateFields = async (formData, queryStringParams) => {
       JSON.stringify(formData)
     );
 
-    console.debug("Response from updateFields:", JSON.stringify(updateResponse));
+    console.log("Response from updateFields:", JSON.stringify(updateResponse));
 
     // Extract message text from the response
     const messageText =

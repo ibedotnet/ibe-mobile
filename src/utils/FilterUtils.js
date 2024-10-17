@@ -389,7 +389,7 @@ const handleTextFilter = (
 
   const filterChanged = initialFilters[filterId] !== value;
 
-  console.debug(
+  console.log(
     `Inside handleTextFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the text filter hold the values: ${JSON.stringify({
@@ -432,7 +432,7 @@ const handleDurationFilter = (
       String(lessThanValue) ||
     (initialFilters[filterId]?.unit ?? "h") !== unit;
 
-  console.debug(
+  console.log(
     `Inside handleDurationFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the duration filter hold the values: ${JSON.stringify({
@@ -474,7 +474,7 @@ const handleDateFilter = (
     (initialFilters[filterId]?.greaterThanDate ?? null) !== greaterThanDate ||
     (initialFilters[filterId]?.lessThanValue ?? null) !== lessThanDate;
 
-  console.debug(
+  console.log(
     `Inside handleDateFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the date filter hold the values: ${JSON.stringify({
@@ -507,6 +507,9 @@ const handleStatusFilter = (
   setAppliedFilters,
   setUnsavedChanges
 ) => {
+  // Check if appliedFilters is an object, otherwise initialize it as an empty object
+  const currentAppliedFilters = appliedFilters || {};
+
   if (value !== null) {
     // Check if value is not null, if not null, update the appliedFilters object
     setAppliedFilters((prevAppliedFilters) => {
@@ -517,13 +520,14 @@ const handleStatusFilter = (
     });
   } else {
     // If the value is invalid (null), remove the filter with the label from appliedFilters
-    const { [filterId]: omit, ...remainingFilters } = appliedFilters;
+    const { [filterId]: omit, ...remainingFilters } = currentAppliedFilters;
+    
     setAppliedFilters(remainingFilters);
   }
 
-  const filterChanged = !isEqual(initialFilters[filterId], value);
+  const filterChanged = !isEqual(initialFilters[filterId] || {}, value || {});
 
-  console.debug(
+  console.log(
     `Inside handleStatusFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
       initialFilters
     )}. Currently, the status filter hold the value: ${JSON.stringify({

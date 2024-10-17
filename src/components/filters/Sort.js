@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Button, Modal, Text } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Button,
+  Modal,
+  Text,
+  SafeAreaView,
+} from "react-native";
 import CustomPicker from "../CustomPicker";
 import CustomButton from "../CustomButton";
 import {
@@ -68,7 +75,7 @@ const Sort = ({
       direction: row.order,
     }));
 
-    console.debug("Sort confirmed:", JSON.stringify(sortedArray));
+    console.log("Sort confirmed:", JSON.stringify(sortedArray));
     onClose(sortedArray);
   };
 
@@ -138,7 +145,7 @@ const Sort = ({
       visible={isModalVisible}
       onRequestClose={handleCancel}
     >
-      <View style={styles.modalContainer}>
+      <SafeAreaView style={styles.modalContainer}>
         <Text style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
           {t("select_sort_options")}
         </Text>
@@ -147,7 +154,7 @@ const Sort = ({
             {sortRows.map((row, index) => (
               <View key={index} style={styles.rowContainer}>
                 <CustomPicker
-                  placeholder={t("select_field")}
+                  placeholder={`${t("select_field")}...`}
                   items={getAvailableFields(index).map((field) => ({
                     label: field.propertyLabel,
                     value: field.propertyValue,
@@ -160,7 +167,7 @@ const Sort = ({
                 />
 
                 <CustomPicker
-                  placeholder={t("select_order")}
+                  placeholder={`${t("select_order")}...`}
                   items={sortOrders}
                   initialValue={row.order}
                   onFilter={(value) => updateRow(index, "order", value)}
@@ -205,7 +212,7 @@ const Sort = ({
             <Button title={t("close")} onPress={handleCancel} />
           </View>
         </GestureHandlerRootView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };

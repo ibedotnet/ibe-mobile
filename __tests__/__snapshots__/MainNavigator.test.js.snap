@@ -1,0 +1,427 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`MainNavigator matches snapshot 1`] = `
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
+  <RNSScreenStack
+    style={
+      {
+        "flex": 1,
+      }
+    }
+  >
+    <RNSScreen
+      collapsable={false}
+      gestureResponseDistance={
+        {
+          "bottom": -1,
+          "end": -1,
+          "start": -1,
+          "top": -1,
+        }
+      }
+      nativeBackButtonDismissalEnabled={false}
+      onAppear={[Function]}
+      onDisappear={[Function]}
+      onDismissed={[Function]}
+      onGestureCancel={[Function]}
+      onHeaderBackButtonClicked={[Function]}
+      onNativeDismissCancelled={[Function]}
+      onTransitionProgress={[Function]}
+      onWillDisappear={[Function]}
+      replaceAnimation="push"
+      sheetAllowedDetents="large"
+      sheetCornerRadius={-1}
+      sheetExpandsWhenScrolledToEdge={true}
+      sheetGrabberVisible={false}
+      sheetLargestUndimmedDetent="all"
+      stackPresentation="push"
+      style={
+        {
+          "bottom": 0,
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        }
+      }
+      swipeDirection="horizontal"
+    >
+      <View
+        accessibilityElementsHidden={false}
+        importantForAccessibility="auto"
+        style={
+          {
+            "flex": 1,
+            "flexDirection": "column-reverse",
+          }
+        }
+      >
+        <View
+          collapsable={false}
+          style={
+            [
+              {
+                "flex": 1,
+              },
+              {
+                "backgroundColor": "rgb(242, 242, 242)",
+              },
+              undefined,
+            ]
+          }
+        >
+          <View
+            onLayout={[Function]}
+            style={
+              [
+                {
+                  "alignItems": "center",
+                  "backgroundColor": "#fff",
+                  "flex": 1,
+                  "justifyContent": "center",
+                  "padding": "4%",
+                },
+                {
+                  "paddingBottom": 0,
+                },
+              ]
+            }
+            testID="login-screen"
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "flex": 2,
+                  "justifyContent": "center",
+                }
+              }
+            >
+              <Image
+                accessibilityLabel="ibe logo"
+                resizeMode="contain"
+                source={1}
+                style={
+                  {
+                    "width": 375,
+                  }
+                }
+                testID="ibe-logo"
+              />
+            </View>
+            <View
+              style={
+                {
+                  "flex": 3,
+                  "justifyContent": "center",
+                  "width": "100%",
+                }
+              }
+            >
+              <TextInput
+                accessibilityLabel="Username"
+                maxLength={10}
+                onChangeText={[Function]}
+                placeholder="Username"
+                placeholderTextColor="darkgrey"
+                style={
+                  {
+                    "borderRadius": 28,
+                    "borderWidth": 2,
+                    "marginBottom": "4%",
+                    "paddingHorizontal": 16,
+                    "paddingVertical": 12,
+                  }
+                }
+                value=""
+              />
+              <View
+                style={
+                  {
+                    "alignItems": "center",
+                    "borderRadius": 28,
+                    "borderWidth": 2,
+                    "flexDirection": "row",
+                    "marginBottom": "4%",
+                    "paddingHorizontal": 16,
+                    "paddingVertical": 12,
+                    "width": "100%",
+                  }
+                }
+              >
+                <TextInput
+                  accessibilityLabel="Password"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={20}
+                  onChangeText={[Function]}
+                  placeholder="Password"
+                  placeholderTextColor="darkgrey"
+                  secureTextEntry={true}
+                  style={
+                    {
+                      "flex": 1,
+                    }
+                  }
+                />
+                <View
+                  accessibilityLabel="Show password"
+                  accessibilityState={
+                    {
+                      "busy": undefined,
+                      "checked": undefined,
+                      "disabled": undefined,
+                      "expanded": undefined,
+                      "selected": undefined,
+                    }
+                  }
+                  accessibilityValue={
+                    {
+                      "max": undefined,
+                      "min": undefined,
+                      "now": undefined,
+                      "text": undefined,
+                    }
+                  }
+                  accessible={true}
+                  collapsable={false}
+                  focusable={true}
+                  onClick={[Function]}
+                  onResponderGrant={[Function]}
+                  onResponderMove={[Function]}
+                  onResponderRelease={[Function]}
+                  onResponderTerminate={[Function]}
+                  onResponderTerminationRequest={[Function]}
+                  onStartShouldSetResponder={[Function]}
+                  style={
+                    {
+                      "opacity": 1,
+                    }
+                  }
+                >
+                  <Text
+                    allowFontScaling={false}
+                    selectable={false}
+                    style={
+                      [
+                        {
+                          "color": "black",
+                          "fontSize": 24,
+                        },
+                        undefined,
+                        {
+                          "fontFamily": "ionicons",
+                          "fontStyle": "normal",
+                          "fontWeight": "normal",
+                        },
+                        {},
+                      ]
+                    }
+                  >
+                    
+                  </Text>
+                </View>
+              </View>
+              <TextInput
+                accessibilityLabel="Client ID"
+                keyboardType="numeric"
+                maxLength={4}
+                onChangeText={[Function]}
+                placeholder="Client ID"
+                placeholderTextColor="darkgrey"
+                style={
+                  {
+                    "borderRadius": 28,
+                    "borderWidth": 2,
+                    "marginBottom": "4%",
+                    "paddingHorizontal": 16,
+                    "paddingVertical": 12,
+                  }
+                }
+                value=""
+              />
+              <View
+                style={
+                  {
+                    "alignItems": "center",
+                    "flexDirection": "row",
+                    "justifyContent": "flex-end",
+                    "marginBottom": "4%",
+                  }
+                }
+              >
+                <View
+                  accessibilityLabel="Remember Me"
+                  accessibilityRole="checkbox"
+                  accessibilityState={
+                    {
+                      "busy": undefined,
+                      "checked": false,
+                      "disabled": undefined,
+                      "expanded": undefined,
+                      "selected": undefined,
+                    }
+                  }
+                  accessibilityValue={
+                    {
+                      "max": undefined,
+                      "min": undefined,
+                      "now": undefined,
+                      "text": undefined,
+                    }
+                  }
+                  accessible={true}
+                  collapsable={false}
+                  focusable={true}
+                  onBlur={[Function]}
+                  onClick={[Function]}
+                  onFocus={[Function]}
+                  onResponderGrant={[Function]}
+                  onResponderMove={[Function]}
+                  onResponderRelease={[Function]}
+                  onResponderTerminate={[Function]}
+                  onResponderTerminationRequest={[Function]}
+                  onStartShouldSetResponder={[Function]}
+                  style={
+                    [
+                      {
+                        "borderColor": "#657786",
+                        "borderRadius": 2,
+                        "borderWidth": 2,
+                        "height": 20,
+                        "width": 20,
+                      },
+                      {
+                        "borderColor": "#000",
+                        "marginRight": 5,
+                      },
+                      false,
+                      false,
+                      undefined,
+                      false,
+                    ]
+                  }
+                />
+                <Text
+                  style={
+                    {
+                      "fontSize": 16,
+                    }
+                  }
+                >
+                  Remember Me
+                </Text>
+              </View>
+              <View
+                accessibilityLabel="Login"
+                accessibilityRole="button"
+                accessibilityState={
+                  {
+                    "busy": undefined,
+                    "checked": undefined,
+                    "disabled": undefined,
+                    "expanded": undefined,
+                    "selected": undefined,
+                  }
+                }
+                accessibilityValue={
+                  {
+                    "max": undefined,
+                    "min": undefined,
+                    "now": undefined,
+                    "text": undefined,
+                  }
+                }
+                accessible={true}
+                collapsable={false}
+                focusable={true}
+                onBlur={[Function]}
+                onClick={[Function]}
+                onFocus={[Function]}
+                onResponderGrant={[Function]}
+                onResponderMove={[Function]}
+                onResponderRelease={[Function]}
+                onResponderTerminate={[Function]}
+                onResponderTerminationRequest={[Function]}
+                onStartShouldSetResponder={[Function]}
+                style={
+                  {
+                    "alignItems": "center",
+                    "backgroundColor": "#005eb8",
+                    "borderRadius": 30,
+                    "elevation": 5,
+                    "justifyContent": "center",
+                    "paddingVertical": "5%",
+                    "shadowColor": "#000",
+                    "shadowOffset": {
+                      "height": 2,
+                      "width": 0,
+                    },
+                    "shadowOpacity": 0.8,
+                    "shadowRadius": 2,
+                  }
+                }
+              >
+                <Text
+                  style={
+                    {
+                      "color": "white",
+                      "fontSize": 16,
+                      "fontWeight": "bold",
+                      "letterSpacing": 0.5,
+                    }
+                  }
+                >
+                  Login
+                </Text>
+              </View>
+            </View>
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "flex": 1,
+                  "justifyContent": "center",
+                  "width": "100%",
+                }
+              }
+            >
+              <Text>
+                Version
+                 
+                1.0.0
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      <RNSScreenStackHeaderConfig
+        backButtonInCustomView={false}
+        backTitleVisible={true}
+        backgroundColor="#005eb8"
+        color="#fff"
+        direction="ltr"
+        disableBackButtonMenu={false}
+        hidden={true}
+        hideBackButton={false}
+        largeTitleHideShadow={false}
+        title="Login"
+        titleColor="#fff"
+        titleFontWeight="bold"
+        topInsetEnabled={false}
+        translucent={false}
+      />
+    </RNSScreen>
+  </RNSScreenStack>
+</RNCSafeAreaProvider>
+`;

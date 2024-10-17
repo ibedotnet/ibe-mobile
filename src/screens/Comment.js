@@ -311,7 +311,7 @@ const Comment = ({
       }
     });
 
-    console.debug("Comment list after update: " + JSON.stringify(comments));
+    console.log("Comment list after update: " + JSON.stringify(comments));
 
     // Reset the state and close the modal
     setSelectedComment(null);
@@ -335,7 +335,7 @@ const Comment = ({
     // Update the 'comments' state with the updated comments array
     setComments(updatedComments);
 
-    console.debug("Comment list after deletion: " + JSON.stringify(comments));
+    console.log("Comment list after deletion: " + JSON.stringify(comments));
 
     setSelectedComment(null);
     setIsDeleteConfirmationVisible(false);

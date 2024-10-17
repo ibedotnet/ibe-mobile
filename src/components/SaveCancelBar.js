@@ -12,9 +12,12 @@ import CustomButton from "./CustomButton";
  * @param {string} props.cancelLabel - The text label for the Cancel button.
  * @param {string} props.saveIcon - The name of the icon for the Save button.
  * @param {string} props.cancelIcon - The name of the icon for the Cancel button.
- * @param {boolean} props.saveDisable - Whether the Save button is disabled.
- * @param {boolean} props.cancelDisable - Whether the Cancel button is disabled.
+ * @param {boolean} props.saveDisabled - Whether the Save button is disabled.
+ * @param {boolean} props.cancelDisabled - Whether the Cancel button is disabled.
  * @param {boolean} props.isFloating - Determines whether buttons are displayed as floating buttons or not.
+ * @param {string} [props.accessibilityLabel] - Optional accessibility label for screen readers to describe the buttons.
+ * @param {string} [props.accessibilityRole] - Optional accessibility role to define the component’s purpose for assistive technologies.
+ * @param {string} [props.testID] - Optional test identifier for targeting the component in tests.
  * @returns {JSX.Element} - Rendered component.
  */
 const SaveCancelBar = ({
@@ -24,9 +27,12 @@ const SaveCancelBar = ({
   cancelLabel = "",
   saveIcon,
   cancelIcon,
-  saveDisable,
-  cancelDisable,
+  saveDisabled,
+  cancelDisabled,
   isFloating = false,
+  accessibilityLabel,
+  accessibilityRole,
+  testID,
 }) => {
   const saveIconProps = isFloating
     ? { name: saveIcon, size: 32 }
@@ -37,13 +43,18 @@ const SaveCancelBar = ({
     : { name: cancelIcon };
 
   return (
-    <View style={isFloating ? styles.floatingContainer : styles.barContainer}>
+    <View
+      style={isFloating ? styles.floatingContainer : styles.barContainer}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      testID={testID}
+    >
       {/* Save button */}
       <CustomButton
         onPress={onSave}
         label={saveLabel}
         icon={saveIconProps}
-        disabled={saveDisable}
+        disabled={saveDisabled}
         style={isFloating ? styles.floatingButton : styles.barButton}
       />
       {/* Separator (only for bar layout) */}
@@ -53,7 +64,7 @@ const SaveCancelBar = ({
         onPress={onCancel}
         label={cancelLabel}
         icon={cancelIconProps}
-        disabled={cancelDisable}
+        disabled={cancelDisabled}
         style={isFloating ? styles.floatingButton : styles.barButton}
       />
     </View>

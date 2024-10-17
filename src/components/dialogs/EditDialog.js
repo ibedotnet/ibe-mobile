@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Button, Modal, Text, StyleSheet, View } from "react-native";
+import {
+  Button,
+  Modal,
+  Text,
+  StyleSheet,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 import {
   RichEditor,
@@ -96,7 +104,7 @@ const EditDialog = ({
     if (firstError) {
       setError(firstError);
     } else {
-      console.debug("Dialog input values on confirm:", values);
+      console.log("Dialog input values on confirm:", values);
       onConfirm(values);
       setError(null);
       onClose();
@@ -206,7 +214,10 @@ const EditDialog = ({
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.dialogBox}>
           <Text style={styles.title}>{title}</Text>
           <GestureHandlerRootView>
@@ -218,7 +229,7 @@ const EditDialog = ({
             <Button onPress={handleConfirm} title={t("confirm")} />
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

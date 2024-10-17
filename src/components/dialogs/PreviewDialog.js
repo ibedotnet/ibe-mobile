@@ -171,13 +171,13 @@ const PreviewDialog = ({
         source={{ uri: fileUri }}
         style={contentStyle}
         onLoadComplete={(numberOfPages, filePath) => {
-          console.debug(`Number of pages: ${numberOfPages}`);
+          console.log(`Number of pages: ${numberOfPages}`);
         }}
         onPageChanged={(page, numberOfPages) => {
-          console.debug(`Current page: ${page}`);
+          console.log(`Current page: ${page}`);
         }}
         onError={(error) => {
-          console.debug(error);
+          console.log(error);
         }}
       />
     );

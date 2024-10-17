@@ -1,28 +1,34 @@
-/**
- * CustomImagePicker Component
- *
- * This component provides functionality to pick an image from the gallery
- * or take a photo using the device camera. It allows the user to preview
- * and upload the selected image.
- *
- * @param {object} route - The route object passed by React Navigation.
- * @param {object} navigation - The navigation object passed by React Navigation.
- *
- * @returns {JSX.Element} JSX Element representing the CustomImagePicker component.
- */
-import React, { useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { FontAwesome } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
-import Loader from "./Loader";
-import SaveCancelBar from "./SaveCancelBar";
-import { APP, APP_NAME } from "../constants";
-import { uploadBinaryResource } from "../utils/APIUtils";
+
+import * as FileSystem from "expo-file-system";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { FontAwesome } from "@expo/vector-icons";
+
+import {
+  APP,
+  APP_NAME,
+  BUSOBJCAT,
+  BUSOBJCATMAP,
+  MAX_IMAGE_SIZE,
+} from "../constants";
+import {
+  fetchAndCacheResource,
+  isDoNotReplaceAnyList,
+  uploadBinaryResource,
+} from "../utils/APIUtils";
 import { changeDateToAPIFormat } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
-import updateFields from "../utils/UpdateUtils";
+import updateFields, { handleBackNavigation } from "../utils/UpdateUtils";
+
+import Loader from "./Loader";
+import CustomButton from "./CustomButton";
+import CustomBackButton from "./CustomBackButton";
+import { useClientPaths } from "../../context/ClientPathsContext";
 
 /**
  * Button Component
@@ -39,7 +45,7 @@ import updateFields from "../utils/UpdateUtils";
 const Button = ({ label, icon, accessibilityLabel, onPress }) => {
   return (
     <View>
-      <Pressable style={[styles.button, {}]} onPress={onPress}>
+      <Pressable style={[styles.button]} onPress={onPress}>
         <FontAwesome
           name={icon}
           size={18}
@@ -56,70 +62,247 @@ const Button = ({ label, icon, accessibilityLabel, onPress }) => {
 /**
  * CustomImagePicker Component
  *
+ * This component provides functionality to pick an image from the gallery
+ * or take a photo using the device camera. It allows the user to preview
+ * and upload the selected image.
+ *
  * @param {object} route - The route object passed by React Navigation.
  * @param {object} navigation - The navigation object passed by React Navigation.
  *
  * @returns {JSX.Element} JSX Element representing the CustomImagePicker component.
  */
-const CustomImagePicker = ({ route, navigation: { goBack } }) => {
-  const currentUserPhoto = route?.params?.userPhoto;
 
-  // Initialize useTranslation hook
+const CustomImagePicker = ({ route, navigation }) => {
+  // Destructure with fallback values from route parameters
+  const { linkBackToBusObjcat = "" } = route.params || {};
+
+  // Initialize useTranslation hook for internationalization
   const { t } = useTranslation();
 
-  // State variables
-  const [selectedImage, setSelectedImage] = useState(currentUserPhoto);
-  const [isLoading, setIsLoading] = useState(false);
+  // Access client paths from context
+  const { clientPaths, setClientPaths } = useClientPaths();
 
-  const placeholderImageSource = currentUserPhoto
-    ? { uri: currentUserPhoto }
-    : require("../assets/images/blank-picture_640.png");
-  const imageSource = selectedImage
-    ? { uri: selectedImage }
-    : placeholderImageSource;
+  const existingUserPhoto = clientPaths?.userPhotoPath || null;
+
+  // State variables for selected image, loading state, and change tracking
+  const [selectedImage, setSelectedImage] = useState(existingUserPhoto);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasChanged, setHasChanged] = useState(false); // Track if the selected image has change
+
+  const placeholderImageSource = require("../assets/images/blank-picture_640.png");
+
+  // Determine the image source for rendering
+  const imageSource = useMemo(
+    () => (selectedImage ? { uri: selectedImage } : placeholderImageSource),
+    [selectedImage]
+  );
 
   /**
-   * Function to pick image from gallery using ImagePicker.
+   * Resets the selected image and change tracking state.
+   * This function uses `useCallback` to ensure the reference remains stable
+   * across renders, preventing unnecessary re-renders of child components
+   * that depend on this function.
+   *
+   * @function handleDiscardChanges
+   * @callback
    */
-  const pickImageAsync = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      quality: 1,
-    });
+  const handleDiscardChanges = useCallback(() => {
+    // Discard states
+    setSelectedImage(null);
+    setHasChanged(false);
+  }, []);
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-    } else {
-      Alert.alert(t("alert_title"), t("no_image_selected"));
+  useEffect(() => {
+    // Set navigation options for the header buttons
+    navigation.setOptions({
+      headerTitle: "",
+      gestureEnabled: false,
+      headerLeft: () => (
+        <CustomBackButton
+          navigation={navigation}
+          hasUnsavedChanges={hasChanged}
+          discardChanges={handleDiscardChanges}
+          t={t}
+        />
+      ),
+      headerRight: () => (
+        <View style={styles.headerRightContainer}>
+          <CustomButton
+            onPress={onSave}
+            label={t("save")}
+            icon={{
+              name: "content-save",
+              library: "MaterialCommunityIcons",
+              size: 24,
+              color: "white",
+            }}
+            disabled={!hasChanged || isLoading}
+            backgroundColor={false}
+            style={{ icon: { marginRight: 0 } }}
+            labelStyle={styles.buttonLabelWhite}
+            accessibilityLabel={t("save_user_photo")}
+            accessibilityRole="button"
+            testID="save-user-photo-button"
+          />
+          <CustomButton
+            onPress={onDelete}
+            label={t("delete")}
+            icon={{
+              name: "image-remove",
+              library: "MaterialCommunityIcons",
+              size: 24,
+              color: "white",
+            }}
+            disabled={!existingUserPhoto || hasChanged || isLoading}
+            backgroundColor={false}
+            style={{ icon: { marginRight: 0 } }}
+            labelStyle={styles.buttonLabelWhite}
+            accessibilityLabel={t("delete_user_photo")}
+            accessibilityRole="button"
+            testID="delete-user-photo-button"
+          />
+        </View>
+      ),
+    });
+  }, [hasChanged, isLoading]);
+
+  /**
+   * Compresses the selected image to reduce its file size.
+   *
+   * @param {string} uri - The URI of the image to be compressed.
+   * @returns {Promise<string|null>} The URI of the compressed image or null if failed.
+   */
+  const compressImage = async (uri) => {
+    try {
+      console.log(`Compressing image: ${uri}`);
+      const originalFileInfo = await FileSystem.getInfoAsync(uri);
+      console.log(
+        "Original image size:",
+        (originalFileInfo.size / (1024 * 1024)).toFixed(2) + " MB"
+      );
+
+      // Compressing the image
+      const result = await ImageManipulator.manipulateAsync(uri, [], {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG, // Use JPEG for better compression
+      });
+
+      // Check compressed image size
+      const compressedFileInfo = await FileSystem.getInfoAsync(result.uri);
+      console.log(
+        "Compressed image size:",
+        (compressedFileInfo.size / (1024 * 1024)).toFixed(2) + " MB"
+      );
+
+      // Check if the compressed file size exceeds the maximum limit
+      if (compressedFileInfo.size > MAX_IMAGE_SIZE) {
+        console.log("Image size exceeds the allowed limit after compression.");
+        Alert.alert("Error", t("image_size_error"));
+        return null; // Indicate that the image is too large
+      }
+
+      return result.uri; // Return the URI of the compressed image
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      Alert.alert(t("alert_title"), t("compression_error"));
+      return null;
     }
   };
 
   /**
-   * Function to open the device camera and capture a photo using ImagePicker.
+   * Picks an image from the gallery using ImagePicker.
+   */
+  const pickImageAsync = async () => {
+    try {
+      console.log("Opening image picker...");
+      let result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      console.log("Image Picker result:", result);
+
+      if (!result.canceled) {
+        // Compress the image after picking
+        const compressedUri = await compressImage(result.assets[0].uri);
+        setSelectedImage(compressedUri || existingUserPhoto || null);
+        setHasChanged(!!compressedUri); // Set hasChanged to true if an image is captured
+        console.log(
+          "Image selected and possibly compressed, URI:",
+          compressedUri
+        );
+      } else {
+        Alert.alert(t("alert_title"), t("no_image_selected"));
+        console.log("No image selected");
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+    }
+  };
+
+  /**
+   * Requests camera permissions if not granted.
+   * On iOS, permission is mandatory to open the camera.
+   * @returns {Promise<boolean>} True if permission granted, otherwise false.
+   */
+  const getCameraPermissions = async () => {
+    console.log("Requesting camera permissions...");
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (status !== "granted") {
+      console.log("Camera permissions not granted.");
+      Alert.alert(
+        "Permissions required",
+        "Camera access is needed to take photos."
+      );
+      return false;
+    }
+
+    console.log("Camera permissions granted.");
+    return true;
+  };
+
+  /**
+   * Opens the device camera to capture a photo using ImagePicker.
    */
   const openCameraAsync = async () => {
+    // Check for camera permissions before opening the camera
+    const hasPermission = await getCameraPermissions();
+    if (!hasPermission) {
+      console.log("No camera permission, exiting camera function.");
+      return;
+    }
+
+    console.log("Opening camera...");
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       quality: 1,
     });
 
+    console.log("Camera result:", result);
+
     if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
+      // Compress the image after taking a photo
+      const compressedUri = await compressImage(result.assets[0].uri);
+      setSelectedImage(compressedUri || existingUserPhoto || null);
+      setHasChanged(!!compressedUri); // Set hasChanged to true if an image is captured
+      console.log("Photo taken and possibly compressed, URI:", compressedUri);
     } else {
       Alert.alert(t("alert_title"), t("no_photo_taken"));
+      console.log("No photo taken");
     }
   };
-
-  const linkBackToBusObjcat = route?.params?.linkBackToBusObjcat;
 
   /**
    * Function to handle save action.
    * It uploads the selected image and updates the bus object category.
    */
   const onSave = async () => {
+    console.log("Save action triggered");
     if (selectedImage) {
       try {
         setIsLoading(true);
+        console.log("Selected Image before saving:", selectedImage);
 
         // Upload the selected image and get binary resource
         const binaryResource = await uploadBinaryResource(
@@ -137,6 +320,8 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
             allClient: false,
           }
         );
+
+        console.log("Binary resource result:", binaryResource);
 
         // Construct formData object with binary resource data
         const formData = {
@@ -165,11 +350,29 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
 
         // Check if update was successful
         if (updateResponse.success) {
-          showToast(t("photo_updated_success"));
+          const [updatedPhotoUri, updatedThumbnailUri] = await Promise.all([
+            fetchAndCacheResource(binaryResource.attachmentId),
+            fetchAndCacheResource(binaryResource.thumbId),
+          ]);
 
-          goBack(); // Go back to the previous screen
+          setClientPaths((prevPaths) => ({
+            ...prevPaths,
+            userPhotoPath: updatedPhotoUri || null,
+            userThumbnailPath: updatedThumbnailUri || null,
+          }));
+
+          setSelectedImage(updatedPhotoUri || null); // Update UI to reflect photo update
+          setHasChanged(false);
+
+          showToast(t("photo_updated_success"));
+          console.log(
+            "Image successfully uploaded and business object category updated."
+          );
         } else {
           showToast(t("failed_upload_photo"), "error");
+          console.error(
+            "Failed to update business object category with new image."
+          );
         }
 
         if (updateResponse.message) {
@@ -188,19 +391,144 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
       }
     } else {
       Alert.alert(`${t("alert_title")}!`, t("no_image_selected"));
+      console.log("No image selected for saving");
     }
   };
 
   /**
-   * Function to handle cancel action.
+   * Function to handle delete action.
+   * It deletes the current user photo and thumbnail if available.
+   */
+  const onDelete = () => {
+    console.log("Delete action triggered");
+    Alert.alert(
+      t("confirm_delete_title"),
+      t("confirm_delete_message"),
+      [
+        {
+          text: t("cancel"),
+          style: "cancel",
+        },
+        {
+          text: t("confirm"),
+          onPress: async () => {
+            console.log("Delete action confirmed");
+
+            try {
+              setIsLoading(true);
+
+              const formData = {
+                data: {
+                  [`${BUSOBJCATMAP[BUSOBJCAT.EMPLOYEE]}-id`]:
+                    APP.LOGIN_USER_EMPLOYEE_ID,
+                  [`${BUSOBJCATMAP[BUSOBJCAT.EMPLOYEE]}-photoID`]: "",
+                  [`${BUSOBJCATMAP[BUSOBJCAT.EMPLOYEE]}-thumbnailID`]: "",
+                  [`${BUSOBJCATMAP[BUSOBJCAT.EMPLOYEE]}-type`]: "employee",
+                },
+              };
+
+              const queryStringParams = {
+                changeDate: changeDateToAPIFormat(new Date()),
+                userID: APP.LOGIN_USER_ID,
+                client: Number(APP.LOGIN_USER_CLIENT),
+                language: APP.LOGIN_USER_LANGUAGE,
+                testMode: APP.TEST_MODE || null,
+                component: "platform",
+                doNotReplaceAnyList: isDoNotReplaceAnyList(BUSOBJCAT.EMPLOYEE),
+                appName: APP_NAME.EMPLOYEE,
+              };
+
+              const deleteResponse = await updateFields(
+                formData,
+                queryStringParams
+              );
+
+              if (
+                deleteResponse?.success &&
+                deleteResponse?.response?.details?.[0]?.success
+              ) {
+                const detail = deleteResponse.response.details[0];
+
+                if (detail?.data?.ids?.length > 0) {
+                  // Get info for the selected image and thumbnail
+                  const [photoInfo, thumbnailInfo] = await Promise.all([
+                    FileSystem.getInfoAsync(selectedImage),
+                    FileSystem.getInfoAsync(clientPaths?.userThumbnailPath),
+                  ]);
+
+                  // Helper function to delete file if it exists
+                  const deleteFileIfExists = async (fileInfo, filePath) => {
+                    if (fileInfo.exists) {
+                      await FileSystem.deleteAsync(filePath);
+                      console.log(`Cache for file ${filePath} deleted.`);
+                    } else {
+                      console.log(
+                        `No cached file found for deletion: ${filePath}.`
+                      );
+                    }
+                  };
+
+                  // Perform deletion for both image and thumbnail
+                  await Promise.all([
+                    deleteFileIfExists(photoInfo, selectedImage),
+                    deleteFileIfExists(
+                      thumbnailInfo,
+                      clientPaths?.userThumbnailPath
+                    ),
+                  ]);
+
+                  // Update state and UI after deletion
+                  setClientPaths((prevPaths) => ({
+                    ...prevPaths,
+                    userPhotoPath: null,
+                    userThumbnailPath: null,
+                  }));
+                  setSelectedImage(null); // Clear selected image in UI
+                  setHasChanged(false);
+
+                  showToast(t("photo_deleted_success"));
+                  console.log("Image successfully deleted.");
+                } else {
+                  handleDeleteError();
+                }
+              } else {
+                handleDeleteError();
+              }
+            } catch (error) {
+              console.error(
+                "Error in onDelete method of CustomImagePicker:",
+                error
+              );
+              handleDeleteError();
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleDeleteError = () => {
+    showToast(t("failed_delete_photo"), "error");
+    console.error("Failed to delete image.");
+  };
+
+  /**
+   * Function to handle undo action.
    * If an image is selected, it resets the selected image.
    * If no image is selected, it shows an alert informing the user.
    */
   const onReset = () => {
+    console.log("Reset action triggered");
     if (selectedImage) {
-      setSelectedImage(null);
+      setSelectedImage(existingUserPhoto || null);
+      setHasChanged(false);
+      console.log("Selected image reset to existing user photo (if any).");
     } else {
       Alert.alert(`${t("alert_title")}!`, t("no_image_to_reset"));
+      console.log("No image to reset");
     }
   };
 
@@ -209,6 +537,23 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.imageContainer}>
         <Image source={imageSource} style={styles.image} resizeMode="contain" />
+        {hasChanged && (
+          <CustomButton
+            onPress={onReset}
+            label={""}
+            icon={{
+              name: "undo",
+              library: "FontAwesome",
+              size: 24,
+              color: "#000",
+            }}
+            disabled={!hasChanged}
+            backgroundColor={false}
+            accessibilityLabel={t("delete_user_photo")}
+            accessibilityRole="button"
+            testID="delete-user-photo-button"
+          />
+        )}
       </View>
       <View style={styles.buttonContainer}>
         <Button
@@ -224,14 +569,6 @@ const CustomImagePicker = ({ route, navigation: { goBack } }) => {
           onPress={openCameraAsync}
         />
       </View>
-      <SaveCancelBar
-        onSave={onSave}
-        onCancel={onReset}
-        saveLabel={t("save")}
-        cancelLabel={t("reset")}
-        saveIcon="save"
-        cancelIcon="times"
-      />
       {isLoading && <Loader />}
     </SafeAreaView>
   );
@@ -241,16 +578,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerRightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    columnGap: 16,
+  },
   imageContainer: {
-    flex: 1,
+    flex: 2,
     justifyContent: "center",
     alignItems: "center",
   },
   image: {
     borderRadius: 12,
-    borderWidth: 1,
     borderColor: "#ffd33d",
-    width: "60%",
+    width: "50%",
     height: "80%",
   },
   buttonContainer: {
@@ -271,7 +613,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.5,
     shadowRadius: 2,
   },
   buttonIcon: {
@@ -281,6 +623,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     letterSpacing: 0.5,
+  },
+  buttonLabelWhite: {
+    color: "white",
   },
 });
 

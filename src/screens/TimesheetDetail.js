@@ -1,5 +1,11 @@
-import React, { useContext, useEffect, useState, useRef } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTranslation } from "react-i18next";
@@ -42,6 +48,7 @@ import { screenDimension } from "../utils/ScreenUtils";
 import updateFields from "../utils/UpdateUtils";
 import { documentStatusCheck } from "../utils/WorkflowUtils";
 
+import CustomBackButton from "../components/CustomBackButton";
 import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
@@ -543,7 +550,7 @@ const TimesheetDetail = ({ route, navigation }) => {
             if (mostRecentPeriod && mostRecentPeriod.periodSchedule) {
               // If a valid period is found and it has a period schedule, log the period schedule ID
 
-              console.debug(
+              console.log(
                 "Most recent valid period id:",
                 mostRecentPeriod.periodSchedule
               );
@@ -558,7 +565,7 @@ const TimesheetDetail = ({ route, navigation }) => {
               return validPeriodForSelectedDate;
             } else {
               // If the most recent period does not exist or does not refer to a valid period schedule id
-              console.debug(
+              console.log(
                 "Valid period not found in the maintained period schedules for the timesheet type."
               );
               showToast(t("no_valid_period_in_timesheet_type"), "error");
@@ -568,7 +575,7 @@ const TimesheetDetail = ({ route, navigation }) => {
             // If no period schedules are found, log a debug message
             // Default to a weekly interval based on the selected date
 
-            console.debug(
+            console.log(
               "The timesheet type does not have any period maintained, so it will default to a weekly interval."
             );
 
@@ -766,7 +773,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       return;
     }
 
-    console.debug(
+    console.log(
       `Updated values in Timesheet Detail: ${JSON.stringify(values)}`
     );
 
@@ -826,7 +833,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       updatedChanges["comments"] = values.timesheetComments;
     }
 
-    console.debug(
+    console.log(
       `Updated changes in Timesheet Detail: ${JSON.stringify(updatedChanges)}`
     );
 
@@ -917,55 +924,52 @@ const TimesheetDetail = ({ route, navigation }) => {
     }
 
     if (validateWorkSchedule) {
-      console.debug(
-        "Validation work schedule is enabled:",
-        validateWorkSchedule
-      );
+      console.log("Validation work schedule is enabled:", validateWorkSchedule);
 
       // Validate timesheet hours with patterns if patterns exist
       if (patterns?.length > 0) {
-        console.debug(
+        console.log(
           "Patterns exist. Validating timesheet hours with patterns..."
         );
         const isValid =
           validateTimesheetHoursWithPatterns(validateWorkSchedule);
 
         if (!isValid) {
-          console.debug("Timesheet hours validation with patterns failed.");
+          console.log("Timesheet hours validation with patterns failed.");
           return false; // Return false if validation fails
         } else {
-          console.debug("Timesheet hours validation with patterns passed.");
+          console.log("Timesheet hours validation with patterns passed.");
         }
       } else {
-        console.debug(
+        console.log(
           "No patterns found. Proceeding to validate with min/max hours..."
         );
 
         if (workHoursInterval === "day") {
-          console.debug(
+          console.log(
             "Work hours interval is set to 'day'. Validating day hours with min/max..."
           );
           const isValid =
             validateTimesheetDayHoursWithMinMax(validateWorkSchedule);
 
           if (!isValid) {
-            console.debug("Day hours validation with min/max failed.");
+            console.log("Day hours validation with min/max failed.");
             return false; // Return false if validation fails
           } else {
-            console.debug("Day hours validation with min/max passed.");
+            console.log("Day hours validation with min/max passed.");
           }
         } else if (workHoursInterval === "week") {
-          console.debug(
+          console.log(
             "Work hours interval is set to 'week'. Validating week hours with min/max..."
           );
           // Validate the timesheet hours for a weekly period (7 days)
           const isValid = validatePeriodTimesheetHours(validateWorkSchedule, 7);
 
           if (!isValid) {
-            console.debug("Week hours validation with min/max failed.");
+            console.log("Week hours validation with min/max failed.");
             return false; // Return false if validation fails
           } else {
-            console.debug("Week hours validation with min/max passed.");
+            console.log("Week hours validation with min/max passed.");
           }
         }
       }
@@ -975,14 +979,22 @@ const TimesheetDetail = ({ route, navigation }) => {
     return true;
   };
 
-  const hasUnsavedChanges = () => {
-    console.debug(
-      "Upated values reference (if any) in hasUnsavedChanges: ",
+  /**
+   * This function checks if there are unsaved changes by verifying if the `updatedValuesRef` object has any keys.
+   * It uses the `useCallback` hook to ensure the function is only recreated when necessary, optimizing performance.
+   *
+   * @param {Object} updatedValuesRef - A reference object containing updated values. If it has any keys, it indicates unsaved changes.
+   *
+   * @returns {boolean} - Returns `true` if there are unsaved changes, otherwise `false`.
+   */
+  const hasUnsavedChanges = useCallback(() => {
+    console.log(
+      "Updated values reference (if any) in hasUnsavedChanges: ",
       JSON.stringify(updatedValuesRef)
     );
 
     return Object.keys(updatedValuesRef.current).length > 0;
-  };
+  }, [updatedValuesRef]);
 
   const showUnsavedChangesAlert = (onDiscard) => {
     Alert.alert(
@@ -1702,79 +1714,97 @@ const TimesheetDetail = ({ route, navigation }) => {
     }
   };
 
-  useEffect(() => {
-    const beforeRemoveListener = navigation.addListener("beforeRemove", (e) => {
-      if (!hasUnsavedChanges()) {
-        // If we don't have unsaved changes, then we don't need to do anything
-        return;
-      }
+  /**
+   * Memoized function to render the headerLeft with CustomBackButton and title text.
+   * The function re-renders only when `hasUnsavedChanges`, `isEditMode`, or `t` changes.
+   */
+  const headerLeft = useCallback(() => {
+    return (
+      <View style={styles.headerLeftContainer}>
+        <CustomBackButton
+          navigation={navigation}
+          hasUnsavedChanges={hasUnsavedChanges()}
+          t={t}
+        />
+        <Text
+          style={styles.headerLeftText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {isEditMode ? t("timesheet_edit") : t("timesheet_create")}
+        </Text>
+      </View>
+    );
+  }, [hasUnsavedChanges, isEditMode, t]);
 
-      e.preventDefault();
-      showUnsavedChangesAlert(() => {
-        navigation.dispatch(e.data.action);
-      });
-    });
-
-    return beforeRemoveListener;
-  }, [navigation]);
-
-  useEffect(() => {
-    // Change header left text on mount
-    navigation.setOptions({
-      headerTitle: isEditMode ? t("timesheet_edit") : t("timesheet_create"),
-      headerRight: () => {
-        return (
-          <View style={styles.headerRightContainer}>
-            <CustomButton
-              onPress={handleLock}
-              label=""
-              icon={{
-                name: isLocked ? "lock" : "lock-open-variant", // Change icon based on lock state
-                library: "MaterialCommunityIcons",
-                size: 24,
-              }}
-              disabled={!isEditMode || loading} // Disable lock button when not in edit mode or when loading
-            />
-            <CustomButton
-              onPress={handleReload}
-              label=""
-              icon={{
-                name: "refresh-circle",
-                library: "MaterialCommunityIcons",
-                size: 24,
-              }}
-              disabled={!isEditMode || loading} // Disable reload button when not in edit mode or when loading
-            />
-            <CustomButton
-              onPress={handleDelete}
-              label=""
-              icon={{
-                name: "delete",
-                library: "MaterialCommunityIcons",
-                size: 24,
-              }}
-              disabled={!isEditMode || loading || isLocked} // Disable delete button when not in edit mode, when loading, or when locked
-            />
-            <CustomButton
-              onPress={handleSave}
-              label=""
-              icon={{
-                name: "content-save",
-                library: "MaterialCommunityIcons",
-                size: 24,
-              }}
-              disabled={
-                loading ||
-                isLocked ||
-                Object.keys(updatedValues).length === 0 ||
-                timesheetTasks.length === 0
-              } // Disable the button if loading, locked, no changes, or no entries/items are present
-            />
-          </View>
-        );
-      },
-    });
+  /**
+   * Memoized function to render the headerRight with multiple buttons.
+   * The function re-renders only when `isEditMode`, `isLocked`, `loading`, `updatedValues`, or `timesheetTasks` change.
+   */
+  const headerRight = useCallback(() => {
+    return (
+      <View style={styles.headerRightContainer}>
+        <CustomButton
+          onPress={handleLock}
+          label=""
+          icon={{
+            name: isLocked ? "lock" : "lock-open-variant",
+            library: "MaterialCommunityIcons",
+            size: 24,
+          }}
+          disabled={!isEditMode || loading}
+        />
+        <CustomButton
+          onPress={handleReload}
+          label=""
+          icon={{
+            name: "refresh-circle",
+            library: "MaterialCommunityIcons",
+            size: 24,
+          }}
+          disabled={!isEditMode || loading}
+        />
+        <CustomButton
+          onPress={handleDelete}
+          label=""
+          icon={{
+            name: "delete",
+            library: "MaterialCommunityIcons",
+            size: 24,
+          }}
+          disabled={!isEditMode || loading || isLocked}
+        />
+        <CustomButton
+          onPress={handleSave}
+          label=""
+          icon={{
+            name: "content-save",
+            library: "MaterialCommunityIcons",
+            size: 24,
+          }}
+          disabled={
+            loading ||
+            isLocked ||
+            Object.keys(updatedValues).length === 0 ||
+            timesheetTasks.length === 0
+          }
+        />
+      </View>
+    );
   }, [isEditMode, isLocked, loading, updatedValues, timesheetTasks]);
+
+  /**
+   * Sets the header options for the screen, including the custom headerLeft and headerRight components.
+   * This useEffect will run whenever dependencies in the header functions change.
+   */
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: "",
+      gestureEnabled: false,
+      headerLeft: headerLeft,
+      headerRight: headerRight,
+    });
+  }, [headerLeft, headerRight, navigation]);
 
   useEffect(() => {
     if (!loggedInUserInfo.workScheduleExtId) {
@@ -1819,7 +1849,24 @@ const TimesheetDetail = ({ route, navigation }) => {
         itemStatusIDMap && (
           <>
             <Tab.Navigator screenOptions={{ swipeEnabled: false }}>
-              <Tab.Screen name={t("general")}>
+              <Tab.Screen
+                name={t("general")}
+                options={{
+                  tabBarLabel: ({ focused, color }) => (
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={{
+                        color,
+                        fontSize: 14,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {t("general")}
+                    </Text>
+                  ),
+                }}
+              >
                 {() => (
                   <GestureHandlerRootView>
                     <TimesheetDetailGeneral
@@ -1854,7 +1901,24 @@ const TimesheetDetail = ({ route, navigation }) => {
                   </GestureHandlerRootView>
                 )}
               </Tab.Screen>
-              <Tab.Screen name={t("files")}>
+              <Tab.Screen
+                name={t("files")}
+                options={{
+                  tabBarLabel: ({ focused, color }) => (
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={{
+                        color,
+                        fontSize: 14,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {t("files")}
+                    </Text>
+                  ),
+                }}
+              >
                 {() => (
                   <File
                     busObjCat={BUSOBJCAT.TIMESHEET}
@@ -1864,7 +1928,24 @@ const TimesheetDetail = ({ route, navigation }) => {
                   />
                 )}
               </Tab.Screen>
-              <Tab.Screen name={t("comments")}>
+              <Tab.Screen
+                name={t("comments")}
+                options={{
+                  tabBarLabel: ({ focused, color }) => (
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={{
+                        color,
+                        fontSize: 14,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {t("comments")}
+                    </Text>
+                  ),
+                }}
+              >
                 {() => (
                   <Comment
                     busObjCat={BUSOBJCAT.TIMESHEET}
@@ -1874,7 +1955,24 @@ const TimesheetDetail = ({ route, navigation }) => {
                   />
                 )}
               </Tab.Screen>
-              <Tab.Screen name={t("history")}>
+              <Tab.Screen
+                name={t("history")}
+                options={{
+                  tabBarLabel: ({ focused, color }) => (
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={{
+                        color,
+                        fontSize: 14,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {t("history")}
+                    </Text>
+                  ),
+                }}
+              >
                 {() => (
                   <History
                     busObjCat={BUSOBJCAT.TIMESHEET}
@@ -1894,11 +1992,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerRightContainer: {
-    width: screenDimension.width / 2.5,
+  headerLeftContainer: {
+    maxWidth: screenDimension.width / 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "flex-start",
+  },
+  headerLeftText: {
+    fontSize: screenDimension.width > 400 ? 18 : 16,
+    fontWeight: "bold",
+    color: "white",
+  },
+  headerRightContainer: {
+    maxWidth: screenDimension.width / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    columnGap: 8,
   },
 });
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useTranslation } from "react-i18next";
 import { timeUnitLabels } from "../../utils/FormatUtils";
 import CustomTextInput from "../CustomTextInput";
+import CustomPicker from "../CustomPicker";
 
 /**
  * DurationFilter component renders a filter for duration range.
@@ -112,21 +113,35 @@ const DurationFilter = ({
           keyboardType="numeric"
           showClearButton={false}
         />
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={unit}
-            style={styles.picker}
-            onValueChange={(itemValue) => handleUnitChange(itemValue)}
-          >
-            {units.map((unit, index) => (
-              <Picker.Item
-                key={index}
-                label={timeUnitLabels[unit]}
-                value={unit}
-              />
-            ))}
-          </Picker>
-        </View>
+        {Platform.OS === "ios" ? (
+          <CustomPicker
+            placeholder={`${t("select")}...`}
+            items={units.map((unit) => ({
+              label: timeUnitLabels[unit],
+              value: unit,
+            }))}
+            initialValue={unit}
+            onFilter={handleUnitChange}
+            hideSearchInput={true}
+            pickerStyle={{ alignItems: "center" }}
+          />
+        ) : (
+          <View style={styles.androidPickerContainer}>
+            <Picker
+              selectedValue={unit}
+              style={styles.picker}
+              onValueChange={(itemValue) => handleUnitChange(itemValue)}
+            >
+              {units.map((unit, index) => (
+                <Picker.Item
+                  key={index}
+                  label={timeUnitLabels[unit]}
+                  value={unit}
+                />
+              ))}
+            </Picker>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -147,7 +162,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: "4%",
   },
-  pickerContainer: {
+  androidPickerContainer: {
     width: "30%",
     borderWidth: 1,
     borderRadius: 8,

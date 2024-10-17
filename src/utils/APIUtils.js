@@ -23,10 +23,10 @@ import { showToast } from "../utils/MessageUtils";
  * @throws {Error} - Throws an error if the request fails or encounters an error.
  */
 const fetchData = async (endpoint, method, headers = {}, body = {}) => {
-  console.debug("Request url: " + endpoint);
-  console.debug("Request method: " + method);
-  console.debug("Request headers: " + JSON.stringify(headers));
-  console.debug("Request body: " + JSON.stringify(body));
+  console.log("Request url: " + endpoint);
+  console.log("Request method: " + method);
+  console.log("Request headers: " + JSON.stringify(headers));
+  console.log("Request body: " + JSON.stringify(body));
 
   try {
     let requestOptions = {
@@ -114,7 +114,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
     }
 
     const responseText = await response.text();
-    console.debug("Response text: " + responseText);
+    console.log(JSON.stringify(responseText, null, 2));
 
     const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
 
@@ -191,10 +191,10 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
  */
 const fetchAndCacheResource = async (id) => {
   try {
-    console.debug(`Going to fetch resource with id: ${id}`);
+    console.log(`Going to fetch resource with id: ${id}`);
 
     if (!id) {
-      console.debug("Resource ID is blank, skipping fetch");
+      console.log("Resource ID is blank, skipping fetch");
       return;
     }
 
@@ -203,16 +203,18 @@ const fetchAndCacheResource = async (id) => {
     // Check if resource is in cache
     const fileInfo = await FileSystem.getInfoAsync(cachePath);
 
+    console.log(`File Info:`, fileInfo);
+
     if (fileInfo.exists) {
-      console.debug(`Resource ${id} is in cache, return the cached path`);
+      console.log(`Resource ${id} is in cache, return the cached path`);
       return cachePath;
     } else {
-      console.debug(`Resource ${id} not in cache, fetch from API`);
+      console.log(`Resource ${id} not in cache, fetch from API`);
       const apiResponse = await fetch(
         `${API_ENDPOINTS.RESOURCE}/${id}?client=${APP.LOGIN_USER_CLIENT}`
       );
 
-      console.debug(`Fetch resource response status: ${apiResponse.status}`);
+      console.log(`Fetch resource response status: ${apiResponse.status}`);
 
       if (!apiResponse.ok) {
         throw new Error(
@@ -231,7 +233,7 @@ const fetchAndCacheResource = async (id) => {
             encoding: FileSystem.EncodingType.Base64,
           });
 
-          console.debug("Resource saved to cache: ", cachePath);
+          console.log("Resource saved to cache: ", cachePath);
           resolve(cachePath);
         };
 
@@ -265,7 +267,8 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "TimeConfirmation-end",
           "TimeConfirmation-totalTime",
           "TimeConfirmation-extStatus-processTemplateID",
-          "TimeConfirmation-extStatus-statusID:ProcessTemplate-steps-statusLabel",
+          "TimeConfirmation-extStatus-statusID",
+          "TimeConfirmation-extStatus-processTemplateID:ProcessTemplate-steps",
           "TimeConfirmation-remark:text",
           "TimeConfirmation-billableTime",
           "TimeConfirmation-totalTime",
@@ -288,7 +291,7 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "ExpenseClaim-remark:text",
           "ExpenseClaim-amountBU",
           "ExpenseClaim-date",
-          "ExpenseClaim-extStatus-statusID:ProcessTemplate-steps-statusLabel",
+          "ExpenseClaim-extStatus-processTemplateID:ProcessTemplate-steps",
           ...extraFields,
         ],
         where: [
@@ -322,7 +325,7 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "Absence-end",
           "Absence-remark:text",
           "Absence-plannedDays",
-          "Absence-extStatus-statusID:ProcessTemplate-steps-statusLabel",
+          "Absence-extStatus-processTemplateID:ProcessTemplate-steps",
           ...extraFields,
         ],
         where: [
@@ -334,7 +337,7 @@ const getQueryFields = (busObjCat, extraFields = []) => {
         ],
       };
     default:
-      console.debug("None of the case matched in getQueryFields:", busObjCat);
+      console.log("None of the case matched in getQueryFields:", busObjCat);
       return;
   }
 };
@@ -353,7 +356,7 @@ const getSortConditions = (busObjCat) => {
     case BUSOBJCAT.ABSENCE:
       return [{ property: "Absence-start", direction: "DESC" }];
     default:
-      console.debug(
+      console.log(
         "None of the case matched in getSortConditions: " + busObjCat
       );
       return;
@@ -369,7 +372,8 @@ const getSortConditions = (busObjCat) => {
  * @param {Array<Object>} [whereConditions=[]] - (Optional) Array of where conditions for the query.
  * @param {Array<Object>} [orConditions=[]] - (Optional) Array of OR conditions for the query.
  * @param {Array<Object>} [sortConditions=[]] - (Optional) Array of sort conditions for the query.
- * @returns {Promise<Object>} - A promise resolving to an object containing fetched data, page number, and limit.
+ * @returns {Promise<Object>} - A promise that resolves to an object containing the fetched data, page number, limit, and total record count.
+ *                             If an error occurs during the API request, it resolves to an object containing an error message.
  */
 const fetchBusObjCatData = async (
   busObjCat,
@@ -435,7 +439,7 @@ const fetchBusObjCatData = async (
       commonQueryData.sort = JSON.stringify(getSortConditions(busObjCat));
     }
 
-    console.debug(
+    console.log(
       `Query data for ${busObjCat}: ${JSON.stringify(commonQueryData)}`
     );
 
@@ -463,7 +467,12 @@ const fetchBusObjCatData = async (
     }
 
     // Return fetched data along with page number and limit
-    return { data: busObjCatData.data, page, limit };
+    return {
+      data: busObjCatData.data,
+      page: page,
+      limit: limit,
+      totalCount: busObjCatData?.["TOTAL_RECORD_COUNT"],
+    };
   } catch (error) {
     console.error("Error: fetching " + busObjCat + " data: ", error);
   }
@@ -483,7 +492,7 @@ const getAppName = (busObjCat) => {
     case BUSOBJCAT.ABSENCE:
       return APP_NAME.ABSENCE;
     default:
-      console.debug("None of the case matched in getAppName :", busObjCat);
+      console.log("None of the case matched in getAppName :", busObjCat);
       return;
   }
 };
@@ -501,8 +510,10 @@ const isDoNotReplaceAnyList = (busObjCat) => {
       return false;
     case BUSOBJCAT.ABSENCE:
       return true;
+    case BUSOBJCAT.EMPLOYEE:
+      return true;
     default:
-      console.debug(
+      console.log(
         "None of the case matched in doNotReplaceAnyList :",
         busObjCat
       );
@@ -535,7 +546,7 @@ const loadMoreData = async (
   setError
 ) => {
   try {
-    console.debug(
+    console.log(
       `Loading more data for busObjCat: ${busObjCat}. Current page is ${page}. Limit is ${limit}.`
     );
 
@@ -560,14 +571,14 @@ const loadMoreData = async (
       // Check if there is new data to append
       if (newData.length > 0) {
         // Log keys of the new data
-        console.debug(
+        console.log(
           "New Data Keys:",
           newData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
         );
 
         setListData((prevData) => {
           // Log keys of the previous data
-          console.debug(
+          console.log(
             "Previous data keys:",
             prevData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
           );
@@ -583,7 +594,7 @@ const loadMoreData = async (
           );
 
           // Log keys of the filtered new data
-          console.debug(
+          console.log(
             "Filtered New Data Keys:",
             filteredNewData.map((item) => item[`${BUSOBJCATMAP[busObjCat]}-id`])
           );

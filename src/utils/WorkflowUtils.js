@@ -51,7 +51,7 @@ const documentStatusCheck = async (
     }),
   };
 
-  console.debug("Payload in get document status", JSON.stringify(payload));
+  console.log("Payload in get document status", JSON.stringify(payload));
 
   // Convert the payload object into URLSearchParams format for form-encoded submission.
   const formData = new URLSearchParams(payload);
@@ -84,7 +84,7 @@ const documentStatusCheck = async (
         "RuntimeException: No process instance or template found for given parameters"
     ) {
       // If the response indicates that no process template is assigned to the business object category.
-      console.debug("No workflow is assigned to this document type.");
+      console.log("No workflow is assigned to this document type.");
 
       // Return indicating changes are allowed but CustomStatus should not be displayed.
       return { changeAllowed: true, displayCustomStatus: false };

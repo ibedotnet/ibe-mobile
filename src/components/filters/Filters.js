@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   View,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { BUSOBJCATMAP } from "../../constants";
@@ -27,6 +29,7 @@ import {
 import { showToast } from "../../utils/MessageUtils";
 
 import SaveCancelBar from "../SaveCancelBar";
+import CustomBackButton from "../CustomBackButton";
 
 const Filters = ({ route, navigation }) => {
   const { busObjCatFilters, busObjCat, initialFilters } = route.params;
@@ -71,18 +74,28 @@ const Filters = ({ route, navigation }) => {
       busObjCat
     );
 
-    console.debug(
+    console.log(
       `On click of "Apply" in filters screen the list of filters going to be applied in ${busObjCat} is ${JSON.stringify(
-        convertedAppliedFilters
+        convertedAppliedFilters,
+        null,
+        2
       )}. The applied filters is ${JSON.stringify(appliedFilters)}.
       The converted applied filters is ${JSON.stringify(
-        convertedAppliedFilters
+        convertedAppliedFilters,
+        null,
+        2
       )}. The list of where conditions is ${JSON.stringify(
-        whereConditions
+        whereConditions,
+        null,
+        2
       )}. The list of or conditions is ${JSON.stringify(
-        orConditions
+        orConditions,
+        null,
+        2
       )}. Also, the object maintaining unsaved changes (if any) is ${JSON.stringify(
-        unsavedChanges
+        unsavedChanges,
+        null,
+        2
       )}`
     );
 
@@ -104,7 +117,7 @@ const Filters = ({ route, navigation }) => {
     setUnsavedChanges({});
     setClearFilterValue(true);
 
-    console.debug(
+    console.log(
       `On click of "Reset" in filters screen the list of filters going to be applied in ${busObjCat} is ${JSON.stringify(
         appliedFilters
       )} and the object maintaining unsaved changes (if any) is ${JSON.stringify(
@@ -211,6 +224,52 @@ const Filters = ({ route, navigation }) => {
   };
 
   /**
+   * Determines if there are any unsaved changes by checking if any value in the `unsavedChanges` object is `true`.
+   *
+   * @param {Object} unsavedChanges - An object representing the unsaved changes for various fields. Each key corresponds to a field, and the value is a boolean indicating if the change is unsaved.
+   *
+   * The useMemo hook memoizes the result to prevent recalculating unless `unsavedChanges` changes, optimizing performance by avoiding unnecessary checks.
+   *
+   * @returns {boolean} - Returns `true` if any field has unsaved changes, otherwise `false`.
+   */
+  const hasUnsavedChanges = useMemo(() => {
+    console.log(
+      `Before navigating from filters screen to ${busObjCat} screen, object maintaining unsaved changes (if any)
+       is ${JSON.stringify(unsavedChanges)}`
+    );
+
+    return Object.values(unsavedChanges).some((change) => change === true);
+  }, [unsavedChanges]);
+
+  /**
+   * Renders the left section of the header with a custom back button and a text label showing the applied filters count.
+   *
+   * @param {Object} navigation - React Navigation object for navigation handling.
+   * @param {Function} t - Localization function for translating text.
+   * @param {number} appliedFiltersCount - Number of applied filters to display.
+   *
+   * @returns {JSX.Element} A View with the CustomBackButton and a Text displaying applied filters count.
+   */
+  const headerLeft = useCallback(() => {
+    return (
+      <View style={styles.headerLeftContainer}>
+        <CustomBackButton
+          navigation={navigation}
+          hasUnsavedChanges={hasUnsavedChanges}
+          t={t}
+        />
+        <Text
+          style={styles.headerLeftText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {`${t("filters")} (${appliedFiltersCount})`}
+        </Text>
+      </View>
+    );
+  }, [hasUnsavedChanges, appliedFiltersCount]);
+
+  /**
    * Update the count of applied filters whenever the appliedFilters state changes.
    * This effect updates the count of applied filters based on the changes in the appliedFilters state.
    * It sets the appliedFiltersCount state to the length of the applied filters array.
@@ -229,7 +288,9 @@ const Filters = ({ route, navigation }) => {
 
     // Update the header title
     navigation.setOptions({
-      headerTitle: `${t("filters")} (${appliedFiltersCount})`,
+      headerTitle: "",
+      gestureEnabled: false,
+      headerLeft: headerLeft,
     });
   }, [appliedFilters]);
 
@@ -245,64 +306,27 @@ const Filters = ({ route, navigation }) => {
     }
   }, [clearFilterValue]);
 
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (e) => {
-        console.debug(
-          `Before navigating from filters screen to ${busObjCat} screen, object maintaining unsaved changes (if any)
-           is ${JSON.stringify(unsavedChanges)}`
-        );
-
-        const unsavedChangesExist = Object.values(unsavedChanges).some(
-          (change) => change === true
-        );
-
-        if (!unsavedChangesExist) {
-          // If we don't have unsaved changes, then we don't need to do anything
-          return;
-        }
-
-        // Prevent default behavior of leaving the screen
-        e.preventDefault();
-
-        // Prompt the user before leaving the screen
-        Alert.alert(
-          t("discard_changes_alert_title"),
-          t("discard_changes_alert_message"),
-          [
-            {
-              text: t("discard_changes_alert_button_leave"),
-              style: "cancel",
-              onPress: () => {},
-            },
-            {
-              text: t("discard_changes_alert_button_discard"),
-              style: "destructive",
-              // If the user confirmed, then we dispatch the action we blocked earlier
-              // This will continue the action that had triggered the removal of the screen
-              onPress: () => navigation.dispatch(e.data.action),
-            },
-          ]
-        );
-      }),
-    [navigation, unsavedChanges]
-  );
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.filterContainer}>
-          {busObjCatFilters.map((filter) => renderFilter(filter))}
-        </View>
-      </ScrollView>
-      <SaveCancelBar
-        onSave={applyFilters}
-        onCancel={resetFilters}
-        saveLabel={t("apply")}
-        cancelLabel={t("reset")}
-        saveIcon="check"
-        cancelIcon="times"
-      />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={20}
+      >
+        <ScrollView>
+          <View style={styles.filterContainer}>
+            {busObjCatFilters.map((filter) => renderFilter(filter))}
+          </View>
+        </ScrollView>
+        <SaveCancelBar
+          onSave={applyFilters}
+          onCancel={resetFilters}
+          saveLabel={t("apply")}
+          cancelLabel={t("reset")}
+          saveIcon="check"
+          cancelIcon="times"
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -316,6 +340,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignContent: "space-around",
     padding: "5%",
+  },
+  headerLeftContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  headerLeftText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "white",
   },
 });
 
