@@ -1800,7 +1800,6 @@ const TimesheetDetail = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerTitle: "",
-      gestureEnabled: false,
       headerLeft: headerLeft,
       headerRight: headerRight,
     });

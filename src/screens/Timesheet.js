@@ -4,6 +4,7 @@ import {
   Button,
   FlatList,
   Modal,
+  Platform,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -285,9 +286,7 @@ const Timesheet = ({ route, navigation }) => {
       console.error("Error refreshing data:", error);
     } finally {
       // Set refreshing state back to false after data refreshing is complete
-      setTimeout(() => {
-        setRefreshing(false);
-      }, 100);
+      setRefreshing(false);
     }
   }, [setTimesheets, whereConditions, orConditions, sortConditions, limit]);
 
@@ -505,7 +504,6 @@ const Timesheet = ({ route, navigation }) => {
     // Set custom header components
     navigation.setOptions({
       headerTitle: "",
-      gestureEnabled: false,
       headerLeft: headerLeft,
       headerRight: headerRight,
     });
@@ -521,230 +519,235 @@ const Timesheet = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View>
-        <FlatList
-          data={timesheets}
-          keyExtractor={(item) => item["TimeConfirmation-id"]}
-          renderItem={({ item, index }) => {
-            try {
-              // Extracting and formatting data for each timesheet item
-              const timesheetId = item?.["TimeConfirmation-id"];
+      {
+        // Hack/Workaround for iOS: Display the loader manually when refreshing
+        // state is true because onRefresh loader doesn't trigger correctly on
+        // component mount for iOS.
+      }
+      {Platform.OS === "ios" && refreshing && <Loader />}
+      <FlatList
+        data={timesheets}
+        keyExtractor={(item) => item["TimeConfirmation-id"]}
+        renderItem={({ item, index }) => {
+          try {
+            // Extracting and formatting data for each timesheet item
+            const timesheetId = item?.["TimeConfirmation-id"];
 
-              const startDate = new Date(item["TimeConfirmation-start"]);
-              const formattedStartDate = isValid(startDate)
-                ? format(
-                    startDate,
-                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                  )
-                : "Invalid start date";
+            const startDate = new Date(item["TimeConfirmation-start"]);
+            const formattedStartDate = isValid(startDate)
+              ? format(
+                  startDate,
+                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                )
+              : "Invalid start date";
 
-              const endDate = new Date(item["TimeConfirmation-end"]);
-              const formattedEndDate = isValid(endDate)
-                ? format(
-                    endDate,
-                    convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
-                  )
-                : "Invalid end date";
+            const endDate = new Date(item["TimeConfirmation-end"]);
+            const formattedEndDate = isValid(endDate)
+              ? format(
+                  endDate,
+                  convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+                )
+              : "Invalid end date";
 
-              const statusTemplateExtId =
-                item?.["TimeConfirmation-extStatus-processTemplateID"] || "";
+            const statusTemplateExtId =
+              item?.["TimeConfirmation-extStatus-processTemplateID"] || "";
 
-              const statusSteps =
-                item?.[
-                  "TimeConfirmation-extStatus-processTemplateID:ProcessTemplate-steps"
-                ] || [];
+            const statusSteps =
+              item?.[
+                "TimeConfirmation-extStatus-processTemplateID:ProcessTemplate-steps"
+              ] || [];
 
-              const statusExtId =
-                item?.["TimeConfirmation-extStatus-statusID"] || "";
+            const statusExtId =
+              item?.["TimeConfirmation-extStatus-statusID"] || "";
 
-              const matchingStep =
-                statusExtId && statusSteps && statusSteps instanceof Array
-                  ? statusSteps.find((step) => step.extID === statusExtId)
-                  : null;
+            const matchingStep =
+              statusExtId && statusSteps && statusSteps instanceof Array
+                ? statusSteps.find((step) => step.extID === statusExtId)
+                : null;
 
-              const statusLabel = matchingStep ? matchingStep.statusLabel : "";
+            const statusLabel = matchingStep ? matchingStep.statusLabel : "";
 
-              let remark = item?.["TimeConfirmation-remark:text"] || "";
+            let remark = item?.["TimeConfirmation-remark:text"] || "";
 
-              const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
-              const convertedTotalTime =
-                convertMillisecondsToUnit(
-                  totalTime,
-                  totalTime >= 3600000 ? "hours" : "minutes"
-                )?.displayTime || "";
+            const totalTime = item?.["TimeConfirmation-totalTime"] || 0;
+            const convertedTotalTime =
+              convertMillisecondsToUnit(
+                totalTime,
+                totalTime >= 3600000 ? "hours" : "minutes"
+              )?.displayTime || "";
 
-              const itemStyle = {
-                backgroundColor:
-                  formattedStartDate.includes("Invalid") ||
-                  formattedEndDate.includes("Invalid") ||
-                  statusLabel.includes("Invalid")
-                    ? "lightcoral"
-                    : "white",
-              };
+            const itemStyle = {
+              backgroundColor:
+                formattedStartDate.includes("Invalid") ||
+                formattedEndDate.includes("Invalid") ||
+                statusLabel.includes("Invalid")
+                  ? "lightcoral"
+                  : "white",
+            };
 
-              const handlePress = () => {
-                const currentTime = new Date().getTime();
-                const delta = currentTime - lastPress;
+            const handlePress = () => {
+              const currentTime = new Date().getTime();
+              const delta = currentTime - lastPress;
 
-                if (delta < DOUBLE_CLICK_DELTA) {
-                  // Double click threshold
-                  // Double click detected, navigate to add timesheet screen
-                  navigation.navigate("TimesheetDetail", {
-                    timesheetId,
-                    statusTemplateExtId,
-                  });
-                }
+              if (delta < DOUBLE_CLICK_DELTA) {
+                // Double click threshold
+                // Double click detected, navigate to add timesheet screen
+                navigation.navigate("TimesheetDetail", {
+                  timesheetId,
+                  statusTemplateExtId,
+                });
+              }
 
-                // Update last press timestamp and timesheet ID pressed
-                setLastPress(currentTime);
-              };
+              // Update last press timestamp and timesheet ID pressed
+              setLastPress(currentTime);
+            };
 
-              return (
-                <TouchableOpacity onPress={handlePress}>
-                  <View style={[styles.row, itemStyle]}>
-                    <View style={styles.firstColumn}>
-                      <Text
-                        style={styles.firstColumnText}
-                        numberOfLines={2}
-                        ellipsizeMode="tail"
-                      >
-                        {statusLabel}
-                      </Text>
-                    </View>
-                    <View style={styles.secondColumn}>
-                      <Text style={styles.secondColumnFirstRowText}>
-                        {formattedStartDate}
-                        {" - "}
-                        {formattedEndDate}
-                      </Text>
-                      <Text
-                        style={styles.secondColumnSecondRowText}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {remark}
-                      </Text>
-                      {item && (
-                        <View style={styles.showMoreButtonContainer}>
-                          <TouchableOpacity
-                            onPress={() => toggleItemExpansion(timesheetId)}
-                          >
-                            <Text style={styles.showMoreButtonText}>
-                              {expandedItems[timesheetId]
-                                ? t("show_less")
-                                : t("show_more")}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                      {expandedItems[timesheetId] && (
-                        <>
-                          {additionalData[timesheetId] ? (
-                            <>
-                              {/* Render additional data components here */}
-                              <View style={styles.additionalDataContainer}>
-                                <View style={styles.additionalDataItem}>
-                                  <View
-                                    style={styles.additionalDataLabelContainer}
-                                  >
-                                    <Text style={styles.additionalDataLabel}>
-                                      {t("timesheet_work_time")}
-                                    </Text>
-                                  </View>
-                                  <View
-                                    style={styles.additionalDataValueContainer}
-                                  >
-                                    <Text style={styles.additionalDataValue}>
-                                      {additionalData[timesheetId]["totalTime"]}
-                                    </Text>
-                                  </View>
+            return (
+              <TouchableOpacity onPress={handlePress}>
+                <View style={[styles.row, itemStyle]}>
+                  <View style={styles.firstColumn}>
+                    <Text
+                      style={styles.firstColumnText}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {statusLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.secondColumn}>
+                    <Text style={styles.secondColumnFirstRowText}>
+                      {formattedStartDate}
+                      {" - "}
+                      {formattedEndDate}
+                    </Text>
+                    <Text
+                      style={styles.secondColumnSecondRowText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {remark}
+                    </Text>
+                    {item && (
+                      <View style={styles.showMoreButtonContainer}>
+                        <TouchableOpacity
+                          onPress={() => toggleItemExpansion(timesheetId)}
+                        >
+                          <Text style={styles.showMoreButtonText}>
+                            {expandedItems[timesheetId]
+                              ? t("show_less")
+                              : t("show_more")}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {expandedItems[timesheetId] && (
+                      <>
+                        {additionalData[timesheetId] ? (
+                          <>
+                            {/* Render additional data components here */}
+                            <View style={styles.additionalDataContainer}>
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_work_time")}
+                                  </Text>
                                 </View>
-                                <View style={styles.additionalDataItem}>
-                                  <View
-                                    style={styles.additionalDataLabelContainer}
-                                  >
-                                    <Text style={styles.additionalDataLabel}>
-                                      {t("timesheet_billable_time")}
-                                    </Text>
-                                  </View>
-                                  <View
-                                    style={styles.additionalDataValueContainer}
-                                  >
-                                    <Text style={styles.additionalDataValue}>
-                                      {
-                                        additionalData[timesheetId][
-                                          "billableTime"
-                                        ]
-                                      }
-                                    </Text>
-                                  </View>
-                                </View>
-                                <View style={styles.additionalDataItem}>
-                                  <View
-                                    style={styles.additionalDataLabelContainer}
-                                  >
-                                    <Text style={styles.additionalDataLabel}>
-                                      {t("timesheet_over_time")}
-                                    </Text>
-                                  </View>
-                                  <View
-                                    style={styles.additionalDataValueContainer}
-                                  >
-                                    <Text style={styles.additionalDataValue}>
-                                      {additionalData[timesheetId]["overTime"]}
-                                    </Text>
-                                  </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {additionalData[timesheetId]["totalTime"]}
+                                  </Text>
                                 </View>
                               </View>
-                            </>
-                          ) : (
-                            // Loading indicator while fetching additional data
-                            <Loader size={"small"} />
-                          )}
-                        </>
-                      )}
-                    </View>
-                    <View style={styles.thirdColumn}>
-                      <Text
-                        style={[
-                          styles.thirdColumnText,
-                          {
-                            color: totalTime === 0 ? "red" : "green",
-                          },
-                        ]}
-                      >
-                        {convertedTotalTime}
-                      </Text>
-                    </View>
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_billable_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {
+                                      additionalData[timesheetId][
+                                        "billableTime"
+                                      ]
+                                    }
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={styles.additionalDataItem}>
+                                <View
+                                  style={styles.additionalDataLabelContainer}
+                                >
+                                  <Text style={styles.additionalDataLabel}>
+                                    {t("timesheet_over_time")}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={styles.additionalDataValueContainer}
+                                >
+                                  <Text style={styles.additionalDataValue}>
+                                    {additionalData[timesheetId]["overTime"]}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </>
+                        ) : (
+                          // Loading indicator while fetching additional data
+                          <Loader size={"small"} />
+                        )}
+                      </>
+                    )}
                   </View>
-                </TouchableOpacity>
-              );
-            } catch (error) {
-              console.error("Error rendering item:", error);
-              return (
-                <Text style={{ color: "red" }}>
-                  {item?.["TimeConfirmation-id"]}
-                </Text>
-              );
-            }
-          }}
-          onEndReached={handleLoadMoreData}
-          onEndReachedThreshold={1}
-          refreshing={isLoading}
-          ListFooterComponent={() => {
-            return isLoading ? <Loader /> : null;
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              tintColor="#0000ff"
-              title={t("pull_to_refresh")}
-              titleColor="#0000ff"
-              onRefresh={onRefresh}
-            />
+                  <View style={styles.thirdColumn}>
+                    <Text
+                      style={[
+                        styles.thirdColumnText,
+                        {
+                          color: totalTime === 0 ? "red" : "green",
+                        },
+                      ]}
+                    >
+                      {convertedTotalTime}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          } catch (error) {
+            console.error("Error rendering item:", error);
+            return (
+              <Text style={{ color: "red" }}>
+                {item?.["TimeConfirmation-id"]}
+              </Text>
+            );
           }
-        />
-      </View>
+        }}
+        onEndReached={handleLoadMoreData}
+        onEndReachedThreshold={1}
+        refreshing={isLoading}
+        ListFooterComponent={() => {
+          return isLoading ? <Loader /> : null;
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor="#0000ff"
+            title={t("pull_to_refresh")}
+            titleColor="#0000ff"
+            colors={["#0000ff"]}
+            onRefresh={onRefresh}
+          />
+        }
+      />
       {/* Modal for date selection on creating timesheet*/}
       <Modal
         transparent={true}

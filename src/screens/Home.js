@@ -218,6 +218,7 @@ const Home = ({ route, navigation }) => {
             maxWidth: screenDimension.width / 3,
             borderWidth: 1,
             borderRadius: 8,
+            borderColor: "#fff",
           }}
           source={getClientLogoSource}
           onError={(error) => console.error("Error loading logo image:", error)}

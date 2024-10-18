@@ -1,5 +1,5 @@
-import React from "react";
-import { Alert, View, Platform } from "react-native";
+import React, { useEffect } from "react";
+import { Alert, View, Platform, BackHandler } from "react-native";
 import CustomButton from "./CustomButton";
 
 /**
@@ -52,6 +52,19 @@ const CustomBackButton = ({
       navigation.goBack(); // Navigate back if no unsaved changes
     }
   };
+
+  // Handle Android hardware back button press
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handlePress(); // Trigger the same logic as the custom back button
+        return true; // Prevent default behavior
+      }
+    );
+
+    return () => backHandler.remove(); // Cleanup the event listener when the component unmounts
+  }, [hasUnsavedChanges]);
 
   // Determine the icon based on the platform
   const iconName =

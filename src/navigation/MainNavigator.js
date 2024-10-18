@@ -58,7 +58,7 @@ const MainNavigator = () => {
           screenOptions sets default options (like header style) for all screens. */}
       <Stack.Navigator
         initialRouteName="Login"
-        screenOptions={common.header} // Applying the common header style to all screens
+        screenOptions={{ ...common.header, gestureEnabled: false }} // Applying the common header style to all screens
       >
         {/* Stack.Screen: Defines each screen in the stack.
             name is the unique name for the route.

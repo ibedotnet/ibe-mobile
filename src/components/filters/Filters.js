@@ -289,7 +289,6 @@ const Filters = ({ route, navigation }) => {
     // Update the header title
     navigation.setOptions({
       headerTitle: "",
-      gestureEnabled: false,
       headerLeft: headerLeft,
     });
   }, [appliedFilters]);

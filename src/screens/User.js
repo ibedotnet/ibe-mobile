@@ -366,7 +366,6 @@ const User = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerTitle: t("user_preference"),
-      gestureEnabled: false,
       headerLeft: () => (
         <CustomBackButton
           navigation={navigation}

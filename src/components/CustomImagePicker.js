@@ -116,7 +116,6 @@ const CustomImagePicker = ({ route, navigation }) => {
     // Set navigation options for the header buttons
     navigation.setOptions({
       headerTitle: "",
-      gestureEnabled: false,
       headerLeft: () => (
         <CustomBackButton
           navigation={navigation}
