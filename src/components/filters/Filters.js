@@ -27,9 +27,10 @@ import {
   validateAppliedFilters,
 } from "../../utils/FilterUtils";
 import { showToast } from "../../utils/MessageUtils";
+import { screenDimension } from "../../utils/ScreenUtils";
 
-import SaveCancelBar from "../SaveCancelBar";
 import CustomBackButton from "../CustomBackButton";
+import CustomButton from "../CustomButton";
 
 const Filters = ({ route, navigation }) => {
   const { busObjCatFilters, busObjCat, initialFilters } = route.params;
@@ -42,7 +43,7 @@ const Filters = ({ route, navigation }) => {
   const [clearFilterValue, setClearFilterValue] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState({});
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     setUnsavedChanges({});
 
     const validationResult = validateAppliedFilters(
@@ -99,20 +100,15 @@ const Filters = ({ route, navigation }) => {
       )}`
     );
 
-    // Delaying the navigation slightly ensures that the state update occurs before navigating to the next screen.
-    // This prevents the beforeRemove event from being invoked with non-empty unsaved changes,
-    // which would otherwise trigger the discard dialog incorrectly when the user clicks on apply or reset.
-    setTimeout(() => {
-      navigation.navigate(busObjCat, {
-        whereConditions,
-        orConditions,
-        convertedAppliedFilters,
-        appliedFiltersCount,
-      });
-    }, 100);
-  };
+    navigation.navigate(busObjCat, {
+      whereConditions,
+      orConditions,
+      convertedAppliedFilters,
+      appliedFiltersCount,
+    });
+  }, [appliedFilters]);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setAppliedFilters({});
     setUnsavedChanges({});
     setClearFilterValue(true);
@@ -126,11 +122,11 @@ const Filters = ({ route, navigation }) => {
     );
 
     // By adding this delay, we ensure that any pending state updates are processed before initiating
-    // the navigation, ensuring a smooth user experience without unnecessary discard dialogs.
+    // the navigation, ensuring a smooth user experience.
     setTimeout(() => {
       navigation.navigate(busObjCat, []);
     }, 500);
-  };
+  }, []);
 
   const renderFilter = (filter) => {
     // Translate the filter label using t()
@@ -242,13 +238,18 @@ const Filters = ({ route, navigation }) => {
   }, [unsavedChanges]);
 
   /**
-   * Renders the left section of the header with a custom back button and a text label showing the applied filters count.
+   * Renders the left section of the header, which includes a custom back button
+   * and a text label displaying the count of applied filters.
    *
-   * @param {Object} navigation - React Navigation object for navigation handling.
-   * @param {Function} t - Localization function for translating text.
-   * @param {number} appliedFiltersCount - Number of applied filters to display.
+   * This component is memoized using `useCallback` to optimize performance
+   * by preventing unnecessary re-renders unless the dependencies change.
    *
-   * @returns {JSX.Element} A View with the CustomBackButton and a Text displaying applied filters count.
+   * Dependencies:
+   * - `hasUnsavedChanges`: A boolean indicating if there are unsaved changes.
+   * - `appliedFiltersCount`: The current count of applied filters to display.
+   *
+   * @returns {JSX.Element} A View containing the CustomBackButton and a Text element
+   *                        displaying the count of applied filters.
    */
   const headerLeft = useCallback(() => {
     return (
@@ -270,16 +271,54 @@ const Filters = ({ route, navigation }) => {
   }, [hasUnsavedChanges, appliedFiltersCount]);
 
   /**
-   * Update the count of applied filters whenever the appliedFilters state changes.
-   * This effect updates the count of applied filters based on the changes in the appliedFilters state.
-   * It sets the appliedFiltersCount state to the length of the applied filters array.
+   * The `headerRight` component is used to display two buttons (Apply and Reset) in the header.
+   * These buttons allow the user to either apply or reset filter changes.
+   * Both buttons are dynamically enabled or disabled based on whether there are unsaved changes (`hasUnsavedChanges`).
+   * The `useCallback` hook ensures that this component only re-renders when `hasUnsavedChanges` changes.
+   */
+
+  const headerRight = useCallback(() => {
+    return (
+      <View style={styles.headerRightContainer}>
+        <CustomButton
+          onPress={applyFilters}
+          label={t("apply")}
+          icon={{}}
+          disabled={!hasUnsavedChanges}
+          backgroundColor={false}
+          style={{ icon: { marginRight: 0 } }}
+          labelStyle={styles.buttonLabelWhite}
+          accessibilityLabel={t("apply")}
+          accessibilityRole="button"
+          testID="apply-filters-button"
+        />
+        <CustomButton
+          onPress={resetFilters}
+          label={t("reset")}
+          icon={{}}
+          disabled={appliedFiltersCount === 0}
+          backgroundColor={false}
+          style={{ icon: { marginRight: 0 } }}
+          labelStyle={styles.buttonLabelWhite}
+          accessibilityLabel={t("reset")}
+          accessibilityRole="button"
+          testID="reset-filters-button"
+        />
+      </View>
+    );
+  }, [hasUnsavedChanges, appliedFiltersCount, appliedFilters]);
+
+  /**
+   * Update the count of applied filters whenever the `appliedFilters` state changes.
+   * This effect recalculates the number of applied filters and updates the `appliedFiltersCount` state.
    *
-   * Update the header title to reflect the count of applied filters.
-   * This effect also updates the header title of the screen to include the count of applied filters.
-   * It sets the header title to "Filters (count)" where count represents the number of applied filters.
+   * It also updates the header options to reflect the new count of applied filters.
+   * The header title is set to display the count of applied filters.
    *
    * Dependencies:
-   * - appliedFilters: The state containing the applied filters.
+   * - `appliedFilters`: The state containing the currently applied filters.
+   * - `headerLeft`: The component rendering the left section of the header, which displays the filter count.
+   * - `headerRight`: The component rendering the right section of the header with action buttons.
    */
   useEffect(() => {
     // Update the count of applied filters
@@ -290,8 +329,9 @@ const Filters = ({ route, navigation }) => {
     navigation.setOptions({
       headerTitle: "",
       headerLeft: headerLeft,
+      headerRight: headerRight,
     });
-  }, [appliedFilters]);
+  }, [appliedFilters, headerLeft, headerRight]);
 
   /**
    * Reset the clear filter values after clearing filters.
@@ -317,14 +357,6 @@ const Filters = ({ route, navigation }) => {
             {busObjCatFilters.map((filter) => renderFilter(filter))}
           </View>
         </ScrollView>
-        <SaveCancelBar
-          onSave={applyFilters}
-          onCancel={resetFilters}
-          saveLabel={t("apply")}
-          cancelLabel={t("reset")}
-          saveIcon="check"
-          cancelIcon="times"
-        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -345,9 +377,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
   },
+  headerRightContainer: {
+    width: screenDimension.width / 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
   headerLeftText: {
     fontSize: 18,
     fontWeight: "bold",
+    color: "white",
+  },
+  buttonLabelWhite: {
     color: "white",
   },
 });

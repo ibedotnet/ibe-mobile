@@ -19,12 +19,7 @@ const Help = ({ navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerTitle: t("help"),
-      headerLeft: () => (
-        <CustomBackButton
-          navigation={navigation}
-          t={t}
-        />
-      ),
+      headerLeft: () => <CustomBackButton navigation={navigation} t={t} />,
     });
   }, [navigation, t]);
 
@@ -32,7 +27,7 @@ const Help = ({ navigation }) => {
     <View style={styles.container}>
       <WebView
         style={styles.webview}
-        source={{ uri: "http://www.ibe.net/documentation/" }} // URL for the help documentation
+        source={{ uri: "https://ibe.document360.io/" }} // URL for the help documentation
         startInLoadingState={true} // Show loading indicator while the content is loading
         renderLoading={() => (
           <View style={styles.loadingContainer}>

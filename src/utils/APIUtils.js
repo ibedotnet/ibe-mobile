@@ -528,7 +528,8 @@ const isDoNotReplaceAnyList = (busObjCat) => {
  * @param {number} limit - The limit of items per page.
  * @param {Object} queryFields - The query fields configuration.
  * @param {Array<Object>} whereConditions - Array of where conditions for the query.
- * @param {Array<Object>} orConditions - Array of OR conditions for the query.
+ * @param {Array<Object>} orConditions - Array of or conditions for the query.
+ * @param {Array<Object>} sortConditions - Array of sort conditions for the query.
  * @param {function} setListData - Function to update the list data state.
  * @param {function} setLoading - Function to update the loading state.
  * @param {function} setError - Function to update the error state.
@@ -541,6 +542,7 @@ const loadMoreData = async (
   queryFields,
   whereConditions,
   orConditions,
+  sortConditions,
   setListData,
   setLoading,
   setError
@@ -560,7 +562,8 @@ const loadMoreData = async (
       limit,
       queryFields,
       whereConditions,
-      orConditions
+      orConditions,
+      sortConditions
     );
 
     // Check if there is an error in the fetch response

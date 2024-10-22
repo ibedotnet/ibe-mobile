@@ -347,6 +347,7 @@ const Timesheet = ({ route, navigation }) => {
         null,
         whereConditions,
         orConditions,
+        sortConditions,
         setTimesheets,
         setIsLoading,
         setError

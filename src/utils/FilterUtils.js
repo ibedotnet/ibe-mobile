@@ -387,7 +387,9 @@ const handleTextFilter = (
     setAppliedFilters({ ...appliedFilters, [filterId]: value });
   }
 
-  const filterChanged = initialFilters[filterId] !== value;
+  // Check if the value has changed, ensuring we handle undefined cases properly
+  const initialFilterValue = initialFilters[filterId] || ""; // Default to empty string if undefined
+  const filterChanged = initialFilterValue !== value; // Check if current value differs from initial
 
   console.log(
     `Inside handleTextFilter, the initial set of filters has been recorded as follows: ${JSON.stringify(
@@ -521,7 +523,7 @@ const handleStatusFilter = (
   } else {
     // If the value is invalid (null), remove the filter with the label from appliedFilters
     const { [filterId]: omit, ...remainingFilters } = currentAppliedFilters;
-    
+
     setAppliedFilters(remainingFilters);
   }
 

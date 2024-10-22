@@ -839,72 +839,148 @@ const TimesheetDetailGeneral = ({
   };
 
   /**
-   * fetchPreviousDates
+   *
+   * This function checks if there are any unsaved changes in the `timesheetItemsMap`.
+   * If unsaved changes are detected, it displays an alert asking the user to either discard the changes or cancel the action.
+   * If no unsaved changes are found, or the user chooses to discard changes, it calls the `onConfirm` callback function to proceed with the original action.
+   *
+   * @param {Function} onConfirm - A callback function that is called to proceed with the original action (e.g., fetching previous or next dates) if there are no unsaved changes or the user chooses to discard changes.
+   */
+  const handleUnsavedChanges = (onConfirm) => {
+    // Check if there are any unsaved changes in the timesheet items map by looking for any 'dirty' items
+
+    // Check if there are any unsaved changes in the timesheet items map by looking for any 'dirty' items
+    let hasUnsavedChanges = false;
+
+    if (timesheetItemsMap instanceof Map) {
+      // Iterate over the values of the map
+      for (let item of timesheetItemsMap.values()) {
+        console.debug(JSON.stringify(item, null, 2));
+
+        // Check if 'item' is an array
+        if (Array.isArray(item)) {
+          // Iterate through the array and check if any item in the array has isDirty set to true
+          for (let subItem of item) {
+            console.debug(subItem.isDirty);
+            if (subItem.isDirty) {
+              hasUnsavedChanges = true;
+              break;
+            }
+          }
+        } else {
+          // Handle the case where 'item' is an object (not an array)
+          console.debug(item.isDirty);
+          if (item.isDirty) {
+            hasUnsavedChanges = true;
+            break;
+          }
+        }
+
+        // Exit the loop early if unsaved changes are found
+        if (hasUnsavedChanges) {
+          break;
+        }
+      }
+    }
+
+    console.debug(hasUnsavedChanges);
+    // If there are unsaved changes, display an alert asking the user whether to proceed or cancel
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        t("discard_changes_alert_title"), // Alert title translated using localization function `t`
+        t("discard_changes_alert_message"), // Alert message
+        [
+          {
+            text: t("discard_changes_alert_button_leave"), // Leave button text
+            style: "cancel", // Button style: cancel action
+            onPress: () => {}, // No action on cancel, just close the alert
+          },
+          {
+            text: t("discard_changes_alert_button_discard"), // Discard button text
+            style: "destructive", // Button style: destructive action
+            onPress: () => {
+              onConfirm(); // Call the provided callback function to proceed with the action
+            },
+          },
+        ],
+        { cancelable: false } // Prevent dismissing the alert by tapping outside
+      );
+    } else {
+      // If no unsaved changes are detected, call the onConfirm function directly to proceed
+      onConfirm();
+    }
+  };
+
+  /**
    *
    * This function calculates the new date range for the previous period and updates
    * the state with the new start and end dates. It also checks if a timesheet exists
    * for the new start date using the `handleCheckTimesheetExists` function.
+   * Before proceeding, it checks for unsaved changes and prompts the user accordingly.
    * After updating the date range and checking for the timesheet, it scrolls the date
    * list to the left to show the new dates.
    *
-   * @returns {Promise<void>} - A promise that resolves once the date range is updated,
-   *                            the timesheet existence is checked, and scrolling is complete.
+   * @returns {void} - Returns early if there are unsaved changes and the user chooses not to discard them.
    */
-  const fetchPreviousDates = async () => {
-    // Extract the first visible date from the visibleDates array
-    const firstVisibleDate = new Date(visibleDates[0].fullDate);
+  const fetchPreviousDates = () => {
+    handleUnsavedChanges(async () => {
+      // Extract the first visible date from the visibleDates array
+      const firstVisibleDate = new Date(visibleDates[0].fullDate);
 
-    // Calculate the new end date by subtracting one day from the first visible date
-    const newEnd = addDays(firstVisibleDate, -1);
+      // Calculate the new end date by subtracting one day from the first visible date
+      const newEnd = addDays(firstVisibleDate, -1);
 
-    // Calculate the new start date by subtracting the period length (minus one) from the new end date
-    const newStart = addDays(newEnd, -(period - 1));
+      // Calculate the new start date by subtracting the period length (minus one) from the new end date
+      const newStart = addDays(newEnd, -(period - 1));
 
-    if (!newStart) {
-      return;
-    }
+      // Ensure the new start date is valid before proceeding
+      if (!newStart) {
+        return;
+      }
 
-    // Check if a timesheet exists for the new start date
-    await handleCheckTimesheetExists(newStart);
+      // Check if a timesheet exists for the new start date
+      await handleCheckTimesheetExists(newStart);
 
-    // Scroll to the left to show the new date range
-    dateListRef?.current?.scrollToIndex({
-      index: 0,
-      animated: true,
+      // Scroll to the left to show the new date range
+      dateListRef?.current?.scrollToIndex({
+        index: 0,
+        animated: true,
+      });
     });
   };
 
   /**
-   * fetchNextDates
    *
    * This function calculates the new date range for the next period and updates
    * the state with the new start and end dates. It also checks if a timesheet exists
    * for the new start date using the `handleCheckTimesheetExists` function.
+   * Before proceeding, it checks for unsaved changes and prompts the user accordingly.
    * After updating the date range and checking for the timesheet, it scrolls the date
-   * list to the left to show the new dates.
+   * list to the right to show the new dates.
    *
-   * @returns {Promise<void>} - A promise that resolves once the date range is updated,
-   *                            the timesheet existence is checked, and scrolling is complete.
+   * @returns {void} - Returns early if there are unsaved changes and the user chooses not to discard them.
    */
-  const fetchNextDates = async () => {
-    // Extract the last visible date from the visibleDates array
-    const lastVisibleDate = new Date(
-      visibleDates[visibleDates.length - 1].fullDate
-    );
+  const fetchNextDates = () => {
+    handleUnsavedChanges(async () => {
+      // Extract the last visible date from the visibleDates array
+      const lastVisibleDate = new Date(
+        visibleDates[visibleDates.length - 1].fullDate
+      );
 
-    // Calculate the new start date by adding one day to the last visible date
-    const newStart = addDays(lastVisibleDate, 1);
+      // Calculate the new start date by adding one day to the last visible date
+      const newStart = addDays(lastVisibleDate, 1);
 
-    // Ensure the new start date is valid before proceeding
-    if (!newStart) return;
+      // Ensure the new start date is valid before proceeding
+      if (!newStart) return;
 
-    // Check if a timesheet exists for the new start date
-    await handleCheckTimesheetExists(newStart);
+      // Check if a timesheet exists for the new start date
+      await handleCheckTimesheetExists(newStart);
 
-    // Scroll to the right to show the new date range
-    dateListRef?.current?.scrollToIndex({
-      index: 0,
-      animated: true,
+      // Scroll to the right to show the new date range
+      dateListRef?.current?.scrollToIndex({
+        index: 0,
+        animated: true,
+      });
     });
   };
 
