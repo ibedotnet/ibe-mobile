@@ -201,7 +201,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
    Start by forking the repository to your GitHub account:
 
    ```bash
-   git clone https://github.com/yourusername/ibe-mobile.git
+   git clone https://github.com/ibedotnet/ibe-mobile.git
    ```
 
 2. **Create a new branch**:
