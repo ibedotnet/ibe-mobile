@@ -114,7 +114,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
     }
 
     const responseText = await response.text();
-    console.log(JSON.stringify(responseText, null, 2));
+    //console.log(JSON.stringify(responseText, null, 2));
 
     const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
 

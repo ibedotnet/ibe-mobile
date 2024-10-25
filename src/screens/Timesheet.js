@@ -336,7 +336,7 @@ const Timesheet = ({ route, navigation }) => {
       showToast(t("no_more_data"), "warning");
       return;
     }
-
+    
     // Proceed to load more data only if there are no errors
     if (!error) {
       // Call utility function to load more data
@@ -365,6 +365,7 @@ const Timesheet = ({ route, navigation }) => {
     error,
     whereConditions,
     orConditions,
+    sortConditions,
   ]);
 
   /**

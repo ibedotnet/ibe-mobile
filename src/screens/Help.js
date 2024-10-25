@@ -27,7 +27,7 @@ const Help = ({ navigation }) => {
     <View style={styles.container}>
       <WebView
         style={styles.webview}
-        source={{ uri: "https://ibe.document360.io/" }} // URL for the help documentation
+        source={{ uri: "https://ibe.document360.io/mobile" }} // URL for the help documentation
         startInLoadingState={true} // Show loading indicator while the content is loading
         renderLoading={() => (
           <View style={styles.loadingContainer}>

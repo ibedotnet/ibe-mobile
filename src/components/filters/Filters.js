@@ -283,7 +283,12 @@ const Filters = ({ route, navigation }) => {
         <CustomButton
           onPress={applyFilters}
           label={t("apply")}
-          icon={{}}
+          icon={{
+            name: "check",
+            library: "FontAwesome",
+            size: 24,
+            color: "white",
+          }}
           disabled={!hasUnsavedChanges}
           backgroundColor={false}
           style={{ icon: { marginRight: 0 } }}
@@ -295,7 +300,12 @@ const Filters = ({ route, navigation }) => {
         <CustomButton
           onPress={resetFilters}
           label={t("reset")}
-          icon={{}}
+          icon={{
+            name: "times",
+            library: "FontAwesome",
+            size: 24,
+            color: "white",
+          }}
           disabled={appliedFiltersCount === 0}
           backgroundColor={false}
           style={{ icon: { marginRight: 0 } }}
@@ -382,6 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
+    columnGap: 10,
   },
   headerLeftText: {
     fontSize: 18,
