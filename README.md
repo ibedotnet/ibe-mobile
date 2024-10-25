@@ -133,7 +133,6 @@ This will generate an APK or AAB file that can be distributed to users or upload
 ibe-mobile
 ├── tests
 ├── .expo
-├── %ProgramData%
 ├── android
 ├── context
 ├── node_modules
