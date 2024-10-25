@@ -51,7 +51,7 @@ Before you begin, ensure you have the following tools installed:
 ## Tech Stack
 
 - [**Expo**](https://expo.dev/): Framework for building cross-platform applications.
-- [**React Native**](https://reactnative.dev/)): Main framework for mobile UI.
+- [**React Native**](https://reactnative.dev/): Main framework for mobile UI.
 - **Internal APIs**: Used for managing authentication, data, and other functionalities (e.g., `app.ibe.net/endpoint`).
 
 ## Installation
@@ -126,6 +126,71 @@ npx expo build:android
 ```
 
 This will generate an APK or AAB file that can be distributed to users or uploaded to the Google Play Store.
+
+## Folder Structure
+
+```
+ibe-mobile
+├── tests
+├── .expo
+├── %ProgramData%
+├── android
+├── context
+├── node_modules
+└── src
+    ├── assets
+    ├── components
+    ├── hooks
+    ├── locales
+    ├── navigation
+    ├── screens
+    ├── styles
+    └── utils
+        ├── constants.js
+        ├── i18n.js
+        └── .gitignore
+├── App.js
+├── app.json
+├── babel.config.js
+├── eas.json
+├── package-lock.json
+└── package.json
+```
+
+### Project Directory: ibe-mobile
+
+### Root Directory
+
+* **tests/**: Contains test files for the project.
+* **.expo/**: Expo project configuration files.
+* **%ProgramData%/**: Windows-specific directory, likely used for storing application data.
+* **android/**: Contains Android-specific project files and resources.
+* **context/**: Possibly used for storing application context or state.
+* **node_modules/**: Stores dependencies and modules required by the project.
+* **src/**: Source code directory for the project.
+
+### src Directory
+
+* **assets/**: Stores static assets like images, fonts, and icons.
+* **components/**: Contains reusable UI components.
+* **hooks/**: Custom React hooks for managing state and side effects.
+* **locales/**: Stores language-specific localization files.
+* **navigation/**: Handles navigation between screens or pages.
+* **screens/**: Contains individual screens or views of the application.
+* **styles/**: Stylesheets for styling the UI elements.
+* **utils/**: Utility functions and helpers used throughout the project.
+
+### Project Configuration Files
+
+* **constants.js**: Contains global constants or configuration values.
+* **i18n.js**: Handles internationalization and localization.
+* **.gitignore**: Specifies files or directories to be excluded from Git version control.
+* **App.js**: Main entry point of the React Native application.
+* **app.json**: Expo project configuration file.
+* **babel.config.js**: Babel configuration for transpiling JavaScript code.
+* **eas.json**: Expo build configuration file.
+* **package-lock.json**: Stores dependency versions used in the project.
+* **package.json**: Project metadata and dependency list.
 
 ## Contributing
 
