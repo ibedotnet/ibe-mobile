@@ -240,7 +240,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
 
 ### Reporting Issues
 
-If you encounter any issues or bugs, feel free to [open an issue](https://github.com/iebdotnet/ibe-mobile/issues) on the repository. When reporting, please be sure to include:
+If you encounter any issues or bugs, feel free to [open an issue](https://github.com/ibedotnet/ibe-mobile/issues) on the repository. When reporting, please be sure to include:
 
 - A clear title and description.
 - Steps to reproduce the issue.
@@ -248,4 +248,4 @@ If you encounter any issues or bugs, feel free to [open an issue](https://github
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://opensource.org/licenses/MIT) file for details.
