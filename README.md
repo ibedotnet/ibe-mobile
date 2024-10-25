@@ -58,7 +58,7 @@ Before you begin, ensure you have the following tools installed:
 1. **Clone the repository**:
    
    ```bash
-   git clone https://github.com/yourusername/ibe-mobile.git
+   git clone https://github.com/ibedotnet/ibe-mobile.git
    
 2. **Navigate into the project directory**:
    
@@ -240,7 +240,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
 
 ### Reporting Issues
 
-If you encounter any issues or bugs, feel free to [open an issue](https://github.com/yourusername/ibe-mobile/issues) on the repository. When reporting, please be sure to include:
+If you encounter any issues or bugs, feel free to [open an issue](https://github.com/iebdotnet/ibe-mobile/issues) on the repository. When reporting, please be sure to include:
 
 - A clear title and description.
 - Steps to reproduce the issue.
