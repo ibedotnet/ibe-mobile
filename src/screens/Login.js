@@ -223,6 +223,7 @@ const Login = ({ navigation }) => {
     // Create a new object for user info
     const newUserInfo = {
       personId: user["Person-id"] || "",
+      userType: user["User-type"] || "",
       timeConfirmationType: empWorkSchedue.timeConfirmationType || "",
       hireDate: user["Resource-core-hireDate"] || null,
       termDate: user["Resource-core-termDate"] || null,
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 2,
     borderRadius: 30,
-    paddingVertical: "4%",
+    paddingVertical: "5%",
     paddingHorizontal: "5%",
     marginBottom: "4%",
   },
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderRadius: 30,
-    paddingVertical: "4%",
+    paddingVertical: "2%",
     paddingHorizontal: "5%",
     marginBottom: "4%",
   },

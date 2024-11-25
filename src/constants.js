@@ -121,7 +121,7 @@ const APP_ACTIVITY_ID = {
   /** Activity ID for absence module. */
   ABSENCE: "manage.absencemgt.myabsencerequest",
   /** Activity ID for inbox module. */
-  INBOX: "platform.bpm.inbox",
+  MESSAGELOG: "platform.bpm.inbox",
 };
 
 /**
@@ -153,7 +153,7 @@ const BUSOBJCAT = {
   /** Business object category for absence. */
   ABSENCE: "Absence",
   /** Business object category for inbox. */
-  INBOX: "Inbox",
+  MESSAGELOG: "Approval",
   /** Business object category for employee. */
   EMPLOYEE: "Employee",
 };
@@ -206,9 +206,9 @@ const INTSTATUS = {
  */
 const LOGIN_INPUTS_MAXLENGTH = {
   /** Maximum length for username field. */
-  USERNAME: 10,
+  USERNAME: 30,
   /** Maximum length for password field. */
-  PASSWORD: 20,
+  PASSWORD: 30,
   /** Maximum length for client ID field. */
   CLIENTID: 4,
 };

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo } from "react"; // React and hooks
+import React, { useCallback, useContext, useEffect, useMemo } from "react"; // React and hooks
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Alert,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,9 +25,14 @@ import { screenDimension } from "../utils/ScreenUtils";
 
 import { common } from "../styles/common";
 import { useClientPaths } from "../../context/ClientPathsContext";
+import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 const Home = ({ route, navigation }) => {
   const { t } = useTranslation();
+
+  const {
+    loggedInUserInfo: { userType },
+  } = useContext(LoggedInUserInfoContext);
 
   const logoDimension = useMemo(() => screenDimension.width / 2, []);
 
@@ -165,7 +171,7 @@ const Home = ({ route, navigation }) => {
               onError={(error) =>
                 console.error("Error loading user photo:", error)
               }
-              resizeMode="contain"
+              contentFit="contain"
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -195,11 +201,16 @@ const Home = ({ route, navigation }) => {
     });
   }, [getUserImageSource, navigateToUploadPhoto, navigateToUserScreen]);
 
-  // Handlers for navigation to different screens
   const onPressTimesheets = () => navigation.navigate("Timesheet");
   const onPressExpenses = () => navigation.navigate("Expense");
   const onPressAbsences = () => navigation.navigate("Absence");
-  const onPressApprovals = () => navigation.navigate("Inbox");
+  const onPressApprovals = () => {
+    if (userType === "admin") {
+      navigation.navigate("Approval");
+    } else {
+      Alert.alert(t("access_denied"), t("must_be_admin"));
+    }
+  };
 
   return (
     <SafeAreaView style={common.container} testID="home-screen">
@@ -225,7 +236,7 @@ const Home = ({ route, navigation }) => {
           onLoad={() =>
             console.log("Logo image loaded:", clientPaths.clientLogoPath)
           }
-          resizeMode="contain"
+          contentFit="contain"
         />
       </View>
       {/* Main Menu Section */}
@@ -290,7 +301,6 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity
             onPress={onPressApprovals}
             accessibilityLabel={t("navigate_to_approvals")}
-            disabled={true}
           >
             <View style={styles.card}>
               <MaterialIcons name="approval" size={24} color="black" />

@@ -51,6 +51,7 @@
   "login_exception_message": "Se produjo una excepción durante el inicio de sesión.",
   "login_invalid_credentials_message": "El nombre de usuario o la contraseña son incorrectos",
   "home": "Inicio",
+  "approval": "Aprobación",
   "home_hello_user": "¡Hola, Usuario!",
   "navigate_to_upload_photo": "Navegar a Subir Foto",
   "navigate_to_user_screen": "Navegar a la Pantalla de Usuario",
@@ -256,5 +257,16 @@
   "no_changes_detected": "No se detectaron cambios.",
   "save_preferences_failed": "No se pudieron guardar las preferencias. Por favor, inténtelo de nuevo.",
   "image_size_error": "El tamaño de la imagen es demasiado grande. Por favor, seleccione una imagen más pequeña.",
-  "pull_to_refresh": "Desliza hacia abajo para refrescar"
+  "pull_to_refresh": "Desliza hacia abajo para refrescar",
+  "acces_denied": "Acceso Denegado",
+  "must_be_admin": "Debes ser un administrador para acceder a esta sección.",
+  "status_update_failed": "La actualización del estado falló.",
+  "select_recipient": "Seleccionar destinatario",
+  "recipient_required": "Se requiere un destinatario para continuar.",
+  "comment_required": "Se requiere un comentario para continuar.",
+  "read": "Leído",
+  "unread": "No leído",
+  "document_category": "Categoría del Documento",
+  "message_type": "Tipo de Mensaje",
+  "message_within": "Mensaje Dentro de"
 }

@@ -11,9 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ibe2023.ibemobile"
@@ -35,9 +33,7 @@
       }
     },
     "owner": "ibe-2023",
-    "plugins": [
-      "expo-localization",
-      "expo-secure-store"
-    ]
+    "plugins": ["expo-localization", "expo-secure-store", "expo-asset"],
+    "newArchEnabled": true
   }
 }

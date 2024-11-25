@@ -44,11 +44,11 @@ const EditDialog = ({
   // Initialize state with the initial values from inputsConfigs
   const [values, setValues] = useState(
     inputsConfigs.reduce((acc, config) => {
-      acc[config.id] = config.initialValue || "";
+      acc[config.id] = config.initialValue ?? "";
       return acc;
     }, {})
   );
-  const [initialValues, setInitialValues] = useState(values); // Track initial values
+  const [initialValues, setInitialValues] = useState(values);
   const [error, setError] = useState(null);
 
   // Use useRef to store editor references
@@ -92,12 +92,17 @@ const EditDialog = ({
 
     const validationErrors = inputsConfigs.map((config) => {
       const fieldValue = values[config.id];
+
+      // Determine the field validation function
       const fieldValidation =
         config.validateInput ||
         (!config.allowBlank ? emptyValidation : (value) => null); // Use empty validation only if allowBlank is false
 
+      // Return the validation result for the field
       return fieldValidation({ [config.id]: fieldValue });
     });
+
+    console.log("Validation errors in Edit Dialog:", validationErrors);
 
     // Check if any validation error occurred
     const firstError = validationErrors.find((error) => error !== null);
@@ -146,6 +151,10 @@ const EditDialog = ({
             style={[styles.richTextContainer, { minHeight: 150 }]}
           >
             <RichToolbar
+              style={{
+                borderTopLeftRadius: 8,
+                borderTopRightRadius: 8,
+              }}
               getEditor={() => richTextRefs.current[config.id]}
               selectedIconTint="black"
               actions={[
@@ -161,7 +170,7 @@ const EditDialog = ({
             />
             <RichEditor
               ref={(el) => (richTextRefs.current[config.id] = el)}
-              initialContentHTML={values[config.id]}
+              initialContentHTML={values[config.id] || ""}
               style={styles.richEditor}
               placeholder={config.placeholder || t("write_your_comment_here")}
               pasteAsPlainText={true}
@@ -190,12 +199,12 @@ const EditDialog = ({
                 commonQueryParams: config.commonQueryParams,
               }}
               pickerLabel={config.pickerLabel}
-              initialAdditionalLabel={config.initialAdditionalLabel}
-              initialItemLabel={config.initialItemLabel}
-              initialItemValue={config.initialItemValue}
+              initialAdditionalLabel={config.initialAdditionalLabel || ""}
+              initialItemLabel={config.initialItemLabel || ""}
+              initialItemValue={config.initialItemValue || ""}
               labelItemField={config.labelItemField}
               valueItemField={config.valueItemField}
-              additionalFields={config.additionalFields}
+              additionalFields={config.additionalFields || []}
               searchFields={config.searchFields}
               multiline={true}
               onValueChange={(value) => handleInputChange(config.id, value)}
@@ -265,13 +274,13 @@ const styles = StyleSheet.create({
     marginBottom: "4%",
   },
   buttonsContainer: {
+    marginTop: "4%",
     flexDirection: "row",
     justifyContent: "space-around",
   },
   richTextContainer: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
+    borderRadius: 8,
     marginBottom: "4%",
   },
   richEditor: {

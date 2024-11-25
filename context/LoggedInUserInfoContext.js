@@ -15,6 +15,7 @@ export const LoggedInUserInfoContext = createContext();
 export const LoggedInUserInfoProvider = ({ children }) => {
   // State to hold logged-in user information
   const [loggedInUserInfo, setLoggedInUserInfo] = useState({
+    userType: null,
     timeConfirmationType: "",
     hireDate: null,
     termDate: null,
