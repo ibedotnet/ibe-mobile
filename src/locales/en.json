@@ -272,5 +272,6 @@
   "unread": "Unread",
   "document_category": "Document Category",
   "message_type": "Message Type",
-  "message_within": "Message Within"
+  "message_within": "Message Within",
+  "message_log_fetched_since": "Messages fetched since {{publishedSinceDate}}."
 }

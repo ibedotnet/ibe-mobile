@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import CustomButton from "../components/CustomButton";
 import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
+import { showToast } from "../utils/MessageUtils";
 
 /**
  * Approval screen component that displays a list of messages for approval,
@@ -44,12 +45,15 @@ const Approval = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [messageTypeMap, setMessageTypeMap] = useState({});
   const [busObjCatMap, setBusObjCatMap] = useState({});
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [clickedStatusButton, setClickedStatusButton] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(false);
+  const [clickedStatusButton, setClickedStatusButton] = useState({});
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false);
   const [isRead, setIsRead] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
+
+  // Utility function to update refresh key for component re-rendering
+  const updateRefresh = () => setRefreshKey((prevKey) => !prevKey);
 
   const messageWithinMap = {
     today: "Today",
@@ -63,9 +67,6 @@ const Approval = ({ route, navigation }) => {
     thisYear: "This Year",
     lastYear: "Last Year",
   };
-
-  // Utility function to update refresh key for component re-rendering
-  const updateRefresh = () => setRefreshKey((prevKey) => prevKey + 1);
 
   const toggleReadStatus = () => {
     setIsRead((prevState) => !prevState);
@@ -114,9 +115,11 @@ const Approval = ({ route, navigation }) => {
    * Fetches message log data asynchronously from API with a past date filter.
    * @returns {Array} Array of message log data or empty array on failure.
    */
-  const fetchMessageLogData = async (isRead, messageWithin = "lastYear") => {
+  const fetchMessageLogData = async (isRead, messageWithin = "thisMonth") => {
     try {
       setLoading(true);
+
+      const publishedSinceDate = getStartDateForFilter(messageWithin);
 
       const requestBody = {
         interfaceName: "MessageLogRead",
@@ -128,7 +131,7 @@ const Approval = ({ route, navigation }) => {
           language: APP.LOGIN_USER_LANGUAGE,
           isRead: isRead,
           user: null,
-          publishedSinceDate: getStartDateForFilter(messageWithin),
+          publishedSinceDate: publishedSinceDate,
         },
       };
 
@@ -148,6 +151,17 @@ const Approval = ({ route, navigation }) => {
         response.retVal &&
         response.retVal.uimessageloglist
       ) {
+        const formattedPublishedSinceDate = format(
+          publishedSinceDate,
+          "dd MMMM yyyy"
+        );
+
+        showToast(
+          t("message_log_fetched_since", {
+            publishedSinceDate: formattedPublishedSinceDate,
+          }),
+          "warning"
+        );
         console.log("Message log data fetched successfully.");
         return response.retVal.uimessageloglist;
       }
@@ -215,7 +229,7 @@ const Approval = ({ route, navigation }) => {
   };
 
   /**
-   * Handle the confirmation of comment dialog and trigger status change.
+   * Handle the confirmation of the comment dialog and trigger the status change.
    *
    * @param {Object} values - The values entered in the dialog.
    * @param {string} values.commentApproval - The comment approval input.
@@ -228,26 +242,35 @@ const Approval = ({ route, navigation }) => {
       console.log("Confirming comment dialog...");
       const { commentApproval, recipientApproval } = values || {};
 
-      // If comment approval is required, we can check that separately (optional)
-      // For now, we'll skip checking the comment field since you've requested to ignore it
-
       if (clickedStatusButton) {
-        clickedStatusButton.commentsEntered = true;
+        // Ensure immutability when updating the record's state
+        if (clickedStatusButton.record) {
+          clickedStatusButton.record = {
+            ...clickedStatusButton.record, // Preserve existing properties
+            commentsEntered: true, // Mark comments as entered
+          };
+        }
 
+        const recipientValue = recipientApproval?.value || null;
+        const commentValue = commentApproval || null;
+
+        // Trigger the status change
         await handleStatusChangeMgmt(
           clickedStatusButton,
           updateRefresh,
-          recipientApproval?.value || null,
-          commentApproval || null,
-          [], // Assuming you might pass additional params here
+          recipientValue,
+          commentValue,
+          [], // Additional parameters if needed
           null
         );
+
         console.log("Status change handled successfully.");
       }
 
-      // Close the dialog only after the status change is confirmed
+      // Close the dialog after status change is completed
       setIsCommentDialogVisible(false);
     } catch (error) {
+      // Log error for debugging purposes
       console.error("Error during status change:", error);
     }
   };
@@ -261,9 +284,11 @@ const Approval = ({ route, navigation }) => {
           fetchBusObjCatData(),
         ]);
 
-        // Set state for message types, bus object categories
         setMessageTypeMap(messageTypes);
         setBusObjCatMap(busObjCats);
+
+        setAppliedFilters({});
+        setAppliedFiltersCount(0);
 
         // Fetch message log data based on read/unread state
         const result = await fetchMessageLogData(isRead);
@@ -407,7 +432,7 @@ const Approval = ({ route, navigation }) => {
     };
 
     applyFilters();
-  }, [appliedFilters, isRead]); // Dependencies include filters and read state
+  }, [appliedFilters]); // Dependencies include filters and read state
 
   /**
    * Render a single message item for the FlatList.
@@ -499,30 +524,32 @@ const Approval = ({ route, navigation }) => {
     try {
       console.log("Button Pressed:", button.clickableTextMsg);
 
-      // Prepare button details
+      // Prepare clicked status button details
       const clickedStatusButtonDetails = {
         record: item,
         updFields: button.updFields,
       };
 
-      // Process update fields
+      setClickedStatusButton(clickedStatusButtonDetails);
+
+      // Process the update fields
       const {
         changeRecipient,
         comment,
         nextStatusCodes,
         openPreviousGateways,
-        numOfRecpDefOnStep,
       } = processUpdateFields(clickedStatusButtonDetails.updFields);
 
-      // Check if comment was entered or if we need a comment/recipient dialog
-      if (
+      // Check conditions for comment dialog
+      const needsCommentDialog =
         !clickedStatusButtonDetails.record.commentsEntered &&
-        (changeRecipient || comment)
-      ) {
-        // Show the comment dialog if comment/recipient changes are required
+        (changeRecipient || comment);
+
+      if (needsCommentDialog) {
+        // Show comment dialog if necessary
         setIsCommentDialogVisible(true);
       } else {
-        // Proceed with status change if comments were entered or no dialog needed
+        // Proceed with status change if no comment dialog is needed
         await handleStatusChangeMgmt(
           clickedStatusButtonDetails,
           updateRefresh,

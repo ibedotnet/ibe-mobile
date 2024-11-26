@@ -44,7 +44,7 @@ const EditDialog = ({
   // Initialize state with the initial values from inputsConfigs
   const [values, setValues] = useState(
     inputsConfigs.reduce((acc, config) => {
-      acc[config.id] = config.initialValue ?? "";
+      acc[config.id] = config.initialValue || "";
       return acc;
     }, {})
   );

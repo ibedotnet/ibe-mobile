@@ -268,5 +268,6 @@
   "unread": "No leído",
   "document_category": "Categoría del Documento",
   "message_type": "Tipo de Mensaje",
-  "message_within": "Mensaje Dentro de"
+  "message_within": "Mensaje Dentro de",
+  "message_log_fetched_since": "Mensajes obtenidos desde {{publishedSinceDate}}."
 }

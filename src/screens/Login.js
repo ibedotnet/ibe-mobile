@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 2,
     borderRadius: 30,
-    paddingVertical: "5%",
+    paddingVertical: "4%",
     paddingHorizontal: "5%",
     marginBottom: "4%",
   },
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderRadius: 30,
-    paddingVertical: "2%",
+    paddingVertical: "4%",
     paddingHorizontal: "5%",
     marginBottom: "4%",
   },

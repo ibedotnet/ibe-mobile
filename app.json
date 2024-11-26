@@ -33,7 +33,7 @@
       }
     },
     "owner": "ibe-2023",
-    "plugins": ["expo-localization", "expo-secure-store", "expo-asset"],
+    "plugins": ["expo-localization", "expo-secure-store"],
     "newArchEnabled": true
   }
 }
