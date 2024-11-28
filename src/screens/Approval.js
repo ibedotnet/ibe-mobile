@@ -1,39 +1,58 @@
+// React and React Native Core Imports
 import React, { useCallback, useState, useEffect } from "react";
 import { View, Text, FlatList, StyleSheet, Platform } from "react-native";
+
+// Third-Party Libraries
 import {
   GestureHandlerRootView,
   Switch,
   TouchableOpacity,
 } from "react-native-gesture-handler";
+import { useTranslation } from "react-i18next";
+import { format } from "date-fns";
 
+// Constants
 import { APP, BUSOBJCAT, INTSTATUS } from "../constants";
 import { API_ENDPOINTS } from "../constants";
+
+// Utility Functions
 import { fetchData } from "../utils/APIUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 import { convertToDateFNSFormat } from "../utils/FormatUtils";
 import {
+  applyLocalFilters,
+  componentMap,
+  detailScreenParamsMap,
   fetchBusObjCatData,
   fetchMessageTypeData,
   getPublishedAge,
   getStartDateForFilter,
   handleStatusChangeMgmt,
+  hasContent,
+  messageWithinMap,
   processUpdateFields,
 } from "../utils/ApprovalUtils";
-
-import Loader from "../components/Loader";
-import CustomBackButton from "../components/CustomBackButton";
-import EditDialog from "../components/dialogs/EditDialog";
-
-import { useTranslation } from "react-i18next";
-import { format } from "date-fns";
-import CustomButton from "../components/CustomButton";
 import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
 import { showToast } from "../utils/MessageUtils";
 
+// Custom Components
+import Loader from "../components/Loader";
+import CustomBackButton from "../components/CustomBackButton";
+import EditDialog from "../components/dialogs/EditDialog";
+import CustomButton from "../components/CustomButton";
+
 /**
- * Approval screen component that displays a list of messages for approval,
- * allows filtering by status, and provides options to change message status with comments.
- * @param {object} navigation - Navigation prop for screen navigation
+ * Approval screen component.
+ *
+ * This component renders a list of messages that require approval. It provides:
+ * - Filtering options to display messages based on their status or time frame.
+ * - Functionality to change the status of messages, including adding comments.
+ * - Navigation to other screens for additional details or actions.
+ *
+ * Props:
+ * @param {object} route - React Navigation's route object, used to access passed parameters.
+ * @param {object} navigation - React Navigation's navigation object, used for screen navigation.
+ *
  */
 
 const Approval = ({ route, navigation }) => {
@@ -41,36 +60,70 @@ const Approval = ({ route, navigation }) => {
 
   // Component State
   const [data, setData] = useState([]);
-  const [initialData, setInitialData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(false);
   const [messageTypeMap, setMessageTypeMap] = useState({});
   const [busObjCatMap, setBusObjCatMap] = useState({});
-  const [refreshKey, setRefreshKey] = useState(false);
   const [clickedStatusButton, setClickedStatusButton] = useState({});
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false);
   const [isRead, setIsRead] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
 
-  // Utility function to update refresh key for component re-rendering
+  /**
+   * Toggles the refresh key, triggering a component re-render.
+   */
   const updateRefresh = () => setRefreshKey((prevKey) => !prevKey);
 
-  const messageWithinMap = {
-    today: "Today",
-    yesterday: "Yesterday",
-    thisWeek: "This Week",
-    lastWeek: "Last Week",
-    thisMonth: "This Month",
-    lastMonth: "Last Month",
-    lastTwoMonths: "Last Two Months",
-    lastSixMonths: "Last Six Months",
-    thisYear: "This Year",
-    lastYear: "Last Year",
-  };
-
+  /**
+   * Toggles the read status of the item.
+   * Changes the value of `isRead` between true and false.
+   */
   const toggleReadStatus = () => {
     setIsRead((prevState) => !prevState);
   };
+
+  /**
+   * Opens a document based on the provided category and document ID.
+   * Dynamically selects the target screen and prepares the parameters to pass to the screen.
+   * If the document category does not exist in the map, shows a toast error message.
+   *
+   * @param {string} documentId - The ID of the document to open.
+   * @param {string} documentCategory - The category of the document (e.g., "TimeConfirmation", "Expense", "Absence").
+   * @param {string} processTemplateExtId - The external ID for the process template (optional).
+   */
+  const openDocument = useCallback(
+    (documentId, documentCategory, processTemplateExtId) => {
+      // Get the target screen based on the documentCategory
+      const targetScreen = componentMap[documentCategory];
+
+      console.debug(targetScreen);
+      // If no target screen is found for the given documentCategory, show a toast error message
+      if (!targetScreen) {
+        // Show error message in the toast with the translated message
+        showToast(t("document_cannot_open", { documentCategory }), "error");
+        return; // Exit early to prevent navigating to an invalid screen
+      }
+
+      // Get the parameters required for the given document category from the detailScreenParamsMap
+      const params = detailScreenParamsMap[documentCategory] || {};
+
+      // Prepare the parameters to pass to the target screen
+      const navigationParams = {};
+
+      // Dynamically assign parameters based on the category
+      if (params.documentId) {
+        navigationParams[params.documentId] = documentId; // Assign the document ID based on the category
+      }
+      if (params.statusTemplateExtId) {
+        navigationParams[params.statusTemplateExtId] = processTemplateExtId; // Add processTemplateExtId if it exists
+      }
+
+      // Navigate to the target screen with the prepared navigation parameters
+      navigation.navigate(targetScreen, navigationParams);
+    },
+    [navigation] // Only re-create the function if `navigation` changes
+  );
 
   /**
    * Navigate to the filters screen with initial filter settings.
@@ -110,80 +163,6 @@ const Approval = ({ route, navigation }) => {
       pickerOptions: pickerOptions,
     });
   };
-
-  /**
-   * Fetches message log data asynchronously from API with a past date filter.
-   * @returns {Array} Array of message log data or empty array on failure.
-   */
-  const fetchMessageLogData = async (isRead, messageWithin = "thisMonth") => {
-    try {
-      setLoading(true);
-
-      const publishedSinceDate = getStartDateForFilter(messageWithin);
-
-      const requestBody = {
-        interfaceName: "MessageLogRead",
-        methodName: "getMessageLog",
-        userID: APP.LOGIN_USER_ID,
-        paramsMap: {
-          clientID: APP.LOGIN_USER_CLIENT,
-          userID: APP.LOGIN_USER_ID,
-          language: APP.LOGIN_USER_LANGUAGE,
-          isRead: isRead,
-          user: null,
-          publishedSinceDate: publishedSinceDate,
-        },
-      };
-
-      const response = await fetchData(
-        API_ENDPOINTS.INVOKE,
-        "POST",
-        {
-          "Content-Type": "application/json",
-        },
-        JSON.stringify(requestBody)
-      );
-
-      // Check if the response contains the necessary message log data
-      if (
-        response &&
-        response.success &&
-        response.retVal &&
-        response.retVal.uimessageloglist
-      ) {
-        const formattedPublishedSinceDate = format(
-          publishedSinceDate,
-          "dd MMMM yyyy"
-        );
-
-        showToast(
-          t("message_log_fetched_since", {
-            publishedSinceDate: formattedPublishedSinceDate,
-          }),
-          "warning"
-        );
-        console.log("Message log data fetched successfully.");
-        return response.retVal.uimessageloglist;
-      }
-
-      console.log("No valid messages found.");
-      return []; // Return empty array if no valid messages
-    } catch (error) {
-      console.error("Failed to fetch message log data:", error);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Utility function to check if a string contains meaningful content (non-empty, non-whitespace).
-   *
-   * @param {string} text - The text to check.
-   * @returns {boolean} - Returns `true` if the text has meaningful content, otherwise `false`.
-   */
-  const hasContent = (text) =>
-    typeof text === "string" && text.trim().length > 0;
 
   /**
    * Validates the recipient approval input.
@@ -275,36 +254,78 @@ const Approval = ({ route, navigation }) => {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Use Promise.all to fetch both data asynchronously
-        const [messageTypes, busObjCats] = await Promise.all([
-          fetchMessageTypeData(),
-          fetchBusObjCatData(),
-        ]);
+  /**
+   * Fetches message log data asynchronously from the API based on a date filter.
+   *
+   * This function constructs a request to fetch message log data using the `MessageLogRead` API method.
+   * The logs are filtered based on the `messageWithin` value, which determines the start date for the filter.
+   * It processes the response, checks if valid message log data is present, and returns the list of logs. If no valid data is found or an error occurs, an empty array is returned.
+   *
+   * @param {string} messageWithin - A filter value (e.g., "lastMonth", "lastWeek") used to determine the start date for fetching message logs.
+   *                                 Defaults to "lastMonth" if no value is provided.
+   * @returns {Promise<Array>} A promise that resolves to an array of message log data, or an empty array if no data is found or an error occurs.
+   */
 
-        setMessageTypeMap(messageTypes);
-        setBusObjCatMap(busObjCats);
+  const fetchMessageLogData = async (messageWithin = "lastMonth") => {
+    try {
+      setLoading(true);
 
-        setAppliedFilters({});
-        setAppliedFiltersCount(0);
+      const publishedSinceDate = getStartDateForFilter(messageWithin);
 
-        // Fetch message log data based on read/unread state
-        const result = await fetchMessageLogData(isRead);
-        if (result) {
-          setData(result);
-          setInitialData(result);
-        } else {
-          console.error("No messages received or data was invalid");
-        }
-      } catch (error) {
-        console.error("Error loading data:", error);
+      const requestBody = {
+        interfaceName: "MessageLogRead",
+        methodName: "getMessageLog",
+        userID: APP.LOGIN_USER_ID,
+        paramsMap: {
+          clientID: APP.LOGIN_USER_CLIENT,
+          userID: APP.LOGIN_USER_ID,
+          language: APP.LOGIN_USER_LANGUAGE,
+          isRead: isRead,
+          user: null,
+          publishedSinceDate: publishedSinceDate,
+        },
+      };
+
+      const response = await fetchData(
+        API_ENDPOINTS.INVOKE,
+        "POST",
+        {
+          "Content-Type": "application/json",
+        },
+        JSON.stringify(requestBody)
+      );
+
+      // Check if the response contains the necessary message log data
+      if (
+        response &&
+        response.success &&
+        response.retVal &&
+        response.retVal.uimessageloglist
+      ) {
+        const formattedPublishedSinceDate = format(
+          publishedSinceDate,
+          "dd MMMM yyyy"
+        );
+
+        showToast(
+          t("message_log_fetched_since", {
+            publishedSinceDate: formattedPublishedSinceDate,
+          }),
+          "warning"
+        );
+        console.log("Message log data fetched successfully.");
+        return response.retVal.uimessageloglist;
       }
-    };
 
-    loadData();
-  }, [refreshKey, isRead]);
+      console.log("No valid messages found.");
+      return []; // Return empty array if no valid messages
+    } catch (error) {
+      console.error("Failed to fetch message log data:", error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /**
    * Memoized headerLeft component.
@@ -397,61 +418,133 @@ const Approval = ({ route, navigation }) => {
     setAppliedFiltersCount(Object.keys(newAppliedFilters).length);
   }, [route?.params?.convertedAppliedFilters]);
 
+  /**
+   * useEffect hook to fetch and load initial data when the component is mounted.
+   *
+   * This effect runs only once after the component is initially rendered. It fetches required data
+   * asynchronously, including message types, business object categories, and message log data,
+   * and updates the component state with the fetched data. If any fetch operation fails, an error
+   * is logged.
+   */
   useEffect(() => {
-    const applyFilters = async () => {
+    /**
+     * Asynchronous function to load required data for the component.
+     *
+     * The function performs the following tasks:
+     * - Fetches message type data and business object categories concurrently using `Promise.all`.
+     * - After the message type and business object categories are fetched, it proceeds to fetch the message log data.
+     * - Updates component state with the fetched message types, business object categories, and message log data.
+     * - Logs errors if any of the fetch operations fail.
+     */
+    const loadInitialData = async () => {
       try {
-        let messageLogData = data; // Start with existing data for local filtering
+        // Fetch message types and business object categories concurrently
+        const [messageTypes, busObjCats] = await Promise.all([
+          fetchMessageTypeData(),
+          fetchBusObjCatData(),
+        ]);
 
-        // If `messageWithin` exists, fetch data from server
-        if (appliedFilters.messageWithin) {
-          messageLogData = await fetchMessageLogData(
-            isRead,
-            appliedFilters.messageWithin
-          );
+        // Update state with fetched message types and business object categories
+        setMessageTypeMap(messageTypes);
+        setBusObjCatMap(busObjCats);
+
+        // Fetch message log data after the initial data is loaded
+        const result = await fetchMessageLogData();
+        if (result) {
+          setData(result);
         } else {
-          // If no `messageWithin` filter is applied, reset to the initial full dataset
-          messageLogData = initialData;
+          console.error("No messages received or data was invalid.");
         }
-
-        // If `messageType` or `documentCategory` filters are applied, filter locally
-        const filteredData = messageLogData.filter((item) => {
-          const matchCategory = appliedFilters.documentCategory
-            ? item.busObjCat === appliedFilters.documentCategory
-            : true; // If no filter, match all
-          const matchMessageType = appliedFilters.messageType
-            ? item.type === appliedFilters.messageType
-            : true; // If no filter, match all
-
-          return matchCategory && matchMessageType;
-        });
-
-        setData(filteredData);
       } catch (error) {
-        console.error("Error applying filters:", error);
+        // Log any errors that occur during the data fetching process
+        console.error("Error loading data:", error);
       }
     };
 
-    applyFilters();
-  }, [appliedFilters]); // Dependencies include filters and read state
+    // Trigger the data loading once when the component is mounted
+    loadInitialData();
+  }, []);
+
+  /**
+   * The useEffect hook that loads message log data and applies filters based on the dependencies.
+   *
+   * This effect runs whenever the `isRead`, `refreshKey`, or `appliedFilters` (which includes `messageWithin`)
+   * dependencies change. It performs the following actions:
+   * 1. Sets the `messageWithin` filter state from `appliedFilters`.
+   * 2. Fetches the message log data from the server using the `fetchMessageLogData` function.
+   * 3. If the data is successfully fetched, it applies local filters (e.g., `messageType`, `documentCategory`)
+   *    using the `applyLocalFilters` function.
+   * 4. Finally, updates the `data` state with the filtered results.
+   *
+   * In case of any errors during the fetch operation, an error message is logged.
+   */
+  useEffect(() => {
+    const loadDataAndApplyFilters = async () => {
+      try {
+        // Fetch message log data from the server
+        const messageLogData = await fetchMessageLogData(
+          appliedFilters.messageWithin
+        );
+
+        // If message log data is successfully fetched, apply filters
+        if (messageLogData) {
+          const filteredData = applyLocalFilters(
+            messageLogData,
+            appliedFilters
+          );
+
+          setData(filteredData); // Update the data state with filtered results
+        } else {
+          console.error("Failed to fetch message log data or data is empty.");
+        }
+      } catch (error) {
+        console.error("Error fetching message log data:", error);
+      }
+    };
+
+    loadDataAndApplyFilters();
+  }, [isRead, refreshKey, appliedFilters]);
 
   /**
    * Render a single message item for the FlatList.
    */
   const renderItem = useCallback(
     ({ item }) => {
-      const isItemRead = item.isRead || !item.readOn || !item.respondedOn;
-      const messageStatus = isItemRead ? "Read" : "Unread";
-
       const actionPerformed = item.fields.find(
         (field) => field.name === "actionPerformed"
+      )?.value;
+      const documentId = item.iD;
+      const documentCategory = item.busObjCat;
+      const processTemplateExtId = item.fields.find(
+        (field) => field.name === "processTemplateID"
       )?.value;
 
       return (
         <View style={styles.itemContainer}>
           <View style={styles.firstRow}>
-            <Text numberOfLines={3} ellipsizeMode="tail">
-              {item.text}
-            </Text>
+            <View style={styles.firstRowFirstColumn}>
+              <Text numberOfLines={3} ellipsizeMode="tail">
+                {item.text}
+              </Text>
+            </View>
+            <View style={styles.firstRowSecondColumn}>
+              <CustomButton
+                onPress={() =>
+                  openDocument(
+                    documentId,
+                    documentCategory,
+                    processTemplateExtId
+                  )
+                }
+                label=""
+                icon={{
+                  name: "open-outline",
+                  library: "Ionicons",
+                  size: 24,
+                  color: "blue",
+                }}
+              />
+            </View>
           </View>
           <View style={styles.secondRow}>
             <Text numberOfLines={1} ellipsizeMode="tail">
@@ -459,9 +552,6 @@ const Approval = ({ route, navigation }) => {
             </Text>
             <Text numberOfLines={1} ellipsizeMode="tail">
               {busObjCatMap[item.busObjCat] || item.busObjCat || ""}
-            </Text>
-            <Text numberOfLines={1} ellipsizeMode="tail">
-              {messageStatus}
             </Text>
           </View>
           <View style={styles.thirdRow}>
@@ -665,10 +755,20 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
   },
   firstRow: {
+    flexDirection: "row",
+    alignItems: "center",
     fontWeight: "bold",
     padding: "2%",
     borderBottomWidth: 0.5,
     borderBottomColor: "#ccc",
+  },
+  firstRowFirstColumn: {
+    flex: 1,
+  },
+  firstRowSecondColumn: {
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondRow: {
     flexDirection: "row",

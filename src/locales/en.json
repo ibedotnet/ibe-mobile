@@ -263,7 +263,7 @@
   "image_size_error": "Image size is too large. Please select a smaller image.",
   "pull_to_refresh": "Pull to refresh",
   "access_denied": "Access Denied",
-  "mus_be_admin": "You must be an admin to access this section.",
+  "must_be_admin": "You must be an admin to access this section.",
   "status_update_failed": "Status update failed.",
   "select_recipient": "Select recipient",
   "recipient_required": "Recipient is required to proceed.",
@@ -273,5 +273,6 @@
   "document_category": "Document Category",
   "message_type": "Message Type",
   "message_within": "Message Within",
-  "message_log_fetched_since": "Messages fetched since {{publishedSinceDate}}."
+  "message_log_fetched_since": "Messages fetched since {{publishedSinceDate}}.",
+  "document_cannot_open": "The document category {{documentCategory}} cannot be opened on this platform."
 }

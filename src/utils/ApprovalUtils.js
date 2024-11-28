@@ -1,8 +1,65 @@
-import { formatDistanceToNow } from "date-fns"; // External library
+import { formatDistanceToNow } from "date-fns";
 
-import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants"; // Constants
-import { fetchData } from "./APIUtils"; // Utility
-import { showToast } from "./MessageUtils"; // Utility
+import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants";
+import { fetchData } from "./APIUtils";
+import { showToast } from "./MessageUtils";
+
+/**
+ * Filters the message log data based on the provided filters.
+ *
+ * @param {Array<Object>} data - The array of message log data to filter.
+ * @param {Object} filters - The object containing filter criteria.
+ * @param {string} [filters.documentCategory] - The document category to filter by (optional).
+ * @param {string} [filters.messageType] - The message type to filter by (optional).
+ *
+ * @returns {Array<Object>} The filtered array of message log data.
+ *
+ */
+const applyLocalFilters = (data, filters) => {
+  return data.filter((item) => {
+    // Check if the document category matches the filter (or match all if no filter applied)
+    const matchCategory = filters.documentCategory
+      ? item.busObjCat === filters.documentCategory
+      : true;
+
+    // Check if the message type matches the filter (or match all if no filter applied)
+    const matchMessageType = filters.messageType
+      ? item.type === filters.messageType
+      : true;
+
+    // Return true if both conditions are met
+    return matchCategory && matchMessageType;
+  });
+};
+
+/**
+ * Map to define which screen should be navigated to for specific categories.
+ * Keys represent the business object category, and values specify the corresponding detail screen.
+ */
+const componentMap = {
+  TimeConfirmation: "TimesheetDetail", // Navigate to TimesheetDetail for TimeConfirmation
+  Expense: "ExpenseDetail", // Navigate to ExpenseDetail for Expense category
+  Absence: "AbsenceDetail", // Navigate to AbsenceDetail for Absence category
+};
+
+/**
+ * Map to define the parameters required when navigating to detail screens for different categories.
+ * Keys represent the business object category, and values define the required parameters for each category.
+ */
+const detailScreenParamsMap = {
+  TimeConfirmation: {
+    documentId: "timesheetId", // Parameter: timesheet ID for TimeConfirmation
+    statusTemplateExtId: "statusTemplateExtId", // Parameter: status template external ID
+  },
+  Expense: {
+    documentId: "expenseId", // Parameter: expense ID for Expense category
+    statusTemplateExtId: "statusTemplateExtId", // Parameter: status template external ID
+  },
+  Absence: {
+    documentId: "absenceId", // Parameter: absence ID for Absence category
+    statusTemplateExtId: "statusTemplateExtId", // Parameter: status template external ID
+  },
+};
 
 /**
  * Fetches data from the API based on a given category and maps `extID` to `name:text`.
@@ -23,7 +80,23 @@ const fetchCategoryData = async (category) => {
                 value: category,
               },
             ]
-          : [],
+          : [
+              {
+                fieldName: `${category}-isMetaModel`,
+                operator: "!=",
+                value: true,
+              },
+              {
+                fieldName: `${category}-isSetting`,
+                operator: "!=",
+                value: true,
+              },
+              {
+                fieldName: `${category}-kindOfBusData`,
+                operator: "!=",
+                value: true,
+              },
+            ],
     };
 
     const formData = {
@@ -89,6 +162,19 @@ const formatDateToISOString = (date) => {
     String(date.getUTCSeconds()).padStart(2, "0") +
     "-0000"
   );
+};
+
+/**
+ * Calculates and returns the time elapsed since a given date in a human-readable format.
+ * Uses the `date-fns` library’s `formatDistanceToNow` function.
+ *
+ * @param {string | Date} publishedOn - The date of publication in string format or as a Date object.
+ * @returns {string} A human-readable string representing the time elapsed since the date.
+ */
+const getPublishedAge = (publishedOn) => {
+  if (!publishedOn) return "";
+  const publishedDate = new Date(publishedOn);
+  return formatDistanceToNow(publishedDate, { addSuffix: true });
 };
 
 /**
@@ -193,64 +279,6 @@ const getStartDateForFilter = (filter) => {
 };
 
 /**
- * Calculates and returns the time elapsed since a given date in a human-readable format.
- * Uses the `date-fns` library’s `formatDistanceToNow` function.
- *
- * @param {string | Date} publishedOn - The date of publication in string format or as a Date object.
- * @returns {string} A human-readable string representing the time elapsed since the date.
- */
-const getPublishedAge = (publishedOn) => {
-  if (!publishedOn) return "";
-  const publishedDate = new Date(publishedOn);
-  return formatDistanceToNow(publishedDate, { addSuffix: true });
-};
-
-/**
- * Processes update fields for a given set of data.
- *
- * @param {Array<Object>} updFields - The update fields to process.
- * @returns {Object} - An object containing all processed fields.
- */
-const processUpdateFields = (updFields = []) => {
-  const processedFields = {
-    changeRecipient: false,
-    comment: false,
-    nextStatusCodes: [],
-    openPreviousGateways: null,
-    numOfRecpDefOnStep: null,
-  };
-
-  updFields.forEach((field) => {
-    switch (field.name) {
-      case "comment":
-        processedFields.comment =
-          field.value === "true" || field.value === true;
-        break;
-      case "changeRecipient":
-        processedFields.changeRecipient =
-          field.value === "true" || field.value === true;
-        break;
-      case "openPreviousGateways":
-        processedFields.openPreviousGateways = field.value;
-        break;
-      case "nextStatusCodes":
-        processedFields.nextStatusCodes.push(field.value);
-        break;
-      case "numOfRecpDefOnStep":
-        processedFields.numOfRecpDefOnStep = field.value;
-        break;
-    }
-  });
-
-  console.log(
-    "Processed Update Fields:",
-    JSON.stringify(processedFields, null, 2)
-  );
-
-  return processedFields;
-};
-
-/**
  * Handles status change management and updates status based on `processMessage`.
  *
  * @param {Object} processMessage - The message object with status update details.
@@ -335,12 +363,87 @@ const handleStatusChangeMgmt = async (
   }
 };
 
+/**
+ * Checks if a string contains meaningful content (non-empty, non-whitespace).
+ *
+ * @param {string} text - The text to check.
+ * @returns {boolean} - Returns `true` if the text has meaningful content, otherwise `false`.
+ */
+const hasContent = (text) => typeof text === "string" && text.trim().length > 0;
+
+/**
+ * Map to define the time filter options for messages with corresponding labels.
+ * Keys represent the time range identifiers, and values define the labels displayed to the user.
+ */
+const messageWithinMap = {
+  today: "0. Today", // Messages from today
+  yesterday: "1. Yesterday", // Messages from yesterday
+  thisWeek: "2. This Week", // Messages from the current week
+  lastWeek: "3. Last Week", // Messages from the previous week
+  thisMonth: "4. This Month", // Messages from the current month
+  lastMonth: "5. Last Month", // Messages from the previous month
+  lastTwoMonths: "6. Last Two Months", // Messages from the last two months
+  lastSixMonths: "7. Last Six Months", // Messages from the last six months
+  thisYear: "8. This Year", // Messages from the current year
+  lastYear: "9. Last Year", // Messages from the previous year
+};
+
+/**
+ * Processes update fields for a given set of data.
+ *
+ * @param {Array<Object>} updFields - The update fields to process.
+ * @returns {Object} - An object containing all processed fields.
+ */
+const processUpdateFields = (updFields = []) => {
+  const processedFields = {
+    changeRecipient: false,
+    comment: false,
+    nextStatusCodes: [],
+    openPreviousGateways: null,
+    numOfRecpDefOnStep: null,
+  };
+
+  updFields.forEach((field) => {
+    switch (field.name) {
+      case "comment":
+        processedFields.comment =
+          field.value === "true" || field.value === true;
+        break;
+      case "changeRecipient":
+        processedFields.changeRecipient =
+          field.value === "true" || field.value === true;
+        break;
+      case "openPreviousGateways":
+        processedFields.openPreviousGateways = field.value;
+        break;
+      case "nextStatusCodes":
+        processedFields.nextStatusCodes.push(field.value);
+        break;
+      case "numOfRecpDefOnStep":
+        processedFields.numOfRecpDefOnStep = field.value;
+        break;
+    }
+  });
+
+  console.log(
+    "Processed Update Fields:",
+    JSON.stringify(processedFields, null, 2)
+  );
+
+  return processedFields;
+};
+
 export {
+  applyLocalFilters,
+  componentMap,
+  detailScreenParamsMap,
   fetchMessageTypeData,
   fetchBusObjCatData,
   formatDateToISOString,
   getPublishedAge,
   getStartDateForFilter,
   handleStatusChangeMgmt,
+  hasContent,
+  messageWithinMap,
   processUpdateFields,
 };

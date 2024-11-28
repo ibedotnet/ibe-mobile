@@ -269,5 +269,6 @@
   "document_category": "Categoría del Documento",
   "message_type": "Tipo de Mensaje",
   "message_within": "Mensaje Dentro de",
-  "message_log_fetched_since": "Mensajes obtenidos desde {{publishedSinceDate}}."
+  "message_log_fetched_since": "Mensajes obtenidos desde {{publishedSinceDate}}.",
+  "document_cannot_open": "La categoría de documento {{documentCategory}} no se puede abrir en esta plataforma."
 }
