@@ -1,7 +1,15 @@
+// Third-party imports
 import { formatDistanceToNow } from "date-fns";
 
-import { API_ENDPOINTS, APP, INTSTATUS, TEST_MODE } from "../constants";
-import { fetchData } from "./APIUtils";
+// Internal imports (API, constants, utility functions, etc.)
+import {
+  API_ENDPOINTS,
+  APP,
+  APP_NAME,
+  INTSTATUS,
+  TEST_MODE,
+} from "../constants";
+import { fetchData, getAppNameByDocumentCategory } from "./APIUtils";
 import { showToast } from "./MessageUtils";
 
 /**
@@ -162,6 +170,201 @@ const formatDateToISOString = (date) => {
     String(date.getUTCSeconds()).padStart(2, "0") +
     "-0000"
   );
+};
+
+/**
+ * Fetches data based on the given query fields and dynamic parameters.
+ * @async
+ * @function fetchDataBasedOnFields
+ * @param {Object} queryFields - The fields to query (e.g., for employee details).
+ * @param {string} appName - The application name (dynamically passed based on document category).
+ * @returns {Promise<Object|null>} - Returns the response data if successful, or null if an error occurs.
+ */
+const fetchDataBasedOnFields = async (queryFields, appName) => {
+  try {
+    if (!queryFields || !appName) {
+      throw new Error("Missing required parameters: queryFields or appName.");
+    }
+
+    const commonQueryParams = {
+      appName: appName,
+      client: parseInt(APP.LOGIN_USER_CLIENT),
+      user: APP.LOGIN_USER_ID,
+      userID: APP.LOGIN_USER_ID,
+      language: APP.LOGIN_USER_LANGUAGE,
+      intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+    };
+
+    const formData = {
+      query: JSON.stringify(queryFields),
+      ...commonQueryParams,
+    };
+
+    const response = await fetchData(
+      API_ENDPOINTS.QUERY,
+      "POST",
+      {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      new URLSearchParams(formData).toString()
+    );
+
+    if (response && response.success) {
+      return response.data || null;
+    } else {
+      console.error(
+        "Failed to fetch data: ",
+        response?.message || "Unknown error"
+      );
+      return null;
+    }
+  } catch (error) {
+    console.error("Error in fetching data: ", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches the employee ID based on the document category and document ID.
+ * @async
+ * @function fetchEmployeeID
+ * @param {string} documentCategory - The category of the document (e.g., "Timesheet", "Absence").
+ * @param {string} documentId - The ID of the document.
+ * @returns {Promise<string|null>} - Returns the EmployeeID as a string, or null if not found or an error occurs.
+ */
+const fetchEmployeeID = async (documentCategory, documentId) => {
+  if (!documentCategory || !documentId) {
+    console.error("Document category and ID are required.");
+    return null;
+  }
+
+  const queryFields = {
+    fields: [`${documentCategory}-employeeID`], // Only fetch the employeeID field
+    where: [
+      {
+        fieldName: `${documentCategory}-id`,
+        operator: "=",
+        value: documentId,
+      },
+    ],
+  };
+
+  try {
+    const data = await fetchDataBasedOnFields(
+      queryFields,
+      getAppNameByDocumentCategory(documentCategory)
+    );
+
+    if (data && data.length > 0) {
+      // Extract and return the EmployeeID field
+      return data[0][`${documentCategory}-employeeID`] || null;
+    } else {
+      console.error("Employee ID not found for the given document.");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching employee details:", error);
+    return null;
+  }
+};
+
+/**
+ * Fetches employee details based on the employee ID, including work schedule details.
+ * @async
+ * @function fetchEmployeeCoreDetails
+ * @param {string} employeeId - The employee ID for which details are to be fetched.
+ * @returns {Promise<Object|null>} - Returns employee details along with work schedule details if successful, or null if an error occurs.
+ */
+const fetchEmployeeCoreDetails = async (employeeId) => {
+  if (!employeeId) {
+    console.error("Employee ID is required.");
+    return null;
+  }
+
+  const queryFields = {
+    fields: [
+      "Resource-id",
+      "Resource-personID",
+      "Resource-userID:User-type",
+      "Resource-companyID",
+      "Resource-core-hireDate",
+      "Resource-core-termDate",
+      "Resource-timeMgt-workScheduleID",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-id",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-name",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-patterns",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-dailyStdHours",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-maxWorkHours",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-minWorkHours",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-calendarDetails",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-nonWorkingDates",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-nonWorkingDays",
+      "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-startOfWeek",
+    ],
+    where: [
+      {
+        fieldName: "Resource-id",
+        operator: "=",
+        value: employeeId,
+      },
+    ],
+  };
+
+  const data = await fetchDataBasedOnFields(queryFields, APP_NAME.EMPLOYEE);
+
+  if (data) {
+    return data[0] || null;
+  } else {
+    console.error(
+      "Employee details with work schedule not found for employee ID:",
+      employeeId
+    );
+    return null;
+  }
+};
+
+/**
+ * Fetches employee ID first, then fetches employee core details,
+ * and updates the ApprovalUserInfoContext.
+ * @async
+ * @function fetchEmployeeDetails
+ * @param {string} documentCategory - The category of the document (e.g., "Timesheet", "Absence").
+ * @param {string} documentId - The ID of the document to fetch employee details for.
+ * @returns {Promise<Object>} - Resolves with an object containing success and employee details.
+ */
+const fetchEmployeeDetails = async (documentCategory, documentId) => {
+  const validateData = (data, errorMsg) => {
+    if (!data) {
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
+  try {
+    console.log(
+      `Fetching details for document ID: ${documentId} (Category: ${documentCategory})`
+    );
+
+    // Step 1: Fetch employee ID using documentCategory and documentId
+    const employeeID = await fetchEmployeeID(documentCategory, documentId);
+    validateData(
+      employeeID,
+      `Employee ID not found for document ID: ${documentId}`
+    );
+
+    // Step 2: Fetch employee details using the fetched employeeID
+    const employeeDetails = await fetchEmployeeCoreDetails(employeeID);
+    validateData(
+      employeeDetails,
+      `Employee details not found for employee ID: ${employeeID}`
+    );
+
+    return { success: true, employeeDetails };
+  } catch (error) {
+    console.error("Error fetching and updating context:", error);
+    return { success: false, error: error.message };
+  }
 };
 
 /**
@@ -437,6 +640,7 @@ export {
   applyLocalFilters,
   componentMap,
   detailScreenParamsMap,
+  fetchEmployeeDetails,
   fetchMessageTypeData,
   fetchBusObjCatData,
   formatDateToISOString,

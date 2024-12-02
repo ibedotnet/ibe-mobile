@@ -25,14 +25,9 @@ import { screenDimension } from "../utils/ScreenUtils";
 
 import { common } from "../styles/common";
 import { useClientPaths } from "../../context/ClientPathsContext";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 const Home = ({ route, navigation }) => {
   const { t } = useTranslation();
-
-  const {
-    loggedInUserInfo: { userType },
-  } = useContext(LoggedInUserInfoContext);
 
   const logoDimension = useMemo(() => screenDimension.width / 2, []);
 
@@ -204,13 +199,7 @@ const Home = ({ route, navigation }) => {
   const onPressTimesheets = () => navigation.navigate("Timesheet");
   const onPressExpenses = () => navigation.navigate("Expense");
   const onPressAbsences = () => navigation.navigate("Absence");
-  const onPressApprovals = () => {
-    if (userType === "admin") {
-      navigation.navigate("Approval");
-    } else {
-      Alert.alert(t("access_denied"), t("must_be_admin"));
-    }
-  };
+  const onPressApprovals = () => navigation.navigate("Approval");
 
   return (
     <SafeAreaView style={common.container} testID="home-screen">

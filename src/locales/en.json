@@ -274,5 +274,6 @@
   "message_type": "Message Type",
   "message_within": "Message Within",
   "message_log_fetched_since": "Messages fetched since {{publishedSinceDate}}.",
-  "document_cannot_open": "The document category {{documentCategory}} cannot be opened on this platform."
+  "document_cannot_open": "The document category {{documentCategory}} cannot be opened on this platform.",
+  "failed_to_fetch_employee_details": "Failed to fetch employee details. The document cannot be opened. Please try again later."
 }

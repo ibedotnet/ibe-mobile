@@ -270,5 +270,6 @@
   "message_type": "Tipo de Mensaje",
   "message_within": "Mensaje Dentro de",
   "message_log_fetched_since": "Mensajes obtenidos desde {{publishedSinceDate}}.",
-  "document_cannot_open": "La categoría de documento {{documentCategory}} no se puede abrir en esta plataforma."
+  "document_cannot_open": "La categoría de documento {{documentCategory}} no se puede abrir en esta plataforma.",
+  "failed_to_fetch_employee_details": "No se pudieron obtener los detalles del empleado. El documento no se puede abrir. Por favor, intente nuevamente más tarde."
 }

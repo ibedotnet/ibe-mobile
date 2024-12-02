@@ -1,6 +1,6 @@
 import { API_ENDPOINTS, APP, BUSOBJCAT, TEST_MODE } from "../constants";
 
-import { fetchData, getAppName } from "../utils/APIUtils";
+import { fetchData, getAppNameByCategory } from "../utils/APIUtils";
 import { normalizeDateToUTC } from "./FormatUtils";
 
 /**
@@ -50,7 +50,7 @@ const checkTimesheetExistsForDate = async (date, showInfoInCreate, t) => {
     client: parseInt(APP.LOGIN_USER_CLIENT),
     user: APP.LOGIN_USER_ID,
     userID: APP.LOGIN_USER_ID,
-    appName: JSON.stringify(getAppName(BUSOBJCAT.TIMESHEET)),
+    appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.TIMESHEET)),
     language: APP.LOGIN_USER_LANGUAGE,
     intStatus: JSON.stringify([0, 1, 2]),
   };

@@ -5,7 +5,7 @@ import CustomButton from "./CustomButton";
 
 import {
   fetchData,
-  getAppName,
+  getAppNameByCategory,
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
@@ -166,7 +166,7 @@ const CustomStatus = ({
       language: APP.LOGIN_USER_LANGUAGE,
       testMode: TEST_MODE,
       doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
-      appName: JSON.stringify(getAppName(busObjCat)),
+      appName: JSON.stringify(getAppNameByCategory(busObjCat)),
       component: "platform",
     };
 

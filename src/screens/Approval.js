@@ -1,5 +1,5 @@
 // React and React Native Core Imports
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, useContext } from "react";
 import { View, Text, FlatList, StyleSheet, Platform } from "react-native";
 
 // Third-Party Libraries
@@ -31,6 +31,7 @@ import {
   hasContent,
   messageWithinMap,
   processUpdateFields,
+  fetchEmployeeDetails,
 } from "../utils/ApprovalUtils";
 import { convertToFilterScreenFormat, filtersMap } from "../utils/FilterUtils";
 import { showToast } from "../utils/MessageUtils";
@@ -40,6 +41,8 @@ import Loader from "../components/Loader";
 import CustomBackButton from "../components/CustomBackButton";
 import EditDialog from "../components/dialogs/EditDialog";
 import CustomButton from "../components/CustomButton";
+
+import { ApprovalUserInfoContext } from "../../context/ApprovalUserInfoContext";
 
 /**
  * Approval screen component.
@@ -57,6 +60,10 @@ import CustomButton from "../components/CustomButton";
 
 const Approval = ({ route, navigation }) => {
   const { t } = useTranslation();
+
+  const { approvalUserInfo = {}, setApprovalUserInfo } = useContext(
+    ApprovalUserInfoContext
+  );
 
   // Component State
   const [data, setData] = useState([]);
@@ -91,38 +98,117 @@ const Approval = ({ route, navigation }) => {
    * @param {string} documentId - The ID of the document to open.
    * @param {string} documentCategory - The category of the document (e.g., "TimeConfirmation", "Expense", "Absence").
    * @param {string} processTemplateExtId - The external ID for the process template (optional).
+   * @returns {Promise<void>} - A promise that resolves when the navigation is complete or exits early in case of an error.
    */
   const openDocument = useCallback(
-    (documentId, documentCategory, processTemplateExtId) => {
-      // Get the target screen based on the documentCategory
-      const targetScreen = componentMap[documentCategory];
+    async (documentId, documentCategory, processTemplateExtId) => {
+      try {
+        setLoading(true);
 
-      console.debug(targetScreen);
-      // If no target screen is found for the given documentCategory, show a toast error message
-      if (!targetScreen) {
-        // Show error message in the toast with the translated message
-        showToast(t("document_cannot_open", { documentCategory }), "error");
-        return; // Exit early to prevent navigating to an invalid screen
+        // Determine the target screen for the provided document category
+        const targetScreen = componentMap[documentCategory];
+
+        // If the category is not found in the component map, notify the user with a toast and exit
+        if (!targetScreen) {
+          showToast(t("document_cannot_open", { documentCategory }), "error");
+          return; // Prevent further execution if the screen is invalid
+        }
+
+        // Get predefined parameters for the document category, or use an empty object if none are found
+        const params = detailScreenParamsMap[documentCategory] || {};
+
+        // Initialize an object to store navigation parameters dynamically
+        const navigationParams = {};
+
+        // Add the document ID to the navigation parameters if required by the document category
+        if (params.documentId) {
+          navigationParams[params.documentId] = documentId;
+        }
+
+        // Add the process template external ID to the navigation parameters if applicable
+        if (params.statusTemplateExtId) {
+          navigationParams[params.statusTemplateExtId] = processTemplateExtId;
+        }
+
+        // Mark the navigation as originating from the approval screen
+        navigationParams.openedFromApproval = true;
+
+        // Fetch additional employee details based on the document category and ID
+        const { success, employeeDetails, error } = await fetchEmployeeDetails(
+          documentCategory,
+          documentId
+        );
+
+        // If fetching employee details fails, show an error toast and exit
+        if (!success) {
+          showToast(
+            t("failed_to_fetch_employee_details") + `: ${error}`,
+            "error"
+          );
+          return; // Exit early if employee details are unavailable
+        }
+
+        // If setApprovalUserInfo is asynchronous, await its completion here
+        await setApprovalUserInfo({
+          userType: employeeDetails["Resource-userID:User-type"] || "",
+          timeConfirmationType: employeeDetails.timeConfirmationType || "",
+          hireDate: employeeDetails["Resource-core-hireDate"] || null,
+          termDate: employeeDetails.termDate || null,
+          personId: employeeDetails["Resource-personID"] || null,
+          companyId: employeeDetails["Resource-companyID"] || null,
+          workScheduleExtId:
+            employeeDetails["Resource-timeMgt-workScheduleID"] || null,
+          workScheduleName:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-name"
+            ] || null,
+          calendarExtId:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID"
+            ] || null,
+          nonWorkingDates:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-nonWorkingDates"
+            ] || null,
+          nonWorkingDays:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-nonWorkingDays"
+            ] || null,
+          startOfWeek:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-calendarID:WorkCalendar-startOfWeek"
+            ] || null,
+          dailyStdHours:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-dailyStdHours"
+            ] || null,
+          stdWorkHours: employeeDetails.stdWorkHours || null,
+          minWorkHours:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-minWorkHours"
+            ] || null,
+          maxWorkHours:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-maxWorkHours"
+            ] || null,
+          workHoursInterval: employeeDetails.workHoursInterval || null,
+          patterns:
+            employeeDetails[
+              "Resource-timeMgt-workScheduleID:WorkSchedule-patterns"
+            ] || null,
+        });
+
+        // After ensuring that the context has been updated, navigate to the target screen
+        navigation.navigate(targetScreen, navigationParams);
+      } catch (error) {
+        // Log any unexpected error for debugging and notify the user with a generic error message
+        console.error("Error in openDocument: ", error);
+        showToast(t("unexpected_error"), "error");
+      } finally {
+        setLoading(false);
       }
-
-      // Get the parameters required for the given document category from the detailScreenParamsMap
-      const params = detailScreenParamsMap[documentCategory] || {};
-
-      // Prepare the parameters to pass to the target screen
-      const navigationParams = {};
-
-      // Dynamically assign parameters based on the category
-      if (params.documentId) {
-        navigationParams[params.documentId] = documentId; // Assign the document ID based on the category
-      }
-      if (params.statusTemplateExtId) {
-        navigationParams[params.statusTemplateExtId] = processTemplateExtId; // Add processTemplateExtId if it exists
-      }
-
-      // Navigate to the target screen with the prepared navigation parameters
-      navigation.navigate(targetScreen, navigationParams);
     },
-    [navigation] // Only re-create the function if `navigation` changes
+    [navigation] // Re-create the function only if the `navigation` object changes
   );
 
   /**

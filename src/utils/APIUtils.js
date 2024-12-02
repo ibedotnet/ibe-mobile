@@ -114,7 +114,7 @@ const fetchData = async (endpoint, method, headers = {}, body = {}) => {
     }
 
     const responseText = await response.text();
-    console.log(JSON.stringify(responseText, null, 2));
+    //console.log(JSON.stringify(responseText, null, 2));
 
     const jsonResponse = JSON.parse(responseText || "{}"); // Parse JSON response or default to empty object
 
@@ -419,7 +419,7 @@ const fetchBusObjCatData = async (
       language: APP.LOGIN_USER_LANGUAGE,
       query: JSON.stringify(queryFields),
       testMode: TEST_MODE,
-      appName: JSON.stringify(getAppName(busObjCat)),
+      appName: JSON.stringify(getAppNameByCategory(busObjCat)),
       intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
     };
 
@@ -483,7 +483,7 @@ const fetchBusObjCatData = async (
  * @param {string} busObjCat - The business object category.
  * @returns {string} - The application path name.
  */
-const getAppName = (busObjCat) => {
+const getAppNameByCategory = (busObjCat) => {
   switch (busObjCat) {
     case BUSOBJCAT.TIMESHEET:
       return APP_NAME.TIMESHEET;
@@ -492,9 +492,27 @@ const getAppName = (busObjCat) => {
     case BUSOBJCAT.ABSENCE:
       return APP_NAME.ABSENCE;
     default:
-      console.log("None of the case matched in getAppName :", busObjCat);
-      return;
+      console.log(
+        "None of the case matched in getAppNameByCategory:",
+        busObjCat
+      );
+      return null;
   }
+};
+
+/**
+ * Retrieve the app name for a given document category.
+ * @param {string} documentCategory - The document category (e.g., "TimeConfirmation").
+ * @returns {string|null} - The corresponding app name, or null if not found.
+ */
+const getAppNameByDocumentCategory = (documentCategory) => {
+  // Find the key in BUSOBJCATMAP using the document category
+  const categoryKey = Object.keys(BUSOBJCATMAP).find(
+    (key) => BUSOBJCATMAP[key] === documentCategory
+  );
+
+  // Convert the category key (e.g., "Timesheet") to uppercase to match APP_NAME keys
+  return categoryKey ? APP_NAME[categoryKey.toUpperCase()] : null;
 };
 
 /**
@@ -755,7 +773,8 @@ export {
   fetchData,
   fetchAndCacheResource,
   fetchBusObjCatData,
-  getAppName,
+  getAppNameByCategory,
+  getAppNameByDocumentCategory,
   isDoNotReplaceAnyList,
   loadMoreData,
   uploadBinaryResource,

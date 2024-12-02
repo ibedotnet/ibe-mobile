@@ -224,12 +224,12 @@ const Login = ({ navigation }) => {
     const newUserInfo = {
       personId: user["Person-id"] || "",
       userType: user["User-type"] || "",
-      timeConfirmationType: empWorkSchedue.timeConfirmationType || "",
       hireDate: user["Resource-core-hireDate"] || null,
       termDate: user["Resource-core-termDate"] || null,
       companyId: user["Resource-companyID"] || "",
       workScheduleExtId: empWorkSchedue.extID || "",
       workScheduleName: empWorkSchedue.name || "",
+      timeConfirmationType: empWorkSchedue.timeConfirmationType || "",
       dailyStdHours: empWorkSchedue.dailyStdHours || 28800000,
       stdWorkHours: empWorkSchedue.stdWorkHours || 28800000,
       minWorkHours: empWorkSchedue.minWorkHours || 28800000,
@@ -251,7 +251,7 @@ const Login = ({ navigation }) => {
     // Log the details of the user information without nonWorkingDates
     console.log(
       "Logged in details without nonWorkingDates:",
-      JSON.stringify(userInfoWithoutNonWorkingDates, null, 2)
+      userInfoWithoutNonWorkingDates
     );
   };
 
