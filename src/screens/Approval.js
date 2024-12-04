@@ -431,6 +431,7 @@ const Approval = ({ route, navigation }) => {
       </View>
     );
   }, [navigation, data.length, t]);
+  
   /**
    * Memoized headerRight component.
    * This component will be used as the right side of the navigation header.

@@ -28,8 +28,8 @@ const Environment = {
  */
 const BASE_URL = {
   [Environment.DEVELOPMENT]: "http:///172.17.0.117",
-  [Environment.TESTING]: "http://testserver.ibenv.net",
-  [Environment.PRODUCTION]: "http://appnew.ibenv.net",
+  [Environment.TESTING]: "https://testserver.ibenv.net",
+  [Environment.PRODUCTION]: "https://appnew.ibenv.net",
 };
 
 // Determine the current environment
