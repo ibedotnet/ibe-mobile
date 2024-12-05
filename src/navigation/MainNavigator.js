@@ -9,6 +9,7 @@ import Login from "../screens/Login";
 import Timesheet from "../screens/Timesheet";
 import TimesheetDetail from "../screens/TimesheetDetail";
 import User from "../screens/User";
+import Approval from "../screens/Approval";
 import Help from "../screens/Help";
 
 import CustomImagePicker from "../components/CustomImagePicker";
@@ -73,7 +74,7 @@ const MainNavigator = () => {
           options={{ headerShown: false }}
         />
 
-        {/* Other screens in the app: Home, Timesheet, TimesheetDetail, Expense, Absence, User */}
+        {/* Other screens in the app: Home, Timesheet, TimesheetDetail, Expense, Absence, User, Approval */}
         <Stack.Screen
           name="Home"
           component={Home}
@@ -84,6 +85,7 @@ const MainNavigator = () => {
         <Stack.Screen name="Expense" component={Expense} />
         <Stack.Screen name="Absence" component={Absence} />
         <Stack.Screen name="User" component={User} />
+        <Stack.Screen name="Approval" component={Approval} />
 
         {/* CustomImagePicker screen with custom header options */}
         <Stack.Screen
@@ -94,6 +96,7 @@ const MainNavigator = () => {
 
         {/* Filters screen */}
         <Stack.Screen name="Filters" component={Filters} />
+
         <Stack.Screen name="Help" component={Help} />
       </Stack.Navigator>
     </NavigationContainer>

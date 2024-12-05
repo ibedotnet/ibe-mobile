@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,6 @@ import {
   PREFERRED_LANGUAGES,
   TEST_MODE,
 } from "../constants";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { getRemarkText, setRemarkText } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 import { fetchData } from "../utils/APIUtils";
@@ -36,10 +35,18 @@ const TimesheetDetailItemEditor = ({
   onCancel,
   isItemEditMode,
   isParentLocked,
+  employeeInfo,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
+
+  const { personId } = employeeInfo;
+
+  console.log(
+    `Employee Info Loaded in TimesheetDetailItemEditor: `,
+    JSON.stringify(employeeInfo, null, 2)
+  );
+
   const {
     defaultAsHomeDefault,
     itemCommentRequired,
@@ -603,7 +610,7 @@ const TimesheetDetailItemEditor = ({
       {
         fieldName: "ProjectWBS-assigned",
         operator: "in",
-        value: loggedInUserInfo.personId,
+        value: personId,
       },
       { fieldName: "ProjectWBS-percentComplete", operator: "!=", value: 100 },
     ],
@@ -686,7 +693,7 @@ const TimesheetDetailItemEditor = ({
           {
             fieldName: "Task-assigned",
             operator: "in",
-            value: loggedInUserInfo.personId,
+            value: personId,
           },
           { fieldName: "Task-allResources", operator: "=", value: true },
         ],
@@ -984,7 +991,7 @@ const TimesheetDetailItemEditor = ({
 
     // Find the resource matching the logged-in person.
     const resource = taskResources?.find(
-      (resource) => resource.personID === loggedInUserInfo.personId
+      (resource) => resource.personID === personId
     );
 
     // Return the billable status of the matched resource, or false if no resource is found.

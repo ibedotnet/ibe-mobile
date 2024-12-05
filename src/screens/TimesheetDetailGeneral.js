@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -10,14 +10,7 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FlatList } from "react-native-gesture-handler";
-import {
-  addDays,
-  format,
-  eachDayOfInterval,
-  isValid,
-  parse,
-  set,
-} from "date-fns";
+import { addDays, format, eachDayOfInterval, isValid, parse } from "date-fns";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -44,7 +37,6 @@ import {
   BUSOBJCATMAP,
   PREFERRED_LANGUAGES,
 } from "../constants";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { showToast } from "../utils/MessageUtils";
 
 const TimesheetDetailGeneral = ({
@@ -62,22 +54,26 @@ const TimesheetDetailGeneral = ({
   onTimesheetDetailChange,
   OnFindingLeaveDates,
   timesheetTypeDetails,
+  employeeInfo,
   timesheetDetail,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
 
   const {
-    loggedInUserInfo: {
-      hireDate,
-      termDate,
-      nonWorkingDates,
-      nonWorkingDays,
-      dailyStdHours,
-      patterns,
-      workScheduleName,
-    },
-  } = useContext(LoggedInUserInfoContext);
+    hireDate,
+    termDate,
+    nonWorkingDates,
+    nonWorkingDays,
+    dailyStdHours,
+    patterns,
+    workScheduleName,
+  } = employeeInfo;
+
+  console.log(
+    `Employee Info Loaded in TimesheetDetailGeneral: `,
+    JSON.stringify(employeeInfo)
+  );
 
   const dateListRef = useRef(null);
   const timesheetItemsRef = useRef(null);
@@ -2234,6 +2230,7 @@ const TimesheetDetailGeneral = ({
               onCancel={handleCancelEditItem}
               isItemEditMode={isItemEditMode}
               isParentLocked={isParentLocked}
+              employeeInfo={employeeInfo}
             />
           )}
         </>

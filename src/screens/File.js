@@ -12,7 +12,7 @@ import PreviewDialog from "../components/dialogs/PreviewDialog";
 
 import {
   fetchData,
-  getAppName,
+  getAppNameByCategory,
   isDoNotReplaceAnyList,
   uploadBinaryResource,
 } from "../utils/APIUtils";
@@ -224,7 +224,7 @@ const File = ({
         testMode: TEST_MODE,
         component: "platform",
         doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
-        appName: JSON.stringify(getAppName(busObjCat)),
+        appName: JSON.stringify(getAppNameByCategory(busObjCat)),
       };
 
       // Call the updateFields function to perform the update
@@ -274,7 +274,7 @@ const File = ({
         testMode: TEST_MODE,
         component: "platform",
         doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
-        appName: JSON.stringify(getAppName(busObjCat)),
+        appName: JSON.stringify(getAppNameByCategory(busObjCat)),
       };
 
       // Call the updateFields function to perform the update request.
@@ -835,7 +835,7 @@ const File = ({
               client: parseInt(APP.LOGIN_USER_CLIENT),
               language: APP.LOGIN_USER_LANGUAGE,
               testMode: "",
-              appName: JSON.stringify(getAppName(busObjCat)),
+              appName: JSON.stringify(getAppNameByCategory(busObjCat)),
               intStatus: JSON.stringify([INTSTATUS.ACTIVE, 1]),
               page: 1,
               start: 0,

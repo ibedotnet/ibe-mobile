@@ -70,6 +70,7 @@ const CustomPicker = ({
    */
   const handleValueChange = (itemValue, itemIndex) => {
     setSelectedValue(itemValue);
+    
     // Call onFilter with the selected value
     if (onFilter) {
       onFilter(itemValue);

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo } from "react"; // React and hooks
+import React, { useCallback, useContext, useEffect, useMemo } from "react"; // React and hooks
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Alert,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -165,7 +166,7 @@ const Home = ({ route, navigation }) => {
               onError={(error) =>
                 console.error("Error loading user photo:", error)
               }
-              resizeMode="contain"
+              contentFit="contain"
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -195,11 +196,10 @@ const Home = ({ route, navigation }) => {
     });
   }, [getUserImageSource, navigateToUploadPhoto, navigateToUserScreen]);
 
-  // Handlers for navigation to different screens
   const onPressTimesheets = () => navigation.navigate("Timesheet");
   const onPressExpenses = () => navigation.navigate("Expense");
   const onPressAbsences = () => navigation.navigate("Absence");
-  const onPressApprovals = () => navigation.navigate("Inbox");
+  const onPressApprovals = () => navigation.navigate("Approval");
 
   return (
     <SafeAreaView style={common.container} testID="home-screen">
@@ -225,7 +225,7 @@ const Home = ({ route, navigation }) => {
           onLoad={() =>
             console.log("Logo image loaded:", clientPaths.clientLogoPath)
           }
-          resizeMode="contain"
+          contentFit="contain"
         />
       </View>
       {/* Main Menu Section */}
@@ -290,7 +290,6 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity
             onPress={onPressApprovals}
             accessibilityLabel={t("navigate_to_approvals")}
-            disabled={true}
           >
             <View style={styles.card}>
               <MaterialIcons name="approval" size={24} color="black" />

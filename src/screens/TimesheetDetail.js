@@ -1,9 +1,9 @@
 import React, {
   useCallback,
-  useContext,
   useEffect,
   useState,
   useRef,
+  useContext,
 } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
@@ -32,7 +32,7 @@ import History from "./History";
 import {
   fetchBusObjCatData,
   fetchData,
-  getAppName,
+  getAppNameByCategory,
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import {
@@ -52,8 +52,9 @@ import CustomBackButton from "../components/CustomBackButton";
 import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useTimesheetSave } from "../../context/SaveContext";
+import useEmployeeInfo from "../hooks/useEmployeeInfo";
+
 import { format } from "date-fns";
 
 const Tab = createMaterialTopTabNavigator();
@@ -61,8 +62,6 @@ const Tab = createMaterialTopTabNavigator();
 const TimesheetDetail = ({ route, navigation }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-
-  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
 
   const { updateForceRefresh } = useTimesheetForceRefresh();
 
@@ -72,6 +71,7 @@ const TimesheetDetail = ({ route, navigation }) => {
 
   const statusTemplateExtId = route?.params?.statusTemplateExtId;
   const selectedDate = route?.params?.selectedDate;
+  const openedFromApproval = route?.params?.openedFromApproval;
 
   const [timesheetId, setTimesheetId] = useState(route?.params?.timesheetId);
   // Determine if the component is in edit mode (if a timesheet ID is provided)
@@ -100,7 +100,6 @@ const TimesheetDetail = ({ route, navigation }) => {
   const [timesheetEmployeeId, setTimesheetEmployeeId] = useState("");
   const [leaveDates, setLeaveDates] = useState([]);
   const [absenceDateHoursMap, setAbsenceDateHoursMap] = useState({});
-
   const [timesheetTypeDetails, setTimesheetTypeDetails] = useState({
     defaultAsHomeDefault: "",
     defaultInputDays: "",
@@ -114,15 +113,29 @@ const TimesheetDetail = ({ route, navigation }) => {
     minTimeIncrement: "",
   });
 
+  // Use custom hook to get the employeeInfo based on openedFromApproval flag
+  const employeeInfo = useEmployeeInfo(openedFromApproval);
+
+  // Destructuring necessary properties from employeeInfo
   const {
-    loggedInUserInfo: {
-      patterns,
-      minWorkHours,
-      maxWorkHours,
-      workHoursInterval,
-      dailyStdHours,
-    },
-  } = useContext(LoggedInUserInfoContext);
+    timeConfirmationType,
+    startOfWeek,
+    workScheduleExtId,
+    companyId,
+    personId,
+    patterns,
+    minWorkHours,
+    maxWorkHours,
+    workHoursInterval,
+    dailyStdHours,
+  } = employeeInfo;
+
+  console.log(
+    `Employee Info Loaded in Timesheet Detail: ${
+      openedFromApproval ? "Approval User Info" : "Logged In User Info"
+    }`,
+    JSON.stringify(employeeInfo)
+  );
 
   // Callback function to handle data from child component (timesheet general)
   const handleFindingLeaveDates = (leaveDates, absenceDateHoursMap) => {
@@ -584,7 +597,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                 from: selectedDate,
                 to: selectedDate,
               },
-              loggedInUserInfo.startOfWeek
+              startOfWeek
             );
           }
         } else {
@@ -1055,7 +1068,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         testMode: TEST_MODE,
         component: "platform",
         doNotReplaceAnyList: isDoNotReplaceAnyList(BUSOBJCAT.TIMESHEET),
-        appName: JSON.stringify(getAppName(BUSOBJCAT.TIMESHEET)),
+        appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.TIMESHEET)),
       };
 
       const updateResponse = await updateFields(formData, queryStringParams);
@@ -1302,13 +1315,13 @@ const TimesheetDetail = ({ route, navigation }) => {
         return;
       }
 
-      if (!loggedInUserInfo.workScheduleExtId) {
+      if (!workScheduleExtId) {
         showToast(t("no_workschedule_assigned"), "error");
         return;
       }
 
       const validPeriodDates = await fetchSelectedDatePeriodFromTimesheetType(
-        loggedInUserInfo.timeConfirmationType
+        timeConfirmationType
       );
 
       if (
@@ -1327,7 +1340,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       if (validPeriodDates) {
         setTimesheetStart(validPeriodDates.start);
         setTimesheetEnd(validPeriodDates.end);
-        setTimesheetCompanyId(loggedInUserInfo.companyId);
+        setTimesheetCompanyId(companyId);
         setTimesheetEmployeeId(APP.LOGIN_USER_EMPLOYEE_ID);
 
         const defaultTimesheetRemark = `Timesheet from ${format(
@@ -1343,16 +1356,16 @@ const TimesheetDetail = ({ route, navigation }) => {
 
         // Set the timesheet type here to ensure all required settings (e.g., start and end dates) are correctly applied,
         // preventing rendering issues or errors from incomplete configuration.
-        setTimesheetType(loggedInUserInfo.timeConfirmationType);
+        setTimesheetType(timeConfirmationType);
 
         const updatedChanges = { ...updatedValues };
 
-        updatedChanges["type"] = loggedInUserInfo.timeConfirmationType;
+        updatedChanges["type"] = timeConfirmationType;
         updatedChanges["start"] = normalizeDateToUTC(validPeriodDates.start);
         updatedChanges["end"] = normalizeDateToUTC(validPeriodDates.end);
-        updatedChanges["busUnitID"] = loggedInUserInfo.companyId;
+        updatedChanges["busUnitID"] = companyId;
         updatedChanges["employeeID"] = APP.LOGIN_USER_EMPLOYEE_ID;
-        updatedChanges["responsible"] = loggedInUserInfo.personId;
+        updatedChanges["responsible"] = personId;
         updatedChanges["remark:text"] = defaultTimesheetRemark;
 
         // Update the ref
@@ -1370,7 +1383,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         APP_ACTIVITY_ID.TIMESHEET,
         BUSOBJCATMAP[BUSOBJCAT.TIMESHEET],
         timesheetId,
-        loggedInUserInfo.timeConfirmationType,
+        timeConfirmationType,
         null, // Timesheet extStatus
         setCurrentStatus,
         setListOfNextStatus
@@ -1806,7 +1819,7 @@ const TimesheetDetail = ({ route, navigation }) => {
   }, [headerLeft, headerRight, navigation]);
 
   useEffect(() => {
-    if (!loggedInUserInfo.workScheduleExtId) {
+    if (!workScheduleExtId) {
       showToast(t("no_workschedule_assigned"), "error");
       return;
     }
@@ -1883,6 +1896,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                       onTimesheetDetailChange={handleTimesheetDetailChange}
                       OnFindingLeaveDates={handleFindingLeaveDates}
                       timesheetTypeDetails={timesheetTypeDetails}
+                      employeeInfo={employeeInfo}
                       timesheetDetail={{
                         timesheetType,
                         timesheetExtStatus,

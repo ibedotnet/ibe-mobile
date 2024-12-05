@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
   recordCountText: {
     fontSize: screenDimension.width > 400 ? 18 : 16,
     fontWeight: "bold",
-    color: "white",
+    color: "#fff",
   },
   instructionTextInCreate: {
     fontSize: 16,

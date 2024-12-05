@@ -60,10 +60,49 @@ const timesheetFilters = [
 ];
 
 /**
+ * Represents the filters available for MessageLog.
+ * Each filter object contains an id, label, type, fieldName, fieldValue, and option.
+ * - id: Unique identifier for the filter.
+ * - label: Display label for the filter.
+ * - type: Type of the filter (e.g., picker, text, number, date, status).
+ * - fieldName: Field name corresponding to the filter in the data.
+ * - fieldValue: Field value to filter with.
+ * - option: The key representing the corresponding options for the filter.
+ *   This will be the property name (e.g., "messageTypeOptions", "documentCategoryOptions", "messageWithinOptions")
+ */
+const messageLogFilters = [
+  {
+    id: "documentCategory",
+    label: "document_category",
+    type: "picker",
+    fieldName: "MessageLog-busObjCat",
+    fieldValue: "",
+    option: "documentCategoryOptions",
+  },
+  {
+    id: "messageType",
+    label: "message_type",
+    type: "picker",
+    fieldName: "MessageLog-type",
+    fieldValue: "",
+    option: "messageTypeOptions",
+  },
+  {
+    id: "messageWithin",
+    label: "message_within",
+    type: "picker",
+    fieldName: "MessageLog-publishedOn",
+    fieldValue: "",
+    option: "messageWithinOptions",
+  },
+];
+
+/**
  *An object mapping busObjCat values to their respective filters
  */
 const filtersMap = {
   [BUSOBJCAT.TIMESHEET]: timesheetFilters,
+  [BUSOBJCAT.MESSAGELOG]: messageLogFilters,
 };
 
 /**
@@ -280,6 +319,10 @@ const convertToFilterScreenFormat = (
             // For status filters, directly assign the value
             formattedFilters[key] = appliedFilterValue;
             break;
+          case "picker":
+            // For picker filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
           default:
             break;
         }
@@ -357,6 +400,10 @@ const convertToBusObjCatFormat = (
             break;
           case "status":
             // For status filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
+          case "picker":
+            // For picker filters, directly assign the selected value
             formattedFilters[key] = appliedFilterValue;
             break;
           default:
@@ -492,6 +539,57 @@ const handleDateFilter = (
 };
 
 /**
+ * Handles changes to a picker filter (dropdown or selector).
+ *
+ * @param {string} filterId - The identifier for the filter.
+ * @param {string|null} value - The selected value for the filter.
+ * @param {Object} initialFilters - The initial set of filters.
+ * @param {Object} appliedFilters - The currently applied filters.
+ * @param {Function} setAppliedFilters - Function to update the applied filters.
+ * @param {Function} setUnsavedChanges - Function to update the unsaved changes state.
+ */
+const handlePickerFilter = (
+  filterId,
+  value,
+  initialFilters,
+  appliedFilters,
+  setAppliedFilters,
+  setUnsavedChanges
+) => {
+  // Ensure appliedFilters is an object
+  const currentAppliedFilters = appliedFilters || {};
+
+  if (value !== null) {
+    // Update the appliedFilters object with the selected value for this filter
+    setAppliedFilters((prevAppliedFilters) => ({
+      ...prevAppliedFilters,
+      [filterId]: value,
+    }));
+  } else {
+    // If value is null, remove the filter from appliedFilters
+    const { [filterId]: omit, ...remainingFilters } = currentAppliedFilters;
+    setAppliedFilters(remainingFilters);
+  }
+
+  // Check if the value has changed by comparing the current value with the initial one
+  const filterChanged = !isEqual(initialFilters[filterId] || {}, value || {});
+
+  // Log the update process
+  console.log(
+    `Inside handlePickerFilter, the initial filters are: ${JSON.stringify(
+      initialFilters
+    )}. The selected value for the filter is: ${JSON.stringify({ value })}. ` +
+      `Has the filter value changed? ${filterChanged}.`
+  );
+
+  // Update unsaved changes state
+  setUnsavedChanges((prevUnsavedChanges) => ({
+    ...prevUnsavedChanges,
+    [filterId]: filterChanged,
+  }));
+};
+
+/**
  * Handles changes to the status filter.
  *
  * @param {string} filterId - The identifier for the filter.
@@ -605,6 +703,7 @@ export {
   filtersMap,
   handleDateFilter,
   handleDurationFilter,
+  handlePickerFilter,
   handleStatusFilter,
   handleTextFilter,
   validateAppliedFilters,

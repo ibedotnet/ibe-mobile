@@ -52,6 +52,7 @@
   "login_exception_message": "An exception occurred during login.",
   "login_invalid_credentials_message": "Username or password is incorrect",
   "home": "Home",
+  "approval": "Approval",
   "home_hello_user": "Hello, User!",
   "navigate_to_upload_photo": "Navigate to Upload Photo",
   "navigate_to_user_screen": "Navigate to User Screen",
@@ -260,5 +261,19 @@
   "no_changes_detected": "No changes detected.",
   "save_preferences_failed": "Failed to save preferences. Please try again.",
   "image_size_error": "Image size is too large. Please select a smaller image.",
-  "pull_to_refresh": "Pull to refresh"
+  "pull_to_refresh": "Pull to refresh",
+  "access_denied": "Access Denied",
+  "must_be_admin": "You must be an admin to access this section.",
+  "status_update_failed": "Status update failed.",
+  "select_recipient": "Select recipient",
+  "recipient_required": "Recipient is required to proceed.",
+  "comment_required": "Comment is required to proceed.",
+  "read": "Read",
+  "unread": "Unread",
+  "document_category": "Document Category",
+  "message_type": "Message Type",
+  "message_within": "Message Within",
+  "message_log_fetched_since": "Messages fetched since {{publishedSinceDate}}.",
+  "document_cannot_open": "The document category {{documentCategory}} cannot be opened on this platform.",
+  "failed_to_fetch_employee_details": "Failed to fetch employee details. The document cannot be opened. Please try again later."
 }

@@ -9,7 +9,7 @@ import { RichEditor } from "react-native-pell-rich-editor";
 
 import {
   fetchData,
-  getAppName,
+  getAppNameByCategory,
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import { convertToDateFNSFormat, stripHTMLTags } from "../utils/FormatUtils";
@@ -183,7 +183,7 @@ const Comment = ({
         testMode: TEST_MODE,
         component: "platform",
         doNotReplaceAnyList: isDoNotReplaceAnyList(busObjCat),
-        appName: JSON.stringify(getAppName(busObjCat)),
+        appName: JSON.stringify(getAppNameByCategory(busObjCat)),
       };
 
       // Call the updateFields function to perform the MessageLog update
