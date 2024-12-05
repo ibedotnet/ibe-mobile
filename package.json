@@ -55,7 +55,8 @@
     "react-native-svg": "15.2.0",
     "react-native-tab-view": "^3.5.2",
     "react-native-web": "~0.19.6",
-    "react-native-webview": "^13.8.6"
+    "react-native-webview": "^13.8.6",
+    "@expo/metro-runtime": "~3.2.3"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

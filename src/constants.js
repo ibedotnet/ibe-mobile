@@ -4,7 +4,7 @@
  * @returns {string} - The current environment (e.g., "development", "testing", "production").
  */
 const determineEnvironment = () => {
-  return "testing";
+  return "production";
 };
 
 /**
@@ -80,22 +80,11 @@ const API_ENDPOINTS = {
 const API_TIMEOUT = 120000; // 2 minutes
 
 /**
- * Function to dynamically determine the application version.
- * This function could involve reading the version from a file, fetching it from a server, etc.
- * @returns {string} - The application version.
- */
-const getVersion = () => {
-  return "1.0.0"; // Default version for demonstration purposes
-};
-
-/**
  * Object containing application-related constants.
  * @constant
  * @type {Object}
  */
 const APP = {
-  /** The application version. */
-  VERSION: getVersion(),
   /** Client ID of the logged-in user. */
   LOGIN_USER_CLIENT: "",
   /** Date format for the logged-in user. */

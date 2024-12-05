@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useTranslation } from "react-i18next";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import Checkbox from "expo-checkbox";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -53,6 +54,11 @@ const Login = ({ navigation }) => {
 
   const { username, password, clientId, showPassword, rememberMe } = formData;
   const logoWidth = screenDimension.width / 2;
+
+  const version =
+    Constants.expoConfig?.version || // Use this for local development and standalone builds
+    Constants.manifest2?.extra?.expoClient?.version || // Use this for EAS builds
+    "";
 
   /**
    * Updates the formData state with the given name and value.
@@ -428,7 +434,7 @@ const Login = ({ navigation }) => {
       {!isKeyboardVisible && (
         <View style={styles.footer}>
           <Text>
-            {t("login_version_text")} {APP.VERSION}
+            {t("login_version_text")} {version}
           </Text>
         </View>
       )}
