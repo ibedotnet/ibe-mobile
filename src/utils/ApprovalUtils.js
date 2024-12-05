@@ -494,8 +494,8 @@ const getStartDateForFilter = (filter) => {
 const handleStatusChangeMgmt = async (
   processMessage,
   callback,
-  remarkComment,
   recipient,
+  remarkComment,
   nextStatusCodes = [],
   openPreviousGateways
 ) => {
