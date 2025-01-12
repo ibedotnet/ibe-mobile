@@ -4,7 +4,7 @@
  * @returns {string} - The current environment (e.g., "development", "testing", "production").
  */
 const determineEnvironment = () => {
-  return "production";
+  return "testing";
 };
 
 /**

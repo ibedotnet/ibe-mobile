@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ibe2023.ibemobile",
-      "buildNumber": "1.0.0" // Internal build number for iOS
+      "buildNumber": "3" // Internal build number for iOS
     },
     "android": {
       "adaptiveIcon": {

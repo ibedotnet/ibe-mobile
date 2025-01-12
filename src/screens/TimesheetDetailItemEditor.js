@@ -80,8 +80,8 @@ const TimesheetDetailItemEditor = ({
     useState(false);
 
   const timeUnitOptions = [
-    { label: "Hours", value: "hours" },
-    { label: "Minutes", value: "minutes" },
+    { label: "hour(s)", value: "hours" },
+    { label: "minute(s)", value: "minutes" },
   ];
 
   /**

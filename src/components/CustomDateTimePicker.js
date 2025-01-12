@@ -16,6 +16,8 @@ import { convertToDateFNSFormat } from "../utils/FormatUtils";
  * @param {boolean} props.isTimePickerVisible - Whether the time picker is visible.
  * @param {Function} props.onFilter - Callback function triggered when the date or time changes.
  * @param {boolean} props.isDisabled - Whether the picker is disabled.
+ * @param {boolean} props.showClearButton - Whether the clear button is shown.
+ * @param {Object} props.style - Custom styles for different components (container, picker, etc.).
  * @returns {JSX.Element} - CustomDateTimePicker component.
  */
 const CustomDateTimePicker = ({
@@ -26,6 +28,7 @@ const CustomDateTimePicker = ({
   onFilter,
   isDisabled = false,
   showClearButton = true,
+  style = {}, // Default style prop for custom styling
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -82,11 +85,12 @@ const CustomDateTimePicker = ({
       style={[
         styles.pickerContainer,
         { borderColor: isDisabled ? "rgba(0, 0, 0, 0.5)" : "black" },
+        style.pickerContainer, // Custom style for pickerContainer
       ]}
     >
       {/* Button to show the date picker */}
       <CustomButton
-        style={styles.picker}
+        style={[styles.picker, style.picker]} // Custom style for picker button
         onPress={isDisabled ? null : showDatepicker}
         label=""
         icon={{
@@ -101,7 +105,7 @@ const CustomDateTimePicker = ({
       {/* Button to show the time picker, conditionally rendered based on visibility */}
       {isTimePickerVisible && (
         <CustomButton
-          style={styles.picker}
+          style={[styles.picker, style.picker]} // Custom style for picker button
           onPress={isDisabled ? null : showTimepicker}
           label=""
           icon={{
@@ -115,31 +119,32 @@ const CustomDateTimePicker = ({
         />
       )}
       {/* Text displaying the selected date */}
-      <Text style={styles.selectedDate}>
+      <Text style={[styles.selectedDate, style.selectedDate]}>
         {date
           ? `${placeholder ? placeholder + ": " : ""}${format(
               date,
               convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
             )}${isTimePickerVisible ? " " + date.toLocaleTimeString() : ""}`
-          : `${placeholder}: ${t("no_date_selected")}`}
+          : `${placeholder ? placeholder + ": " : ""} ${t("no_date_selected")}`}
       </Text>
       {/* Clear button to clear the selected date, conditionally rendered based on isDisabled prop */}
-      {date &&
-        !isDisabled &&
-        showClearButton && (
-          <CustomButton
-            onPress={clearDate}
-            label={t("clear")}
-            icon={{
-              name: "clear",
-              library: "MaterialIcons",
-              color: "#005eb8",
-            }}
-            backgroundColor={false}
-            style={{ icon: { marginRight: 0 }, borderLeftWidth: 0.5 }}
-            labelStyle={styles.clearButtonText}
-          />
-        )}
+      {date && !isDisabled && showClearButton && (
+        <CustomButton
+          onPress={clearDate}
+          label={t("clear")}
+          icon={{
+            name: "clear",
+            library: "MaterialIcons",
+            color: "#005eb8",
+          }}
+          backgroundColor={false}
+          style={[
+            { icon: { marginRight: 0 }, borderLeftWidth: 0.5 },
+            style.clearButton,
+          ]} // Custom clear button style
+          labelStyle={[styles.clearButtonText, style.clearButtonText]} // Custom clear button text style
+        />
+      )}
       {/* Date picker component, rendered conditionally based on show state */}
       {show && (
         <DateTimePicker

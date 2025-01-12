@@ -509,78 +509,84 @@ const Comment = ({
           <Text style={common.loadingText}>{t("update_in_progress")}...</Text>
         </View>
       )}
-      <ScrollView contentContainerStyle={styles.scrollView}>
-        {comments.map((comment, index) => (
-          <View
-            key={comment.id}
-            style={[
-              styles.commentItem,
-              comment.hasOwnProperty("isNewlyAdded") &&
-                comment["isNewlyAdded"] === true &&
-                styles.newlyAddedItem,
-            ]}
-          >
-            <View style={styles.commentContentContainer}>
-              <View style={[styles.commentContent]}>
-                {comment.content ? (
-                  <RichEditor
-                    key={`${comment.id}-${comment.content}`} // Force re-render when content changes
-                    initialContentHTML={comment.content}
-                    disabled={true}
-                    useContainer={
-                      comment.hasOwnProperty("isNewlyAdded") &&
-                      comment["isNewlyAdded"] === true
-                        ? false
-                        : true
-                    }
-                    editorStyle={
-                      comment.hasOwnProperty("isNewlyAdded") &&
-                      comment["isNewlyAdded"] === true &&
-                      styles.newlyAddedItem
-                    }
+      {comments.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.noCommentsText}>{t("no_comments")}</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollView}>
+          {comments.map((comment, index) => (
+            <View
+              key={comment.id}
+              style={[
+                styles.commentItem,
+                comment.hasOwnProperty("isNewlyAdded") &&
+                  comment["isNewlyAdded"] === true &&
+                  styles.newlyAddedItem,
+              ]}
+            >
+              <View style={styles.commentContentContainer}>
+                <View style={[styles.commentContent]}>
+                  {comment.content ? (
+                    <RichEditor
+                      key={`${comment.id}-${comment.content}`} // Force re-render when content changes
+                      initialContentHTML={comment.content}
+                      disabled={true}
+                      useContainer={
+                        comment.hasOwnProperty("isNewlyAdded") &&
+                        comment["isNewlyAdded"] === true
+                          ? false
+                          : true
+                      }
+                      editorStyle={
+                        comment.hasOwnProperty("isNewlyAdded") &&
+                        comment["isNewlyAdded"] === true &&
+                        styles.newlyAddedItem
+                      }
+                    />
+                  ) : null}
+                </View>
+                <View style={styles.commentActions}>
+                  <CustomButton
+                    onPress={() => handleEditPress(comment)}
+                    icon={{
+                      name: "comment-edit",
+                      library: "MaterialCommunityIcons",
+                      size: 24,
+                      color: "green",
+                    }}
+                    label=""
+                    backgroundColor={false}
+                    disabled={loading || isParentLocked}
+                    style={{ flex: 1 }}
                   />
+                  <CustomButton
+                    onPress={() => handleDeletePress(comment)}
+                    icon={{
+                      name: "comment-remove",
+                      library: "MaterialCommunityIcons",
+                      size: 24,
+                      color: "red",
+                    }}
+                    label=""
+                    backgroundColor={false}
+                    disabled={loading || isParentLocked}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+              <View style={styles.publishedInfo}>
+                {comment.publishedOn && comment.publishedBy ? (
+                  <Text style={styles.publishedText}>
+                    {t("published_on")} {comment.publishedOn} {t("by")}{" "}
+                    {comment.publishedBy}
+                  </Text>
                 ) : null}
               </View>
-              <View style={styles.commentActions}>
-                <CustomButton
-                  onPress={() => handleEditPress(comment)}
-                  icon={{
-                    name: "comment-edit",
-                    library: "MaterialCommunityIcons",
-                    size: 24,
-                    color: "green",
-                  }}
-                  label=""
-                  backgroundColor={false}
-                  disabled={loading || isParentLocked}
-                  style={{ flex: 1 }}
-                />
-                <CustomButton
-                  onPress={() => handleDeletePress(comment)}
-                  icon={{
-                    name: "comment-remove",
-                    library: "MaterialCommunityIcons",
-                    size: 24,
-                    color: "red",
-                  }}
-                  label=""
-                  backgroundColor={false}
-                  disabled={loading || isParentLocked}
-                  style={{ flex: 1 }}
-                />
-              </View>
             </View>
-            <View style={styles.publishedInfo}>
-              {comment.publishedOn && comment.publishedBy ? (
-                <Text style={styles.publishedText}>
-                  {t("published_on")} {comment.publishedOn} {t("by")}{" "}
-                  {comment.publishedBy}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -648,6 +654,15 @@ const styles = StyleSheet.create({
   },
   newlyAddedItem: {
     backgroundColor: "#fffb6f",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noCommentsText: {
+    fontSize: 18,
+    color: "#555",
   },
 });
 

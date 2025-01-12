@@ -7,6 +7,7 @@ import Expense from "../screens/Expense";
 import Home from "../screens/Home";
 import Login from "../screens/Login";
 import Timesheet from "../screens/Timesheet";
+import AbsenceDetail from "../screens/AbsenceDetail";
 import TimesheetDetail from "../screens/TimesheetDetail";
 import User from "../screens/User";
 import Approval from "../screens/Approval";
@@ -84,6 +85,7 @@ const MainNavigator = () => {
         <Stack.Screen name="TimesheetDetail" component={TimesheetDetail} />
         <Stack.Screen name="Expense" component={Expense} />
         <Stack.Screen name="Absence" component={Absence} />
+        <Stack.Screen name="AbsenceDetail" component={AbsenceDetail} />
         <Stack.Screen name="User" component={User} />
         <Stack.Screen name="Approval" component={Approval} />
 

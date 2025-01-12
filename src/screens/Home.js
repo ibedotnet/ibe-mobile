@@ -270,7 +270,6 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity
             onPress={onPressAbsences}
             accessibilityLabel={t("navigate_to_absences")}
-            disabled={true}
           >
             <View style={styles.card}>
               <MaterialCommunityIcons

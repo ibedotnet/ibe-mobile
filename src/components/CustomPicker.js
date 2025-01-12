@@ -70,7 +70,7 @@ const CustomPicker = ({
    */
   const handleValueChange = (itemValue, itemIndex) => {
     setSelectedValue(itemValue);
-    
+
     // Call onFilter with the selected value
     if (onFilter) {
       onFilter(itemValue);
@@ -110,7 +110,7 @@ const CustomPicker = ({
 
     let selectedItem = null;
 
-    if (initialValue && items.length > 0) {
+    if (initialValue && items && items.length > 0) {
       // Find the item in the items array that matches the initial value
       selectedItem = items.find((item) => {
         // Compare values based on their types
@@ -201,7 +201,7 @@ const CustomPicker = ({
             <Picker.Item label={placeholder} value={null} />
 
             {/* Render filtered picker items */}
-            {filteredItems.map((item, index) => (
+            {filteredItems?.map((item, index) => (
               <Picker.Item key={index} label={item.label} value={item.value} />
             ))}
           </Picker>

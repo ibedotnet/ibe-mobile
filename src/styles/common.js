@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-const disableOpacity = 80;
+const disableOpacity = 90;
 
 const common = StyleSheet.create({
   container: {

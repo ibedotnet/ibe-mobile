@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useState,
   useRef,
-  useContext,
 } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
@@ -576,6 +575,19 @@ const TimesheetDetail = ({ route, navigation }) => {
 
               // Return the valid period dates for the selected date
               return validPeriodForSelectedDate;
+            } else if (mostRecentPeriod && mostRecentPeriod.validFromDate) {
+              // If no period schedule but validFromDate exists, calculate a weekly period
+              console.log(
+                "No period schedule found, falling back to a weekly interval based on validFromDate."
+              );
+
+              return normalizePeriodToWeek(
+                {
+                  from: selectedDate,
+                  to: selectedDate,
+                },
+                startOfWeek
+              );
             } else {
               // If the most recent period does not exist or does not refer to a valid period schedule id
               console.log(
@@ -866,7 +878,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the start date is required
       Alert.alert(
         t("validation_error"), // Title of the alert
-        t("timesheet_start_required_message"), // Message of the alert
+        t("start_required_message"), // Message of the alert
         [{ text: t("ok"), style: "cancel" }], // Button configuration
         { cancelable: false } // Prevents closing the alert by tapping outside
       );
@@ -878,7 +890,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the end date is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_end_required_message"),
+        t("end_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -890,7 +902,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the company ID is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_company_required_message"),
+        t("company_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -902,7 +914,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the employee ID is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_employee_required_message"),
+        t("employee_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -1088,7 +1100,7 @@ const TimesheetDetail = ({ route, navigation }) => {
 
         handleReload(); // Call handleReload after saving
 
-        // force refresh timhseet data on list screen
+        // force refresh timehseet data on list screen
         updateForceRefresh(true);
 
         // Notify that save was clicked
@@ -1719,7 +1731,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       ]);
     } catch (error) {
       console.error(
-        "Error in either loading timesheet details or absences: ",
+        "Error in loading timesheet details, absences or process template: ",
         error
       );
     } finally {

@@ -56,7 +56,64 @@ const timesheetFilters = [
     fieldName: "TimeConfirmation-extStatus-processTemplateID",
     fieldValue: "",
   },
-  // Add other filters as needed
+];
+
+/**
+ * Represents the filters available for absences.
+ * Each filter object contains an id, label, type, fieldName, and fieldValue.
+ * - id: Unique identifier for the filter.
+ * - label: Display label for the filter.
+ * - type: Type of the filter (e.g., text, number, date).
+ * - fieldName: Field name corresponding to the filter in the data.
+ * - fieldValue: Field value to filter with.
+ * - units (optional): Array of units for duration type filter (e.g., hours, days).
+ * - convertToMillisecondsEnabled (optional): Boolean indicating whether duration should be converted to milliseconds.
+ */
+const absenceFilters = [
+  {
+    id: "fromDate",
+    label: "start",
+    type: "date",
+    fieldName: "Absence-start",
+    fieldValue: "",
+  },
+  {
+    id: "toDate",
+    label: "end",
+    type: "date",
+    fieldName: "Absence-end",
+    fieldValue: "",
+  },
+  {
+    id: "workflowStatus",
+    label: "status",
+    type: "status",
+    fieldName: "Absence-extStatus-processTemplateID",
+    fieldValue: "",
+  },
+  {
+    id: "absenceType",
+    label: "absence_type",
+    type: "picker",
+    fieldName: "Absence-type",
+    fieldValue: "",
+    option: "absenceTypeOptions",
+  },
+  {
+    id: "adjustments",
+    label: "adjustments",
+    type: "picker",
+    fieldName: "Absence-adjustAbsence",
+    fieldValue: "",
+    option: "booleanOptions",
+  },
+  {
+    id: "reason",
+    label: "reason",
+    type: "text",
+    fieldName: "Absence-remark-text",
+    fieldValue: "",
+  },
 ];
 
 /**
@@ -102,6 +159,7 @@ const messageLogFilters = [
  */
 const filtersMap = {
   [BUSOBJCAT.TIMESHEET]: timesheetFilters,
+  [BUSOBJCAT.ABSENCE]: absenceFilters,
   [BUSOBJCAT.MESSAGELOG]: messageLogFilters,
 };
 
@@ -132,6 +190,12 @@ const convertFiltersToOrConditions = (
           // Implement duration filter handling if needed
           break;
         case "date":
+          // Implement date filter handling if needed
+          break;
+        case "picker":
+          // Implement date filter handling if needed
+          break;
+        case "boolean":
           // Implement date filter handling if needed
           break;
         case "status":
@@ -177,6 +241,7 @@ const convertFiltersToOrConditions = (
  * Converts applied filters into a where condition suitable for fetching data.
  * @param {Object} appliedFilters - The applied filters object containing key-value pairs of filter ids and values.
  * @param {Array} busObjCatFilter - The array of filter objects defining the filters available for the bus object category.
+ * @param {Array} busObjCat - The array of business object categories.
  * @returns {Array} - The where condition array based on the applied filters.
  */
 const convertFiltersToWhereConditions = (
@@ -240,8 +305,23 @@ const convertFiltersToWhereConditions = (
             }
           }
           break;
-        // Add cases for other types of filters if needed
-
+        case "picker":
+          // For picker filters, add to where condition if the value is an array or a single value
+          const pickerValue = appliedFilters[filterId];
+          if (Array.isArray(pickerValue) && pickerValue.length > 0) {
+            whereConditions.push({
+              fieldName: filter.fieldName,
+              operator: "in", // Use IN operator for arrays
+              value: pickerValue, // Add the array as the value
+            });
+          } else if (pickerValue) {
+            whereConditions.push({
+              fieldName: filter.fieldName,
+              operator: "=",
+              value: pickerValue, // Single string value
+            });
+          }
+          break;
         default:
           break;
       }

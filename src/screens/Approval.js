@@ -73,6 +73,8 @@ const Approval = ({ route, navigation }) => {
   const [busObjCatMap, setBusObjCatMap] = useState({});
   const [clickedStatusButton, setClickedStatusButton] = useState({});
   const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false);
+  const [changeRecipient, setChangeRecipient] = useState(false);
+  const [commentRequired, setCommentRequired] = useState(false);
   const [isRead, setIsRead] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState({});
   const [appliedFiltersCount, setAppliedFiltersCount] = useState(0);
@@ -334,6 +336,8 @@ const Approval = ({ route, navigation }) => {
 
       // Close the dialog after status change is completed
       setIsCommentDialogVisible(false);
+      setChangeRecipient(false);
+      setCommentRequired(false);
     } catch (error) {
       // Log error for debugging purposes
       console.error("Error during status change:", error);
@@ -431,7 +435,7 @@ const Approval = ({ route, navigation }) => {
       </View>
     );
   }, [navigation, data.length, t]);
-  
+
   /**
    * Memoized headerRight component.
    * This component will be used as the right side of the navigation header.
@@ -722,6 +726,9 @@ const Approval = ({ route, navigation }) => {
         !clickedStatusButtonDetails.record.commentsEntered &&
         (changeRecipient || comment);
 
+      setChangeRecipient(changeRecipient);
+      setCommentRequired(comment);
+
       if (needsCommentDialog) {
         // Show comment dialog if necessary
         setIsCommentDialogVisible(true);
@@ -749,7 +756,7 @@ const Approval = ({ route, navigation }) => {
       ) : data.length === 0 ? (
         // Display 'No new messages' if data is empty
         <View style={styles.emptyMessageContainer}>
-          <Text style={styles.emptyMessageText}>No new messages</Text>
+          <Text style={styles.emptyMessageText}>{t("no_new_messages")}</Text>
         </View>
       ) : (
         // FlatList to display the message log data
@@ -768,41 +775,51 @@ const Approval = ({ route, navigation }) => {
         onConfirm={handleCommentDialogConfirm}
         title={""}
         inputsConfigs={[
-          {
-            id: "recipientApproval",
-            type: "dropdown",
-            allowBlank: true,
-            queryFields: {
-              fields: ["Person-id", "Person-name-knownAs"],
-              sort: [
+          // Show recipientApproval only if changeRecipient is true
+          ...(changeRecipient
+            ? [
                 {
-                  property: "Person-name-knownAs",
-                  direction: "ASC",
+                  id: "recipientApproval",
+                  type: "dropdown",
+                  allowBlank: true,
+                  queryFields: {
+                    fields: ["Person-id", "Person-name-knownAs"],
+                    sort: [
+                      {
+                        property: "Person-name-knownAs",
+                        direction: "ASC",
+                      },
+                    ],
+                  },
+                  commonQueryParams: {
+                    filterQueryValue: "",
+                    userID: APP.LOGIN_USER_ID,
+                    client: parseInt(APP.LOGIN_USER_CLIENT),
+                    language: APP.LOGIN_USER_LANGUAGE,
+                    intStatus: JSON.stringify([INTSTATUS.ACTIVE, 1]),
+                    page: 1,
+                    start: 0,
+                    limit: 20,
+                  },
+                  pickerLabel: t("select_recipient"),
+                  labelItemField: "Person-name-knownAs",
+                  valueItemField: "Person-id",
+                  searchFields: ["Person-name-knownAs"],
+                  validateInput: validateRecipient,
                 },
-              ],
-            },
-            commonQueryParams: {
-              filterQueryValue: "",
-              userID: APP.LOGIN_USER_ID,
-              client: parseInt(APP.LOGIN_USER_CLIENT),
-              language: APP.LOGIN_USER_LANGUAGE,
-              intStatus: JSON.stringify([INTSTATUS.ACTIVE, 1]),
-              page: 1,
-              start: 0,
-              limit: 20,
-            },
-            pickerLabel: t("select_recipient"),
-            labelItemField: "Person-name-knownAs",
-            valueItemField: "Person-id",
-            searchFields: ["Person-name-knownAs"],
-            validateInput: validateRecipient,
-          },
-          {
-            id: "commentApproval",
-            type: "richText",
-            initialValue: null,
-            validateInput: validateComment,
-          },
+              ]
+            : []),
+          // Show commentApproval only if commentRequired is true
+          ...(commentRequired
+            ? [
+                {
+                  id: "commentApproval",
+                  type: "richText",
+                  initialValue: null,
+                  validateInput: validateComment,
+                },
+              ]
+            : []),
         ]}
       />
     </View>
