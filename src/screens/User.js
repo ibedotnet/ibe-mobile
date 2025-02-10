@@ -32,6 +32,7 @@ import { parseUserComms } from "../utils/UserUtils";
 import { API_ENDPOINTS, APP } from "../constants";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useRequestQueueContext } from "../../context/RequestQueueContext";
+import { useTheme } from "../../context/ThemeContext";
 
 /**
  * Component to display and manage user preferences (e.g., language, request queue settings).
@@ -58,6 +59,8 @@ const User = ({ route, navigation }) => {
   // Use the custom hook to access the request queue context
   const { isRequestQueueEnabled, setIsRequestQueueEnabled } =
     useRequestQueueContext(); // Provides access to request queue context for managing request queue feature.
+
+  const { isDarkMode, toggleTheme } = useTheme();
 
   const [changes, setChanges] = useState([]); // Track changes made to user preferences.
 
@@ -511,6 +514,25 @@ const User = ({ route, navigation }) => {
               accessibilityLabel="Enable request queue toggle"
               accessibilityRole="switch"
               accessibilityState={{ checked: isRequestQueueEnabled }}
+            />
+          </View>
+          <View style={styles.toggleContainer}>
+            <Text
+              style={styles.toggleLabel}
+              accessibilityLabel="Enable dark mode label"
+              accessibilityRole="text"
+            >
+              {t("enable_dark_mode")}
+            </Text>
+            <Switch
+              trackColor={{ false: "#767577", true: "#005eb8" }}
+              thumbColor={isDarkMode ? "#f5dd4b" : "#f4f3f4"}
+              ios_backgroundColor="#3e3e3e"
+              onValueChange={toggleTheme}
+              value={isDarkMode}
+              accessibilityLabel="Enable dark mode toggle"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: isDarkMode }}
             />
           </View>
           <CustomPicker

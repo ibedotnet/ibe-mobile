@@ -101,7 +101,7 @@ const absenceFilters = [
   },
   {
     id: "adjustments",
-    label: "adjustments",
+    label: "adjustment",
     type: "picker",
     fieldName: "Absence-adjustAbsence",
     fieldValue: "",

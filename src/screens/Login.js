@@ -232,6 +232,8 @@ const Login = ({ navigation }) => {
       userType: user["User-type"] || "",
       hireDate: user["Resource-core-hireDate"] || null,
       termDate: user["Resource-core-termDate"] || null,
+      confirmationDate: user["Resource-core-confirmationDate"] || null,
+      noticePeriod: user["Resource-core-noticePeriod"] || null,
       companyId: user["Resource-companyID"] || "",
       workScheduleExtId: empWorkSchedue.extID || "",
       workScheduleName: empWorkSchedue.name || "",
@@ -245,7 +247,10 @@ const Login = ({ navigation }) => {
       calendarExtId: empWorkCalendar.extID || "",
       nonWorkingDates: empWorkCalendar.nonWorkingDates || [],
       nonWorkingDays: empWorkCalendar.nonWorkingDays || [],
-      startOfWeek: empWorkCalendar.startOfWeek || 1,
+      startOfWeek:
+        empWorkCalendar.startOfWeek !== undefined
+          ? empWorkCalendar.startOfWeek
+          : 1,
     };
 
     // Update context or state with user information

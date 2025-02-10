@@ -305,6 +305,21 @@ const convertToMilliseconds = (number, unit) => {
 };
 
 /**
+ * Helper function to check if two dates are the same day.
+ *
+ * @param {Date} date1 - The first date to compare.
+ * @param {Date} date2 - The second date to compare.
+ * @returns {boolean} - Returns `true` if the dates are the same day, otherwise `false`.
+ */
+const datesAreForSameDay = (date1, date2) => {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+};
+
+/**
  * Retrieves the text of a remark for a specific language from an array of remarks.
  * If the remark for the specified language is not found, it falls back to the preferred languages.
  *
@@ -565,6 +580,7 @@ export {
   convertToDateFNSFormat,
   convertToDateObject,
   convertToMilliseconds,
+  datesAreForSameDay,
   getRemarkText,
   normalizeDateToUTC,
   setRemarkText,

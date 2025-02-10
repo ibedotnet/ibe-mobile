@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   RefreshControl,
@@ -215,7 +216,7 @@ const Absence = ({ route, navigation }) => {
     const pickerOptions = {
       absenceTypeOptions: Object.entries(absenceTypeMap).map(
         ([key, value]) => ({
-          label: value,
+          label: value["AbsenceType-name"] || "Unknown",
           value: key,
         })
       ),
@@ -441,7 +442,7 @@ const Absence = ({ route, navigation }) => {
             const absenceType = item?.["Absence-type:AbsenceType-name"] || "";
             const remark = item?.["Absence-remark:text"] || "";
             const adjustAbsence = item["Absence-adjustAbsence"];
-            const plannedDays = item["Absence-plannedDays"];
+            const plannedDays = item["Absence-plannedDays"] || 0;
             const leaveDuration = formatLeaveDuration(
               plannedDays,
               item["Absence-type:AbsenceType-hourlyLeave"],
@@ -542,7 +543,9 @@ const Absence = ({ route, navigation }) => {
         onEndReached={handleLoadMoreData}
         onEndReachedThreshold={0.1}
         ListFooterComponent={() => {
-          return isFetchingMore ? <Loader /> : null;
+          return isFetchingMore ? (
+            <ActivityIndicator size="small" color="#0000ff" />
+          ) : null;
         }}
         refreshControl={
           <RefreshControl

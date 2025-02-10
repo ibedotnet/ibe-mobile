@@ -4,6 +4,15 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useTranslation } from "react-i18next";
 
+import CustomButton from "../components/CustomButton";
+import CustomBackButton from "../components/CustomBackButton";
+import Loader from "../components/Loader";
+
+import AbsenceDetailGeneral from "./AbsenceDetailGeneral";
+import File from "./File";
+import Comment from "./Comment";
+import History from "./History";
+
 import {
   API_ENDPOINTS,
   APP,
@@ -16,12 +25,10 @@ import {
   TEST_MODE,
 } from "../constants";
 
-import CustomButton from "../components/CustomButton";
+import useEmployeeInfo from "../hooks/useEmployeeInfo";
 
-import AbsenceDetailGeneral from "./AbsenceDetailGeneral";
-import File from "./File";
-import Comment from "./Comment";
-import History from "./History";
+import { useAbsenceForceRefresh } from "../../context/ForceRefreshContext";
+import { useAbsenceSave } from "../../context/SaveContext";
 
 import {
   fetchData,
@@ -39,21 +46,32 @@ import { screenDimension } from "../utils/ScreenUtils";
 import updateFields from "../utils/UpdateUtils";
 import { documentStatusCheck } from "../utils/WorkflowUtils";
 
-import CustomBackButton from "../components/CustomBackButton";
-import Loader from "../components/Loader";
-
-import { useAbsenceForceRefresh } from "../../context/ForceRefreshContext";
-import { useAbsenceSave } from "../../context/SaveContext";
-import useEmployeeInfo from "../hooks/useEmployeeInfo";
 import {
-  fetchAbsenceTypes,
   fetchListData,
   fetchProcessTemplate,
   getAbsenceFields,
+  updateFieldInState,
+  fetchEligibleAbsenceTypes,
+  fetchAbsenceTypes,
+  validateStatusChange,
+  isLeaveAllowedInEmploymentPeriod,
+  fetchEmployeeAbsences,
+  isAbsencesOverlap,
 } from "../utils/AbsenceUtils";
 
 const Tab = createMaterialTopTabNavigator();
 
+/**
+ * AbsenceDetail component handles the detailed view of an absence record.
+ * It allows users to view, edit, create, and delete absence records.
+ * The component uses multiple tabs to organize the absence details, files, comments, and history.
+ *
+ * @param {Object} props - The component props.
+ * @param {Object} props.route - The route object containing navigation parameters.
+ * @param {Object} props.navigation - The navigation object for navigating between screens.
+ *
+ * @returns {JSX.Element} The rendered component.
+ */
 const AbsenceDetail = ({ route, navigation }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -63,6 +81,7 @@ const AbsenceDetail = ({ route, navigation }) => {
   const { notifySave } = useAbsenceSave();
 
   const updatedValuesRef = useRef({});
+  const employeeIDRef = useRef(null);
 
   const statusTemplateExtId = route?.params?.statusTemplateExtId;
   const openedFromApproval = route?.params?.openedFromApproval;
@@ -92,59 +111,40 @@ const AbsenceDetail = ({ route, navigation }) => {
   const [absencePlannedDays, setAbsencePlannedDays] = useState(null);
   const [absenceSubmittedOn, setAbsenceSubmittedOn] = useState(null);
   const [absenceAdjustAbsence, setAbsenceAdjustAbsence] = useState(false);
+  const [absenceAdjustTaken, setAbsenceAdjustTaken] = useState(false);
   const [absenceHoursByDay, setAbsenceHoursByDay] = useState([]);
   const [absenceExtStatus, setAbsenceExtStatus] = useState({});
   const [absenceRemark, setAbsenceRemark] = useState("");
-  const [absenceTypeDetails, setAbsenceTypeDetails] = useState({}); // Stores details of the selected absence type, if available
-  const [allAbsenceTypes, setAllAbsenceTypes] = useState({}); // Maintains a map of all available absence types
+  const [absenceTypeDetails, setAbsenceTypeDetails] = useState({});
+  const [allAbsenceTypes, setAllAbsenceTypes] = useState({});
+  const [behaviorFields, setBehaviorFields] = useState({
+    absenceTypeFixedCalendar: absenceTypeDetails.absenceTypeFixedCalendar || "",
+    absenceTypeDisplayInHours:
+      absenceTypeDetails.absenceTypeDisplayInHours || false,
+    absenceTypeHourlyLeave: absenceTypeDetails.absenceTypeHourlyLeave || false,
+    absenceTypeAllowedInProbation:
+      absenceTypeDetails.absenceTypeAllowedInProbation || false,
+    absenceTypeAllowedInTermination:
+      absenceTypeDetails.absenceTypeAllowedInTermination || false,
+    selectedHoliday: null,
+    absenceTypeAdminAdjustOnly:
+      absenceTypeDetails.absenceTypeAdminAdjustOnly || false,
+    absenceTypeHalfDaysNotAllowed:
+      absenceTypeDetails.absenceTypeHalfDaysNotAllowed || false,
+    absenceTypeMinRequest: absenceTypeDetails.absenceTypeMinRequest || null,
+    absenceTypeMaxRequest: absenceTypeDetails.absenceTypeMaxRequest || null,
+  });
+  const [isAddToBalance, setIsAddToBalance] = useState(true);
+  const [processTemplate, setProcessTemplate] = useState(null);
+  const [employeeAbsences, setEmployeeAbsences] = useState([]);
 
   // Use custom hook to get the employeeInfo based on openedFromApproval flag
   const employeeInfo = useEmployeeInfo(openedFromApproval);
 
-  // Destructuring necessary properties from employeeInfo
-  const {} = employeeInfo;
-
   /**
-   * This function checks if there are unsaved changes by verifying if the `updatedValuesRef` object has any keys.
-   * It uses the `useCallback` hook to ensure the function is only recreated when necessary, optimizing performance.
-   *
-   * @param {Object} updatedValuesRef - A reference object containing updated values. If it has any keys, it indicates unsaved changes.
-   *
-   * @returns {boolean} - Returns `true` if there are unsaved changes, otherwise `false`.
+   * Handles locking or unlocking the absence record.
+   * Only proceeds if the component is in edit mode.
    */
-  const hasUnsavedChanges = useCallback(() => {
-    console.log(
-      "Updated values reference (if any) in hasUnsavedChanges: ",
-      JSON.stringify(updatedValuesRef)
-    );
-
-    return Object.keys(updatedValuesRef.current).length > 0;
-  }, [updatedValuesRef]);
-
-  const showUnsavedChangesAlert = (onDiscard) => {
-    Alert.alert(
-      t("unsaved_changes_title"),
-      t("unsaved_changes_message"),
-      [
-        {
-          text: t("cancel"),
-          style: "cancel",
-        },
-        {
-          text: t("discard"),
-          style: "destructive",
-          onPress: () => {
-            // Reset updatedValuesRef.current and call onDiscard
-            updatedValuesRef.current = {};
-            setUpdatedValues({});
-            onDiscard();
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  };
-
   const handleLock = async () => {
     /**
      * Proceed only if the edit mode is enabled.
@@ -194,227 +194,21 @@ const AbsenceDetail = ({ route, navigation }) => {
 
   /**
    * Handles reloading the absence data.
-   * - Fetches the latest absence data if there are no unsaved changes.
-   * - Shows an alert to confirm discarding unsaved changes before fetching data.
+   * Fetches the latest absence data if there are no unsaved changes.
+   * Shows an alert to confirm discarding unsaved changes before fetching data.
    */
   const handleReload = () => {
     const reloadData = () => {
-      fetchAbsence(); // Fetch the latest absence data
+      loadAbsenceDetail(); // Fetch the latest absence data
     };
 
     hasUnsavedChanges() ? showUnsavedChangesAlert(reloadData) : reloadData();
   };
 
-  const handleAbsenceDetailChange = (values) => {
-    console.log(`Updated values in Absence Detail: ${JSON.stringify(values)}`);
-
-    const updatedChanges = { ...updatedValues };
-
-    if (
-      values.absenceRemark !== undefined &&
-      !isEqual(values.absenceRemark, absenceRemark)
-    ) {
-      setAbsenceRemark(values.absenceRemark);
-      updatedChanges["remark:text"] = getRemarkText(
-        values.absenceRemark,
-        lang,
-        PREFERRED_LANGUAGES
-      );
-    }
-
-    if (
-      values.absenceStartDate !== undefined &&
-      !isEqual(values.absenceStartDate, absenceStart)
-    ) {
-      setAbsenceStart(values.absenceStartDate);
-      updatedChanges["start"] = values.absenceStartDate;
-    }
-
-    if (
-      values.absenceEndDate !== undefined &&
-      !isEqual(values.absenceEndDate, absenceEnd)
-    ) {
-      setAbsenceEnd(values.absenceEndDate);
-      updatedChanges["end"] = values.absenceEndDate;
-    }
-
-    if (
-      values.absenceStartDayFraction !== undefined &&
-      !isEqual(values.absenceStartDayFraction, absenceStartDayFraction)
-    ) {
-      setAbsenceStartDayFraction(values.absenceStartDayFraction);
-      updatedChanges["startHalfDay"] = values.absenceStartDayFraction;
-    }
-
-    if (
-      values.absenceEndDayFraction !== undefined &&
-      !isEqual(values.absenceEndDayFraction, absenceEndDayFraction)
-    ) {
-      setAbsenceEndDayFraction(values.absenceEndDayFraction);
-      updatedChanges["endHalfDay"] = values.absenceEndDayFraction;
-    }
-
-    if (
-      values.absenceDuration !== undefined &&
-      !isEqual(values.absenceDuration, absencePlannedDays)
-    ) {
-      setAbsenceEndDayFraction(values.absenceDuration);
-      updatedChanges["plannedDays"] = values.absenceDuration;
-    }
-
-    if (
-      values.absenceType !== undefined &&
-      !isEqual(values.absenceType, absenceType)
-    ) {
-      setAbsenceEndDayFraction(values.absenceType);
-      updatedChanges["type"] = values.absenceType;
-    }
-
-    if (
-      values.absenceFiles !== undefined &&
-      !isEqual(values.absenceFiles, absenceFiles)
-    ) {
-      setAbsenceFiles(values.absenceFiles);
-      updatedChanges["files"] = values.absenceFiles;
-    }
-
-    if (
-      values.absenceComments !== undefined &&
-      !isEqual(values.absenceComments, absenceComments)
-    ) {
-      setAbsenceComments(values.absenceComments);
-      updatedChanges["comments"] = values.absenceComments;
-    }
-
-    console.log(
-      `Updated changes in Absence Detail: ${JSON.stringify(updatedChanges)}`
-    );
-
-    // Update the ref
-    updatedValuesRef.current = updatedChanges;
-    // Update the changes state
-    setUpdatedValues(updatedChanges);
-  };
-
-  const validateAbsenceOnSave = () => {
-    const {} = absenceTypeDetails;
-
-    // Check if the absence start date is provided
-    if (!absenceStart) {
-      Alert.alert(
-        t("validation_error"), // Title of the alert
-        t("start_required_message"), // Message of the alert
-        [{ text: t("ok"), style: "cancel" }], // Button configuration
-        { cancelable: false } // Prevents closing the alert by tapping outside
-      );
-      return false; // Return false to prevent saving
-    }
-
-    // Check if the absence end date is provided
-    if (!absenceEnd) {
-      Alert.alert(
-        t("validation_error"),
-        t("end_required_message"),
-        [{ text: t("ok"), style: "cancel" }],
-        { cancelable: false }
-      );
-      return false;
-    }
-
-    // Check if the absence end date is provided
-    if (!absenceType) {
-      Alert.alert(
-        t("validation_error"),
-        t("type_required_message"),
-        [{ text: t("ok"), style: "cancel" }],
-        { cancelable: false }
-      );
-      return false;
-    }
-
-    // If all validations pass, return true to proceed with saving
-    return true;
-  };
-
-  const handleSave = async () => {
-    try {
-      const isValidAbsence = validateAbsenceOnSave();
-
-      if (isValidAbsence) {
-        await updateAbsence(updatedValues);
-      }
-    } catch (error) {
-      console.error("Error in saving absence", error);
-    }
-  };
-
-  const updateAbsence = async (updatedValues = {}) => {
-    try {
-      const prefixedUpdatedValues = {};
-      for (const key in updatedValues) {
-        prefixedUpdatedValues[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-${key}`] =
-          updatedValues[key];
-      }
-
-      // Add the prefixed updated values to the formData
-      const formData = {
-        data: {
-          [`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-id`]: absenceId,
-          ...prefixedUpdatedValues,
-        },
-      };
-
-      const queryStringParams = {
-        userID: APP.LOGIN_USER_ID,
-        client: APP.LOGIN_USER_CLIENT,
-        language: APP.LOGIN_USER_LANGUAGE,
-        testMode: TEST_MODE,
-        component: "platform",
-        doNotReplaceAnyList: isDoNotReplaceAnyList(BUSOBJCAT.ABSENCE),
-        appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.ABSENCE)),
-      };
-
-      const updateResponse = await updateFields(formData, queryStringParams);
-
-      // Check if update was successful
-      if (updateResponse.success) {
-        // Extract the new ID from the response
-        const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
-        if (newId) {
-          setAbsenceId(newId); // Update the absenceId with the new ID
-          setIsEditMode(true);
-        }
-
-        // Clear updatedValuesRef.current and updatedValues state
-        updatedValuesRef.current = {};
-        setUpdatedValues({});
-
-        handleReload(); // Call handleReload after saving
-
-        // force refresh absence data on list screen
-        updateForceRefresh(true);
-
-        // Notify that save was clicked
-        notifySave();
-
-        if (lang !== "en") {
-          showToast(t("update_success"));
-        }
-
-        updateForceRefresh(true);
-
-        if (updateResponse.message) {
-          showToast(updateResponse.message);
-        }
-      } else {
-        showToast(t("update_failure"), "error");
-      }
-    } catch (error) {
-      console.error("Error in updateAbsence of AbsenceDetail", error);
-      showToast(t("unexpected_error"), "error");
-    }
-  };
-
+  /**
+   * Handles deleting the absence record.
+   * Shows a confirmation alert before deleting the record.
+   */
   const handleDelete = () => {
     if (isEditMode) {
       Alert.alert(
@@ -481,21 +275,614 @@ const AbsenceDetail = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Checks if there are unsaved changes by verifying if the `updatedValuesRef` object has any keys.
+   * Uses the `useCallback` hook to ensure the function is only recreated when necessary, optimizing performance.
+   *
+   * @returns {boolean} - Returns `true` if there are unsaved changes, otherwise `false`.
+   */
+  const hasUnsavedChanges = useCallback(() => {
+    console.log(
+      "Updated values reference (if any) in hasUnsavedChanges: ",
+      JSON.stringify(updatedValuesRef)
+    );
+
+    return Object.keys(updatedValuesRef.current).length > 0;
+  }, [updatedValuesRef]);
+
+  /**
+   * Shows an alert to confirm discarding unsaved changes.
+   *
+   * @param {Function} onDiscard - The function to call if the user confirms discarding changes.
+   */
+  const showUnsavedChangesAlert = (onDiscard) => {
+    Alert.alert(
+      t("unsaved_changes_title"),
+      t("unsaved_changes_message"),
+      [
+        {
+          text: t("cancel"),
+          style: "cancel",
+        },
+        {
+          text: t("discard"),
+          style: "destructive",
+          onPress: () => {
+            // Reset updatedValuesRef.current and call onDiscard
+            updatedValuesRef.current = {};
+            setUpdatedValues({});
+            onDiscard();
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+  /**
+   * Updates the absence record with the provided updated values.
+   *
+   * @param {Object} updatedValues - The updated values for the absence record.
+   */
+  const updateAbsence = async (updatedValues = {}) => {
+    try {
+      const prefixedUpdatedValues = {};
+      for (const key in updatedValues) {
+        prefixedUpdatedValues[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-${key}`] =
+          updatedValues[key];
+      }
+
+      // Add the prefixed updated values to the formData
+      const formData = {
+        data: {
+          [`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-id`]: absenceId,
+          ...prefixedUpdatedValues,
+        },
+      };
+
+      const queryStringParams = {
+        userID: APP.LOGIN_USER_ID,
+        client: APP.LOGIN_USER_CLIENT,
+        language: APP.LOGIN_USER_LANGUAGE,
+        testMode: TEST_MODE,
+        component: "platform",
+        doNotReplaceAnyList: isDoNotReplaceAnyList(BUSOBJCAT.ABSENCE),
+        appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.ABSENCE)),
+      };
+
+      const updateResponse = await updateFields(formData, queryStringParams);
+
+      // Check if update was successful
+      if (updateResponse.success) {
+        // Extract the new ID from the response
+        const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
+        if (newId) {
+          setAbsenceId(newId); // Update the absenceId with the new ID
+          setIsEditMode(true);
+        }
+
+        // Clear updatedValuesRef.current and updatedValues state
+        updatedValuesRef.current = {};
+        setUpdatedValues({});
+
+        // force refresh absence data on list screen
+        updateForceRefresh(true);
+
+        // Notify that save was clicked
+        notifySave();
+
+        if (lang !== "en") {
+          showToast(t("update_success"));
+        }
+
+        updateForceRefresh(true);
+
+        if (updateResponse.message) {
+          showToast(updateResponse.message);
+        }
+      } else {
+        showToast(t("update_failure"), "error");
+      }
+    } catch (error) {
+      console.error("Error in updateAbsence of AbsenceDetail", error);
+      showToast(t("unexpected_error"), "error");
+    }
+  };
+
+  /**
+   * Handles saving the absence details.
+   * Validates the absence details and updates the absence record if valid.
+   */
+  const handleSave = async () => {
+    try {
+      const isValidAbsence = validateAbsenceOnSave();
+
+      if (isValidAbsence) {
+        await updateAbsence(updatedValues);
+      }
+    } catch (error) {
+      console.error("Error in saving absence", error);
+    }
+  };
+
+  /**
+   * Handles changes in the absence details.
+   * Updates the state and reference object with the new values.
+   *
+   * @param {Object} values - The updated values for the absence details.
+   */
+  const handleAbsenceDetailChange = (values) => {
+    console.log(
+      `Received updated values in Absence Detail: ${JSON.stringify(values)}`
+    );
+
+    const updatedChanges = { ...updatedValues };
+
+    // Normalize start and end dates before updating
+    if (values.absenceStartDate) {
+      values.absenceStartDate = normalizeDateToUTC(values.absenceStartDate);
+    }
+    if (values.absenceEndDate) {
+      values.absenceEndDate = normalizeDateToUTC(values.absenceEndDate);
+    }
+
+    // Parse plannedDays from values
+    if (values.absenceDuration) {
+      values.absenceDuration = parseFloat(values.absenceDuration);
+    }
+
+    // Update isAddToBalance if it exists in values and adjust absenceDuration if necessary
+    if (values.isAddToBalance !== undefined) {
+      setIsAddToBalance(values.isAddToBalance);
+      if (absenceAdjustAbsence && values.isAddToBalance < 0) {
+        values.absenceDuration = parseFloat(values.absenceDuration * -1);
+      }
+    }
+
+    updateFieldInState(
+      values,
+      "absenceType",
+      absenceType,
+      setAbsenceType,
+      updatedChanges,
+      "type"
+    );
+    updateFieldInState(
+      values,
+      "absenceStartDate",
+      absenceStart,
+      setAbsenceStart,
+      updatedChanges,
+      "start"
+    );
+    updateFieldInState(
+      values,
+      "absenceEndDate",
+      absenceEnd,
+      setAbsenceEnd,
+      updatedChanges,
+      "end"
+    );
+    updateFieldInState(
+      values,
+      "absenceStartDayFraction",
+      absenceStartDayFraction,
+      setAbsenceStartDayFraction,
+      updatedChanges,
+      "startHalfDay"
+    );
+    updateFieldInState(
+      values,
+      "absenceEndDayFraction",
+      absenceEndDayFraction,
+      setAbsenceEndDayFraction,
+      updatedChanges,
+      "endHalfDay"
+    );
+    updateFieldInState(
+      values,
+      "absenceDuration",
+      absencePlannedDays,
+      setAbsencePlannedDays,
+      updatedChanges,
+      "plannedDays"
+    );
+    updateFieldInState(
+      values,
+      "absenceFiles",
+      absenceFiles,
+      setAbsenceFiles,
+      updatedChanges,
+      "files"
+    );
+    updateFieldInState(
+      values,
+      "absenceComments",
+      absenceComments,
+      setAbsenceComments,
+      updatedChanges,
+      "comments"
+    );
+
+    // Special handling for remark
+    if (
+      values.absenceRemark !== undefined &&
+      !isEqual(values.absenceRemark, absenceRemark)
+    ) {
+      setAbsenceRemark(values.absenceRemark);
+      updatedChanges["remark:text"] = getRemarkText(
+        values.absenceRemark,
+        lang,
+        PREFERRED_LANGUAGES
+      );
+    }
+
+    // Log updated changes
+    console.log(
+      `Updated changes after processing (for saving): ${JSON.stringify(
+        updatedChanges
+      )}`
+    );
+
+    // Prepare and update behavior fields
+    let newBehaviorFields = { ...behaviorFields };
+
+    if (
+      values.selectedHoliday !== undefined &&
+      !isEqual(values.selectedHoliday, newBehaviorFields.selectedHoliday)
+    ) {
+      newBehaviorFields.selectedHoliday = values.selectedHoliday;
+    }
+
+    if (
+      values.absenceTypeFixedCalendar !== undefined &&
+      !isEqual(
+        values.absenceTypeFixedCalendar,
+        newBehaviorFields.absenceTypeFixedCalendar
+      )
+    ) {
+      newBehaviorFields.absenceTypeFixedCalendar =
+        values.absenceTypeFixedCalendar;
+    }
+
+    if (
+      values.absenceTypeAllowedInProbation !== undefined &&
+      !isEqual(
+        values.absenceTypeAllowedInProbation,
+        newBehaviorFields.absenceTypeAllowedInProbation
+      )
+    ) {
+      newBehaviorFields.absenceTypeAllowedInProbation =
+        values.absenceTypeAllowedInProbation;
+    }
+
+    if (
+      values.absenceTypeAllowedInTermination !== undefined &&
+      !isEqual(
+        values.absenceTypeAllowedInTermination,
+        newBehaviorFields.absenceTypeAllowedInTermination
+      )
+    ) {
+      newBehaviorFields.absenceTypeAllowedInTermination =
+        values.absenceTypeAllowedInTermination;
+    }
+
+    if (
+      values.absenceTypeDisplayInHours !== undefined &&
+      !isEqual(
+        values.absenceTypeDisplayInHours,
+        newBehaviorFields.absenceTypeDisplayInHours
+      )
+    ) {
+      newBehaviorFields.absenceTypeDisplayInHours =
+        values.absenceTypeDisplayInHours;
+    }
+
+    if (
+      values.absenceTypeHourlyLeave !== undefined &&
+      !isEqual(
+        values.absenceTypeHourlyLeave,
+        newBehaviorFields.absenceTypeHourlyLeave
+      )
+    ) {
+      newBehaviorFields.absenceTypeHourlyLeave = values.absenceTypeHourlyLeave;
+    }
+
+    if (
+      values.absenceTypeAdminAdjustOnly !== undefined &&
+      !isEqual(
+        values.absenceTypeAdminAdjustOnly,
+        newBehaviorFields.absenceTypeAdminAdjustOnly
+      )
+    ) {
+      newBehaviorFields.absenceTypeAdminAdjustOnly =
+        values.absenceTypeAdminAdjustOnly;
+    }
+
+    if (
+      values.absenceTypeHalfDaysNotAllowed !== undefined &&
+      !isEqual(
+        values.absenceTypeHalfDaysNotAllowed,
+        newBehaviorFields.absenceTypeHalfDaysNotAllowed
+      )
+    ) {
+      newBehaviorFields.absenceTypeHalfDaysNotAllowed =
+        values.absenceTypeHalfDaysNotAllowed;
+    }
+
+    if (
+      values.absenceTypeMinRequest !== undefined &&
+      !isEqual(
+        values.absenceTypeMinRequest,
+        newBehaviorFields.absenceTypeMinRequest
+      )
+    ) {
+      newBehaviorFields.absenceTypeMinRequest = values.absenceTypeMinRequest;
+    }
+
+    if (
+      values.absenceTypeMaxRequest !== undefined &&
+      !isEqual(
+        values.absenceTypeMaxRequest,
+        newBehaviorFields.absenceTypeMaxRequest
+      )
+    ) {
+      newBehaviorFields.absenceTypeMaxRequest = values.absenceTypeMaxRequest;
+    }
+
+    // Log and set updated behavior fields
+    console.log(
+      `Updated behavior fields after processing: ${JSON.stringify(
+        newBehaviorFields
+      )}`
+    );
+    setBehaviorFields(newBehaviorFields);
+
+    // Update reference object and state for non-behavior fields
+    updatedValuesRef.current = {
+      ...updatedValuesRef.current,
+      ...updatedChanges,
+    };
+
+    setUpdatedValues((prevValues) => ({
+      ...prevValues,
+      ...updatedChanges,
+    }));
+  };
+
+  /**
+   * Validates the absence details before saving.
+   * Checks if the required fields are provided.
+   *
+   * @returns {boolean} - Returns `true` if the absence details are valid, otherwise `false`.
+   */
+  const validateAbsenceOnSave = () => {
+    const {
+      absenceTypeFixedCalendar,
+      absenceTypeDisplayInHours,
+      absenceTypeHourlyLeave,
+      absenceTypeAllowedInProbation,
+      absenceTypeAllowedInTermination,
+      absenceTypeAdminAdjustOnly,
+      absenceTypeHalfDaysNotAllowed,
+      absenceTypeMinRequest,
+      absenceTypeMaxRequest,
+      selectedHoliday,
+    } = behaviorFields;
+
+    // Check if the absence type is provided
+    if (!absenceType) {
+      showToast(t("type_required_message"), "error");
+      return false;
+    }
+
+    // Check if the absence start date is provided
+    if (!absenceStart) {
+      showToast(t("start_required_message"), "error");
+      return false;
+    }
+
+    // Check if the absence end date is provided
+    if (!absenceEnd) {
+      showToast(t("end_required_message"), "error");
+      return false;
+    }
+
+    // Check if the start date is greater than the end date
+    if (
+      absenceStart &&
+      absenceEnd &&
+      new Date(absenceStart) > new Date(absenceEnd)
+    ) {
+      showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
+      return false;
+    }
+
+    // Validate adjustment fields
+    if (absenceAdjustAbsence) {
+      const {
+        "AbsenceType-negativeDaysAllowed": negativeDaysAllowed = false,
+        "AbsenceType-negativeDays": negativeDays = 0,
+        "AbsenceType-projectedNextYear": projectedNextYear = 0,
+        "AbsenceType-name": absenceTypeName = "",
+      } = allAbsenceTypes[absenceType];
+      return validateAbsenceOnSaveWithAdjustment(
+        absencePlannedDays,
+        negativeDaysAllowed,
+        negativeDays,
+        projectedNextYear,
+        absenceTypeName,
+        t
+      );
+    }
+
+    // Validate if the absence is allowed during probation or notice period
+    if (
+      !isLeaveAllowedInEmploymentPeriod(
+        employeeInfo,
+        absenceTypeAllowedInProbation,
+        absenceTypeAllowedInTermination,
+        absenceStart,
+        absenceEnd,
+        t
+      )
+    ) {
+      return false;
+    }
+
+    // Negative balance validation
+    const absenceTypeName = absenceTypeDetails?.absenceTypeName || "";
+    const isNegativeDaysAllowed =
+      absenceTypeDetails?.negativeDaysAllowed || false;
+    const maxNegativeDays = absenceTypeDetails?.negativeDays || 0;
+    const balance = kpiValues?.balanceAfter || 0;
+    const durationType =
+      absenceTypeDetails?.displayInHours || absenceTypeDetails?.hourlyLeave
+        ? " hour(s)"
+        : " days";
+
+    if (!isNegativeDaysAllowed && balance < 0) {
+      showToast(
+        `For ${absenceTypeName}, negative balance is not allowed`,
+        "error"
+      );
+      return false;
+    }
+
+    if (isNegativeDaysAllowed && balance < 0) {
+      if (Math.abs(balance) > maxNegativeDays) {
+        showToast(
+          `For ${absenceTypeName}, the maximum allowed negative balance is ${maxNegativeDays}${durationType}`,
+          "error"
+        );
+        return false;
+      } else {
+        setNegativeBalanceFlag(true); // Flag for negative balance
+      }
+    }
+
+    // Check for overlapping absences
+    for (const record of employeeAbsences) {
+      const {
+        "Absence-employeeID": recordEmployeeID,
+        "Absence-start": recordStart,
+        "Absence-end": recordEnd,
+        "Absence-id": recordId,
+      } = record;
+
+      // Skip if current record is empty, or if it's the same record
+      if (
+        !recordStart ||
+        !recordEnd ||
+        absenceId === recordId ||
+        recordEmployeeID !== absenceEmployeeId
+      ) {
+        continue;
+      }
+
+      // If absences overlap, show overlap message
+      if (
+        isAbsencesOverlap(
+          absenceStart,
+          absenceEnd,
+          absenceStartDayFraction,
+          absenceEndDayFraction,
+          recordStart,
+          recordEnd
+        )
+      ) {
+        showToast(
+          t("absence_exists_for_period", {
+            start: recordStart,
+            end: recordEnd,
+          }),
+          "error"
+        );
+        return false;
+      }
+    }
+
+    // Check if the absence type is fixed calendar and also hourly or display in hours
+    if (absenceTypeFixedCalendar) {
+      if (absenceTypeDisplayInHours || absenceTypeHourlyLeave) {
+        showToast(t("type_holiday_and_hourly_not_allowed"), "error");
+        return false;
+      }
+
+      if (!selectedHoliday) {
+        showToast(t("holiday_required_message"), "error");
+        return false;
+      }
+    }
+
+    if (absenceTypeHourlyLeave) {
+      if (absencePlannedDays < 1) {
+        showToast(t("accrue_by_hours_worked_min_duration"), "error");
+        return false;
+      }
+
+      // Check if the hourly time-off request falls on holidays or non-working days
+      if (
+        !isTimeOffOnHoliday(absenceStart, absenceEnd, t, employeeInfo, "error")
+      ) {
+        return false;
+      }
+    }
+
+    // Find the minimum fraction value from dayFractionOptions
+    const minFraction =
+      Array.isArray(dayFractionOptions) && dayFractionOptions.length > 0
+        ? dayFractionOptions.reduce((min, option) => {
+            const fractionValue = parseFloat(option.value);
+            return fractionValue < min ? fractionValue : min;
+          }, 1)
+        : 1;
+
+    // Validate the duration
+    if (
+      !validateDuration(
+        absencePlannedDays,
+        absenceTypeMinRequest,
+        absenceTypeMaxRequest,
+        absenceTypeHalfDaysNotAllowed,
+        absenceTypeHourlyLeave,
+        absenceTypeDisplayInHours,
+        hoursPerDay,
+        t,
+        minFraction
+      )
+    ) {
+      return false;
+    }
+
+    // If all validations pass, return true to proceed with saving
+    return true;
+  };
+
+  /**
+   * Loads the initial details for creating a new absence record.
+   */
   const loadAbsenceCreateDetail = async () => {
     try {
       const updatedChanges = { ...updatedValues };
 
-      setAbsenceStart(normalizeDateToUTC(new Date()));
-      setAbsenceEnd(normalizeDateToUTC(new Date()));
+      const normalizedDate = normalizeDateToUTC(new Date());
+
+      let employeeId = APP.LOGIN_USER_EMPLOYEE_ID;
+      employeeIDRef.current = employeeId;
+
+      setAbsenceEmployeeId(employeeId);
+      setAbsenceStart(new Date());
+      setAbsenceEnd(new Date());
       setAbsenceStartDayFraction("1");
       setAbsenceEndDayFraction(null);
       setAbsencePlannedDays(1);
 
-      updatedChanges["employeeID"] = APP.LOGIN_USER_EMPLOYEE_ID;
+      updatedChanges["employeeID"] = employeeId;
       updatedChanges["adjustAbsence"] = false;
       updatedChanges["adjustTaken"] = false;
-      updatedChanges["start"] = normalizeDateToUTC(new Date());
-      updatedChanges["end"] = normalizeDateToUTC(new Date());
+      updatedChanges["start"] = normalizedDate;
+      updatedChanges["end"] = normalizedDate;
       updatedChanges["startHalfDay"] = "1";
       updatedChanges["endHalfDay"] = "0";
       updatedChanges["plannedDays"] = 1;
@@ -525,7 +912,14 @@ const AbsenceDetail = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Loads the details for an existing absence record.
+   */
   const loadAbsenceDetail = async () => {
+    if (!absenceId) {
+      return;
+    }
+
     try {
       const queryFields = {
         fields: getAbsenceFields(),
@@ -569,11 +963,12 @@ const AbsenceDetail = ({ route, navigation }) => {
       ) {
         const data = response.data[0];
 
+        let employeeId = data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-employeeID`];
+        employeeIDRef.current = employeeId;
+
         setAbsenceFiles(data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-files`]);
         setAbsenceComments(data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-comments`]);
-        setAbsenceEmployeeId(
-          data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-employeeID`]
-        );
+        setAbsenceEmployeeId(employeeId);
         setAbsenceEmployeeName(
           data[
             `${
@@ -597,6 +992,9 @@ const AbsenceDetail = ({ route, navigation }) => {
         );
         setAbsenceAdjustAbsence(
           data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-adjustAbsence`]
+        );
+        setAbsenceAdjustTaken(
+          data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-adjustTaken`]
         );
         setAbsenceHoursByDay(
           data[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-hoursByDay`]
@@ -625,19 +1023,61 @@ const AbsenceDetail = ({ route, navigation }) => {
           absenceTypeHourlyLeave:
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-hourlyLeave`
-            ] || "",
+            ] || false,
           absenceTypeDisplayInHours:
             data[
               `${
                 BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
               }-type:AbsenceType-displayInHours`
-            ] || "",
-          absenceTypeIsFixedCalendar:
+            ] || false,
+          absenceTypeFixedCalendar:
             data[
               `${
                 BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
-              }-type:AbsenceType-isFixedCalendar`
+              }-type:AbsenceType-fixedCalendar`
             ] || "",
+          absenceTypeAllowedInProbation:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-allowedInProbation`
+            ] || false,
+          absenceTypeAllowedInTermination:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-allowedInTermination`
+            ] || false,
+          absenceTypeAdminAdjustOnly:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-adminAdjustOnly`
+            ] || false,
+          absenceTypeHalfDaysNotAllowed:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-halfDaysNotAllowed`
+            ] || false,
+          absenceTypeMinRequest:
+            data[
+              `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-minRequest`
+            ] || null,
+          absenceTypeMaxRequest:
+            data[
+              `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-maxRequest`
+            ] || null,
+          negativeDaysAllowed:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-negativeDaysAllowed`
+            ] || false,
+          negativeDays:
+            data[
+              `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-negativeDays`
+            ] || 0,
         });
 
         const { changeAllowed } = await documentStatusCheck(
@@ -668,25 +1108,55 @@ const AbsenceDetail = ({ route, navigation }) => {
     }
   };
 
-  const fetchAbsence = async () => {
+  /**
+   * Fetches the absence data and related auxiliary data (e.g., process templates, absence types, day fractions).
+   * This function handles both the "create" and "edit" modes and loads the corresponding absence details first
+   * before fetching auxiliary data concurrently.
+   */
+  const fetchAbsenceAndAuxiliaryData = async () => {
     setLoading(true);
 
     try {
-      const [_, processTemplate, absenceTypesMap, dayFractionsMap] =
-        await Promise.all([
-          isEditMode ? loadAbsenceDetail() : loadAbsenceCreateDetail(),
-          fetchProcessTemplate(statusTemplateExtId, setItemStatusIDMap),
-          fetchAbsenceTypes(),
-          fetchListData("DayFraction"),
-        ]);
+      if (isEditMode) {
+        await loadAbsenceDetail();
+        if (!employeeIDRef.current) {
+          throw new Error("Employee ID not found after loading absence detail");
+        }
+      } else {
+        await loadAbsenceCreateDetail();
+        if (!employeeIDRef.current) {
+          throw new Error(
+            "Employee ID not found after loading absence create detail"
+          );
+        }
+      }
 
+      // Fetch all auxiliary data concurrently
+      const [
+        processTemplate,
+        absenceTypesMap,
+        eligibleAbsenceTypes,
+        dayFractionsMap,
+        employeeAbsencesForThisYear,
+      ] = await Promise.all([
+        fetchProcessTemplate(statusTemplateExtId),
+        fetchAbsenceTypes(),
+        fetchEligibleAbsenceTypes(employeeIDRef.current, false, t),
+        fetchListData("DayFraction"),
+        fetchEmployeeAbsences(employeeIDRef.current),
+      ]);
+
+      // Filter absence types to show only those present in eligibleAbsenceTypes
+      const filteredAbsenceTypes = Object.entries(absenceTypesMap).filter(
+        ([key]) => eligibleAbsenceTypes[key]
+      );
+
+      // Update the state with the fetched data
       setItemStatusIDMap(processTemplate || {});
-
       setAllAbsenceTypes(absenceTypesMap);
-
       setAbsenceTypeOptions(
-        Object.entries(absenceTypesMap).map(([key, value]) => ({
-          label: value["AbsenceType-name"], // Access name for the label
+        filteredAbsenceTypes.map(([key, value]) => ({
+          label: value["AbsenceType-name"],
           value: key,
         }))
       );
@@ -696,8 +1166,14 @@ const AbsenceDetail = ({ route, navigation }) => {
           value: key,
         }))
       );
+      setProcessTemplate(processTemplate);
+      setEmployeeAbsences(employeeAbsencesForThisYear);
     } catch (error) {
-      console.error("Error in either loading absence: ", error);
+      console.error(
+        "Error fetching absence data or related auxiliary data: ",
+        error
+      );
+      showToast(t("error_fetching_absence_data"), "error");
     } finally {
       setLoading(false);
     }
@@ -796,7 +1272,7 @@ const AbsenceDetail = ({ route, navigation }) => {
    * It also ensures that any lock is cleared if the user is in edit mode when the component unmounts or re-renders.
    */
   useEffect(() => {
-    fetchAbsence();
+    fetchAbsenceAndAuxiliaryData();
 
     return () => {
       /**
@@ -884,11 +1360,15 @@ const AbsenceDetail = ({ route, navigation }) => {
                         absencePlannedDays,
                         absenceSubmittedOn,
                         absenceAdjustAbsence,
+                        absenceAdjustTaken,
                         absenceHoursByDay,
                         absenceExtStatus,
                         absenceRemark,
                         itemStatusIDMap,
                       }}
+                      validateStatusChange={() =>
+                        validateStatusChange(processTemplate, currentStatus)
+                      }
                     />
                   </GestureHandlerRootView>
                 )}

@@ -1,9 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-  useRef,
-} from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -35,6 +30,7 @@ import {
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import {
+  changeDateToAPIFormat,
   convertToDateFNSFormat,
   getRemarkText,
   isEqual,
@@ -127,13 +123,17 @@ const TimesheetDetail = ({ route, navigation }) => {
     maxWorkHours,
     workHoursInterval,
     dailyStdHours,
+    nonWorkingDates,
   } = employeeInfo;
 
   console.log(
     `Employee Info Loaded in Timesheet Detail: ${
       openedFromApproval ? "Approval User Info" : "Logged In User Info"
     }`,
-    JSON.stringify(employeeInfo)
+    JSON.stringify({
+      ...employeeInfo,
+      nonWorkingDates: `Array of length ${nonWorkingDates.length}`,
+    })
   );
 
   // Callback function to handle data from child component (timesheet general)
@@ -597,7 +597,7 @@ const TimesheetDetail = ({ route, navigation }) => {
               return;
             }
           } else {
-            // If no period schedules are found, log a debug message
+            // If no period schedules are found, log a message
             // Default to a weekly interval based on the selected date
 
             console.log(
@@ -788,7 +788,10 @@ const TimesheetDetail = ({ route, navigation }) => {
       toDate.setDate(toDate.getDate() + 6);
 
       // Return the normalized period
-      return { start: fromDate, end: toDate };
+      return {
+        start: changeDateToAPIFormat(normalizeDateToUTC(fromDate)),
+        end: changeDateToAPIFormat(normalizeDateToUTC(toDate)),
+      };
     }
   };
 
@@ -1047,6 +1050,11 @@ const TimesheetDetail = ({ route, navigation }) => {
 
   const handleSave = async () => {
     try {
+      if (timesheetTasks.length === 0) {
+        showToast(t("timesheet_cannot_be_saved_without_items"), "error");
+        return;
+      }
+
       const isValidTimesheet = validateTimesheetOnSave();
 
       if (isValidTimesheet) {
@@ -1284,6 +1292,7 @@ const TimesheetDetail = ({ route, navigation }) => {
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-projectWbsID:ProjectWBS-extID`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID:Task-text-text`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID:Task-extID`,
     `${
       BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
     }-tasks-taskID:Task-quantities-unitTime`,
@@ -1349,6 +1358,8 @@ const TimesheetDetail = ({ route, navigation }) => {
         return;
       }
 
+      console.debug(validPeriodDates);
+
       if (validPeriodDates) {
         setTimesheetStart(validPeriodDates.start);
         setTimesheetEnd(validPeriodDates.end);
@@ -1373,8 +1384,8 @@ const TimesheetDetail = ({ route, navigation }) => {
         const updatedChanges = { ...updatedValues };
 
         updatedChanges["type"] = timeConfirmationType;
-        updatedChanges["start"] = normalizeDateToUTC(validPeriodDates.start);
-        updatedChanges["end"] = normalizeDateToUTC(validPeriodDates.end);
+        updatedChanges["start"] = validPeriodDates.start;
+        updatedChanges["end"] = validPeriodDates.end;
         updatedChanges["busUnitID"] = companyId;
         updatedChanges["employeeID"] = APP.LOGIN_USER_EMPLOYEE_ID;
         updatedChanges["responsible"] = personId;
@@ -1808,10 +1819,7 @@ const TimesheetDetail = ({ route, navigation }) => {
             size: 24,
           }}
           disabled={
-            loading ||
-            isLocked ||
-            Object.keys(updatedValues).length === 0 ||
-            timesheetTasks.length === 0
+            loading || isLocked || Object.keys(updatedValues).length === 0
           }
         />
       </View>

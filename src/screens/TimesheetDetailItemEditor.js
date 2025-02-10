@@ -26,6 +26,7 @@ import {
 import { getRemarkText, setRemarkText } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 import { fetchData } from "../utils/APIUtils";
+import clientOverrides from "../config/clientOverrides";
 
 const TimesheetDetailItemEditor = ({
   item,
@@ -1083,6 +1084,13 @@ const TimesheetDetailItemEditor = ({
     }));
   }, [editedItem.billable, editedItem.actualTime]);
 
+  const isBillableDisabled =
+    // Disable if defaultAsHomeDefault is "*"
+    defaultAsHomeDefault === "*" ||
+    // Disable if the client is explicitly listed in overrides and has forceDisableSwitch set to true
+    clientOverrides[parseInt(APP.LOGIN_USER_CLIENT)]?.forceDisableSwitch ===
+      true;
+
   return (
     <Modal
       visible={true}
@@ -1293,7 +1301,7 @@ const TimesheetDetailItemEditor = ({
                   ios_backgroundColor="#d3d3d3"
                   value={editedItem.billable}
                   onValueChange={handleBillableChange}
-                  disabled={defaultAsHomeDefault === "*"}
+                  disabled={isBillableDisabled}
                 />
               </View>
             )}

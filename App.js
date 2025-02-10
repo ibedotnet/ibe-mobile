@@ -23,6 +23,7 @@ import {
   ExpenseSaveProvider,
   TimesheetSaveProvider,
 } from "./context/SaveContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 import OfflineView from "./src/components/offline/OfflineView";
 
@@ -131,8 +132,11 @@ const Providers = ({ children }) => (
                       {/* Provides force refresh context for Absence */}
                       <ClientPathsProvider>
                         {/* Provides context for managing client paths */}
-                        {children}
-                        {/* Render child components within the context providers */}
+                        <ThemeProvider>
+                          {/* Provides theme context */}
+                          {children}
+                          {/* Render child components within the context providers */}
+                        </ThemeProvider>
                       </ClientPathsProvider>
                     </AbsenceForceRefreshProvider>
                   </ExpenseForceRefreshProvider>

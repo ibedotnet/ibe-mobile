@@ -7,49 +7,38 @@ import {
   TEST_MODE,
 } from "../constants";
 import { fetchBusObjCatData, fetchData } from "./APIUtils";
-import { normalizeDateToUTC } from "./FormatUtils";
+import { datesAreForSameDay, isEqual, normalizeDateToUTC } from "./FormatUtils";
 import { showToast } from "./MessageUtils";
+import { sprintf } from "sprintf-js";
 
 /**
- * Adjusts the duration of an absence request based on day fractions and holidays.
- *
- * @param {number} duration - The initial duration of the absence in days.
- * @param {number} startDayFraction - The fraction of the start day.
- * @param {number} endDayFraction - The fraction of the end day.
- * @param {Date|string} startDate - The start date of the absence request.
- * @param {Date|string} endDate - The end date of the absence request.
- * @param {Object} employeeInfo - The employee information containing non-working dates and days.
- * @param {Function} t - Translation function used to show localized messages.
- * @returns {number} - The adjusted duration considering day fractions and holidays.
+ * Common prefix for all absence type fields
+ * This prefix is used to create the full field names by appending specific field keys.
  */
-const adjustDurationForDayFractionsAndHolidays = (
-  duration,
-  startDayFraction,
-  endDayFraction,
-  startDate,
-  endDate,
-  employeeInfo,
-  t
-) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+const absenceTypePrefix = `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:`;
 
-  if (isNotHoliday(start, employeeInfo)) {
-    duration = duration - 1 + startDayFraction;
-  } else {
-    showToast(t("time_off_holiday_warning"), "warning");
-  }
-
-  if (start.toDateString() !== end.toDateString()) {
-    if (isNotHoliday(end, employeeInfo)) {
-      duration = duration - 1 + endDayFraction;
-    } else {
-      showToast(t("time_off_holiday_warning"), "warning");
-    }
-  }
-
-  return duration;
-};
+/**
+ * List of dynamic field keys for absence types.
+ * These keys represent individual properties of absence types and
+ * will be combined with the common prefix to generate the full field names.
+ */
+const absenceTypeFields = [
+  "AbsenceType-busObjCat",
+  "AbsenceType-extID",
+  "AbsenceType-name",
+  "AbsenceType-policyText",
+  "AbsenceType-hourlyLeave",
+  "AbsenceType-displayInHours",
+  "AbsenceType-fixedCalendar",
+  "AbsenceType-allowedInProbation",
+  "AbsenceType-allowedInTermination",
+  "AbsenceType-adminAdjustOnly",
+  "AbsenceType-halfDaysNotAllowed",
+  "AbsenceType-minRequest",
+  "AbsenceType-maxRequest",
+  "AbsenceType-negativeDaysAllowed",
+  "AbsenceType-negativeDays",
+];
 
 /**
  * Mapping boolean values to user-friendly strings: "Yes" and "No".
@@ -63,53 +52,228 @@ const booleanMap = {
 };
 
 /**
- * Calculates the actual number of valid days between two dates, excluding non-working days such as holidays and weekends.
+ * Calculates the duration (number of working days) between start and end dates, including fractions.
  *
- * @param {Date|string} startDate - The start date of the absence request.
- * @param {Date|string} endDate - The end date of the absence request.
+ * @param {Date} startDate - The start date of the absence.
+ * @param {Date} endDate - The end date of the absence.
  * @param {Object} employeeInfo - The employee information containing non-working dates and days.
- * @returns {number} - The number of valid days between the start and end dates, excluding non-working days.
+ * @param {string|number|null} startDayFraction - The fraction of the first day used (0-1) as a string, number, or null.
+ * @param {string|number|null} endDayFraction - The fraction of the last day used (0-1) as a string, number, or null.
+ * @param {Object} absenceDetails - The details of the absence.
+ * @param {Function} updateKPIs - Callback function to update KPI values.
+ * @returns {string} - The total working day equivalent (including fractions) as a string.
+ *
+ * @throws {Error} - Throws error if input dates or fractions are invalid.
  */
-const calculateValidDaysBetweenDates = (startDate, endDate, employeeInfo) => {
-  if (!startDate || !endDate) {
-    return 0;
+const calculateDuration = (
+  startDate,
+  endDate,
+  employeeInfo,
+  startDayFraction = "1",
+  endDayFraction = "1",
+  absenceDetails,
+  updateKPIs
+) => {
+  // Ensure fractions are parsed as valid numbers between 0 and 1
+  startDayFraction =
+    startDayFraction !== null && !isNaN(parseFloat(startDayFraction))
+      ? Math.min(Math.max(parseFloat(startDayFraction), 0), 1)
+      : 1;
+  endDayFraction =
+    endDayFraction !== null && !isNaN(parseFloat(endDayFraction))
+      ? Math.min(Math.max(parseFloat(endDayFraction), 0), 1)
+      : null;
+
+  if (!(startDate instanceof Date) || isNaN(startDate)) {
+    throw new Error("Invalid startDate. Expected a valid Date object.");
+  }
+  if (!(endDate instanceof Date) || isNaN(endDate)) {
+    throw new Error("Invalid endDate. Expected a valid Date object.");
+  }
+  if (startDate > endDate) {
+    throw new Error("Start date cannot be after end date.");
   }
 
-  const start = new Date(startDate.toString());
-  const end = new Date(endDate.toString());
-  const { nonWorkingDates, nonWorkingDays } = employeeInfo;
-  let validDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  let duration = 0;
+  const currentDate = new Date(startDate);
+  let isFirstDay = true;
 
-  if (nonWorkingDays && nonWorkingDays.length > 0) {
-    let tempDate = start;
-    const uniqueNonWorkingDates = new Set();
+  if (isNonWorkingDay(startDate, employeeInfo)) {
+    showToast(t("non_working_day_start_date_warning"), "error");
+    return "0";
+  }
 
-    while (tempDate < end) {
-      if (nonWorkingDays.includes(tempDate.getDay())) {
-        validDays++;
-        end.setDate(end.getDate() + 1);
-      }
-
-      if (nonWorkingDates && nonWorkingDates.length > 0) {
-        for (const dateInfo of nonWorkingDates) {
-          const nonWorkingDate = new Date(dateInfo.date.toString());
-          if (nonWorkingDays.includes(nonWorkingDate.getDay())) {
-            continue;
-          }
-          if (nonWorkingDate >= start && nonWorkingDate <= tempDate) {
-            if (!uniqueNonWorkingDates.has(nonWorkingDate.getTime())) {
-              uniqueNonWorkingDates.add(nonWorkingDate.getTime());
-              validDays++;
-              end.setDate(end.getDate() + 1);
-            }
-          }
+  while (currentDate <= endDate) {
+    if (!isNonWorkingDay(currentDate, employeeInfo)) {
+      if (isFirstDay) {
+        // Handle same-day case by taking max of fractions
+        if (startDate.toDateString() === endDate.toDateString()) {
+          const effectiveEndFraction =
+            endDayFraction !== null ? endDayFraction : startDayFraction;
+          duration += Math.max(startDayFraction, effectiveEndFraction);
+          break;
+        } else {
+          duration += startDayFraction;
+          isFirstDay = false;
         }
+      } else if (currentDate.toDateString() === endDate.toDateString()) {
+        duration += endDayFraction !== null ? endDayFraction : 1;
+      } else {
+        duration++;
       }
-      tempDate.setDate(tempDate.getDate() + 1);
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  // Update KPI balances with the calculated duration
+  updateKPIBalances(
+    { ...absenceDetails, absenceDuration: duration },
+    updateKPIs
+  );
+
+  // Return the duration as a string to handle text box compatibility
+  return duration.toString();
+};
+
+/**
+ * Calculates the end date based on the start date, duration, and fractions, considering weekends and holidays.
+ *
+ * @param {Date} startDate - The start date of the absence.
+ * @param {string|number} duration - The total working day equivalent as a string (from text input) or number.
+ * @param {Object} employeeInfo - The employee information containing non-working dates and days.
+ * @param {number|string|null} startDayFraction - The fraction of the first day used (0-1) as a number, string, or null.
+ * @param {number|string|null} endDayFraction - The fraction of the last day used (0-1) as a number, string, or null.
+ * @param {Object} absenceDetails - The details of the absence.
+ * @param {Function} updateKPIs - Callback function to update KPI values.
+ * @returns {Date} - The calculated end date.
+ *
+ * @throws {Error} Throws an error if the start date is invalid, or if duration, startDayFraction, or endDayFraction are out of valid bounds.
+ *
+ * @example
+ * calculateEndDate(new Date(), "3.5", employeeInfo, "0.5", "0.5", absenceDetails, updateKPIs);
+ * // Returns a date three and a half working days after the start date, accounting for holidays.
+ */
+const calculateEndDate = (
+  startDate,
+  duration,
+  employeeInfo,
+  startDayFraction = "1",
+  endDayFraction = "1",
+  absenceDetails,
+  updateKPIs
+) => {
+  // Ensure the duration is a valid number
+  const parsedDuration = parseFloat(duration);
+  if (isNaN(parsedDuration) || parsedDuration < 0) {
+    throw new Error("Invalid duration. Expected a non-negative number.");
+  }
+
+  // Convert fractions to valid numbers or defaults if null or invalid
+  startDayFraction =
+    startDayFraction !== null ? parseFloat(startDayFraction) || 0 : 0;
+  endDayFraction =
+    endDayFraction !== null ? parseFloat(endDayFraction) || 1 : 1;
+
+  if (!(startDate instanceof Date) || isNaN(startDate)) {
+    throw new Error("Invalid startDate. Expected a valid Date object.");
+  }
+  if (startDayFraction < 0 || startDayFraction > 1) {
+    throw new Error("Invalid startDayFraction. Must be between 0 and 1.");
+  }
+  if (endDayFraction < 0 || endDayFraction > 1) {
+    throw new Error("Invalid endDayFraction. Must be between 0 and 1.");
+  }
+
+  if (parsedDuration === 0) return new Date(startDate);
+
+  let remainingDuration = parsedDuration - startDayFraction;
+  let endDate = new Date(startDate);
+
+  // Skip initial non-working days only if startDayFraction is 0
+  if (startDayFraction === 0) {
+    while (isNonWorkingDay(endDate, employeeInfo)) {
+      endDate.setDate(endDate.getDate() + 1);
     }
   }
 
-  return Math.max(0, Math.floor(validDays));
+  // Adjust remaining duration considering working days
+  while (remainingDuration > 0) {
+    endDate.setDate(endDate.getDate() + 1);
+
+    if (!isNonWorkingDay(endDate, employeeInfo)) {
+      if (remainingDuration <= 1) {
+        // Apply the remaining fractional day carefully without exceeding 24 hours
+        endDate.setHours(
+          Math.min(endDate.getHours() + endDayFraction * 24, 23)
+        );
+        remainingDuration = 0;
+      } else {
+        remainingDuration--;
+      }
+    }
+  }
+
+  // Update KPI balances in the UI
+  updateKPIBalances(
+    { ...absenceDetails, absenceEnd: endDate, absenceDuration: parsedDuration },
+    updateKPIs
+  );
+
+  return endDate;
+};
+
+/**
+ * Calculates the number of valid working days between the start and end date, excluding non-working days (e.g., weekends, holidays).
+ *
+ * @param {Date|string} startDate - The start date of the period.
+ * @param {Date|string} endDate - The end date of the period.
+ * @param {Object} employeeInfo - The employee's non-working days (e.g., holidays, weekends).
+ * @returns {number} - The count of valid working days between the two dates.
+ *
+ */
+const calculateValidDaysCount = (startDate, endDate, employeeInfo) => {
+  let validDaysCount = 0;
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    if (!isNonWorkingDay(currentDate, employeeInfo)) {
+      validDaysCount++;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return validDaysCount;
+};
+
+/**
+ * Determines if leave cancellation is allowed based on the restriction period and end date.
+ *
+ * @param {number} maxCancellationDays - The number of days after which leave cancellation is restricted.
+ * @param {Date|null} leaveEndDate - The end date of the absence.
+ * @returns {boolean} - Returns true if cancellation is allowed, otherwise false.
+ */
+const canCancelLeave = (maxCancellationDays, leaveEndDate) => {
+  if (maxCancellationDays <= 0 || !leaveEndDate) {
+    return true;
+  }
+
+  const currentDateUTC = normalizeDateToUTC(new Date());
+  const leaveEndDateUTC = normalizeDateToUTC(leaveEndDate);
+
+  const maxCancellationPeriodMs = maxCancellationDays * 24 * 60 * 60 * 1000;
+
+  if (
+    currentDateUTC.getTime() - leaveEndDateUTC.getTime() >
+    maxCancellationPeriodMs
+  ) {
+    showToast(
+      t("leave_cancellation_not_allowed", { days: maxCancellationDays }),
+      "error"
+    );
+    return false;
+  }
+
+  return true;
 };
 
 /**
@@ -136,6 +300,156 @@ const createExtIdStatusLabelMap = (data) => {
   });
 
   return extIdStatusLabelMap;
+};
+
+/**
+ * Fetches eligible absence types for a given employee asynchronously from the API.
+ *
+ * This function constructs a request to fetch absence types using the `AbsenceTypeBalanceReadApi` method.
+ * It processes the response, checks if valid absence type data is present, and returns the list of eligible absence types.
+ * If no valid data is found or an error occurs, an empty array is returned.
+ *
+ * @param {string} employeeId - The ID of the employee for whom absence types are being fetched.
+ * @param {boolean} hideZeroBalances - Flag indicating whether absence types with zero balances should be hidden.
+ *                                      Defaults to `false`.
+ * @param {Function} t - Translation function used to show localized messages.
+ * @returns {Promise<Object>} A promise that resolves to a map of eligible absence types, or an empty object if no data is found or an error occurs.
+ */
+const fetchEligibleAbsenceTypes = async (
+  employeeId,
+  hideZeroBalances = false,
+  t
+) => {
+  try {
+    const normalizedDate = normalizeDateToUTC(new Date());
+    const balanceCheckOnDate = sprintf(
+      "%d-%02d-%02dT%02d:%02d:%02d-0000",
+      normalizedDate.getUTCFullYear(),
+      normalizedDate.getUTCMonth() + 1,
+      normalizedDate.getUTCDate(),
+      normalizedDate.getUTCHours(),
+      normalizedDate.getUTCMinutes(),
+      normalizedDate.getUTCSeconds()
+    );
+
+    const requestBody = {
+      interfaceName: "AbsenceTypeBalanceReadApi",
+      methodName: "readAbsenceTypeBalances",
+      paramsMap: {
+        employeeId: employeeId,
+        userId: APP.LOGIN_USER_ID,
+        hrDivisionId: null,
+        readDate: null,
+        languageId: APP.LOGIN_USER_LANGUAGE,
+        clientId: APP.LOGIN_USER_CLIENT,
+        hideZeroBalances: hideZeroBalances,
+        balanceCheckOnDate: balanceCheckOnDate,
+        absenceType: null,
+        checkBalances: false,
+        absenceDuration: 0.0,
+        employee: null,
+      },
+    };
+
+    // Send the API request
+    const response = await fetchData(
+      API_ENDPOINTS.INVOKE,
+      "POST",
+      {
+        "Content-Type": "application/json",
+      },
+      JSON.stringify(requestBody)
+    );
+
+    // Process the response to extract eligible absence types
+    if (
+      response &&
+      response.success &&
+      response.retVal &&
+      response.retVal.data &&
+      response.retVal.data.length > 0
+    ) {
+      console.log("Eligible absence types fetched successfully.");
+      // Create a map with extID as the key and the entire absence type object as the value
+      const map = response.retVal.data.reduce((acc, item) => {
+        const extID = item["extID"];
+        if (extID) acc[extID] = item; // Use the entire item as the value
+        return acc;
+      }, {});
+
+      return map; // Return the map directly
+    }
+
+    console.log("No eligible absence types found.");
+    showToast(t("no_eligible_absence_types_found"), "error");
+    return {}; // Return empty object if no eligible absence types are found
+  } catch (error) {
+    console.error("Failed to fetch eligible absence types:", error);
+    return {};
+  }
+};
+
+/**
+ * Fetches employee absences with specific conditions.
+ *
+ * @param {string} absenceEmployeeId - The employee ID.
+ * @returns {Promise<Array>} - A Promise resolving to an array of absences.
+ */
+const fetchEmployeeAbsences = async (absenceEmployeeId) => {
+  if (!absenceEmployeeId) {
+    console.error("Invalid employee ID provided in fetchEmployeeAbsences.");
+    return [];
+  }
+
+  const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString(); // Start of the current year
+
+  try {
+    const queryFields = {
+      fields: [
+        "Absence-id",
+        "Absence-type",
+        "Absence-start",
+        "Absence-end",
+        "Absence-employeeID",
+      ],
+      where: [
+        {
+          fieldName: "Absence-employeeID",
+          operator: "=",
+          value: absenceEmployeeId,
+        },
+        { fieldName: "Absence-start", operator: ">=", value: startOfYear },
+      ],
+    };
+
+    const formData = {
+      query: JSON.stringify(queryFields),
+      testMode: TEST_MODE,
+      client: parseInt(APP.LOGIN_USER_CLIENT, 10),
+      user: APP.LOGIN_USER_ID,
+      userID: APP.LOGIN_USER_ID,
+      language: APP.LOGIN_USER_LANGUAGE,
+      intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+    };
+
+    const absencesResponse = await fetchData(
+      API_ENDPOINTS.QUERY,
+      "POST",
+      { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      new URLSearchParams(formData).toString()
+    );
+
+    if (absencesResponse.success) {
+      console.debug(absencesResponse.data);
+      return absencesResponse.data;
+    } else {
+      console.error("Failed to fetch employee absences.");
+      return [];
+    }
+  } catch (error) {
+    console.error("Error fetching employee absences:", error);
+    return [];
+  }
 };
 
 /**
@@ -182,27 +496,6 @@ const formatLeaveDuration = (
 const getAbsenceMilliseconds = (hoursByDay) => {
   return hoursByDay.reduce((sum, entry) => sum + entry.hours, 0);
 };
-
-/**
- * Common prefix for all absence type fields
- * This prefix is used to create the full field names by appending specific field keys.
- */
-const absenceTypePrefix = `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:`;
-
-/**
- * List of dynamic field keys for absence types.
- * These keys represent individual properties of absence types and
- * will be combined with the common prefix to generate the full field names.
- */
-const absenceTypeFields = [
-  "AbsenceType-busObjCat",
-  "AbsenceType-extID",
-  "AbsenceType-name",
-  "AbsenceType-policyText",
-  "AbsenceType-hourlyLeave",
-  "AbsenceType-displayInHours",
-  "AbsenceType-isFixedCalendar",
-];
 
 /**
  * Fetches Absence Types from the API and returns a map where:
@@ -262,82 +555,6 @@ const fetchAbsenceTypes = async () => {
 };
 
 /**
- * Fetches existing absences for the given employee within the specified date range.
- *
- * @param {string} employeeID - The ID of the employee.
- * @param {Date|string} startDate - The start date of the absence request.
- * @param {Date|string} endDate - The end date of the absence request.
- * @returns {Promise<Array>} - A Promise resolving to an array of existing absence records.
- */
-const fetchExistingAbsences = async (employeeID, startDate, endDate) => {
-  try {
-    const queryFields = {
-      fields: [
-        "Absence-start",
-        "Absence-end",
-        "Absence-employeeID",
-        "Absence-startHalfDay",
-        "Absence-endHalfDay",
-        "Absence-duration",
-        "Absence-plannedDays",
-        "Absence-adjustAbsence",
-        "Absence-redemption",
-      ],
-      where: [
-        {
-          fieldName: "Absence-employeeID",
-          operator: "=",
-          value: employeeID,
-        },
-        {
-          fieldName: "Absence-start",
-          operator: "<=",
-          value: new Date(endDate).toISOString(),
-        },
-        {
-          fieldName: "Absence-end",
-          operator: ">=",
-          value: new Date(startDate).toISOString(),
-        },
-        {
-          fieldName: "Absence-intStatus",
-          operator: "nin",
-          value: [3],
-        },
-      ],
-    };
-
-    const formData = {
-      query: JSON.stringify(queryFields),
-      testMode: TEST_MODE,
-      client: parseInt(APP.LOGIN_USER_CLIENT, 10),
-      user: APP.LOGIN_USER_ID,
-      userID: APP.LOGIN_USER_ID,
-      language: APP.LOGIN_USER_LANGUAGE,
-      intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
-    };
-
-    // Fetch existing absences from the API
-    const response = await fetchData(
-      API_ENDPOINTS.QUERY,
-      "POST",
-      { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-      new URLSearchParams(formData).toString()
-    );
-
-    if (response.success && Array.isArray(response.data)) {
-      return response.data;
-    } else {
-      console.error("Unexpected response format for existing absences.");
-      return [];
-    }
-  } catch (error) {
-    console.error("Error in fetching existing absences:", error);
-    return [];
-  }
-};
-
-/**
  * Finds absence type record by its external ID (extid).
  *
  * @param {string} extid - The external ID of the absence type.
@@ -361,38 +578,6 @@ const getAbsenceTypeByExtId = (extid, allAbsenceTypes) => {
 const getAbsenceTypeFields = () => {
   // Dynamically generate the full field names by combining the prefix with each field key
   return absenceTypeFields.map((field) => `${absenceTypePrefix}${field}`);
-};
-
-/**
- * Calculates the adjusted duration of an absence request, considering holidays and weekends.
- *
- * @param {Date|string} startDate - The start date of the absence request.
- * @param {number} duration - The initial duration of the absence in days.
- * @param {Object} employeeInfo - The employee information containing non-working dates and days.
- * @returns {number} - The adjusted duration including holidays and weekends.
- */
-const getAdjustedDuration = (startDate, duration, employeeInfo) => {
-  if (!startDate) {
-    return 0;
-  }
-
-  const startDateObj = new Date(startDate.toString());
-  const endDateObj = new Date(startDateObj);
-  endDateObj.setDate(startDateObj.getDate() + Math.ceil(duration));
-
-  let adjustedDuration = calculateValidDaysBetweenDates(
-    startDateObj,
-    endDateObj,
-    employeeInfo
-  );
-
-  if (adjustedDuration >= 1) {
-    adjustedDuration -= 1;
-  } else {
-    adjustedDuration = 0;
-  }
-
-  return adjustedDuration;
 };
 
 /**
@@ -556,188 +741,272 @@ const fetchProcessTemplate = async (statusTemplateExtId) => {
 };
 
 /**
- * Updates the absence type details based on the given absence type and related information.
+ * Fetches non-working dates from the work calendar based on the provided calendar external ID.
+ *
+ * @param {string} calendarExtId - The external ID of the work calendar.
+ * @returns {Promise<Array>} - A Promise resolving to an array of non-working dates.
+ */
+const fetchWorkCalendar = async (calendarExtId) => {
+  try {
+    const queryFields = {
+      fields: ["WorkCalendar-extID", "WorkCalendar-nonWorkingDates"],
+      where: [
+        {
+          fieldName: "WorkCalendar-extID",
+          operator: "=",
+          value: calendarExtId,
+        },
+      ],
+    };
+
+    const formData = {
+      query: JSON.stringify(queryFields),
+      testMode: TEST_MODE,
+      client: parseInt(APP.LOGIN_USER_CLIENT, 10),
+      user: APP.LOGIN_USER_ID,
+      userID: APP.LOGIN_USER_ID,
+      language: APP.LOGIN_USER_LANGUAGE,
+      intStatus: JSON.stringify([INTSTATUS.ACTIVE]),
+    };
+
+    const response = await fetchData(
+      API_ENDPOINTS.QUERY,
+      "POST",
+      { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      new URLSearchParams(formData).toString()
+    );
+
+    if (response.success && Array.isArray(response.data)) {
+      const workCalendarData = response.data[0];
+      return workCalendarData?.["WorkCalendar-nonWorkingDates"] || [];
+    } else {
+      console.error("Failed to fetch work calendar:", response);
+      return [];
+    }
+  } catch (error) {
+    console.error("Error fetching work calendar:", error);
+    return [];
+  }
+};
+
+/**
+ * Fetches and updates absence type details based on the selected absence type.
  *
  * @param {Object} params - The parameters object.
- * @param {string} params.absenceType - The ID or identifier of the absence type to be updated.
- * @param {Array} params.allAbsenceTypes - A list of all available absence types.
- * @returns {Object} - The updated absence type fields.
- *    - updatedFields: Contains the updated values for absence fields like policy text, start/end date, duration, etc.
+ * @param {string} params.absenceType - The ID of the absence type to update.
+ * @param {Object} params.allAbsenceTypes - A map of all available absence types, keyed by their external IDs.
+ * @returns {Object} - An object containing updated absence type details.
  */
 const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
-  // Retrieve the absence type record based on the external ID (absenceType)
+  // Retrieve the absence type record by its ID
   const absenceTypeRecord =
     getAbsenceTypeByExtId(absenceType, allAbsenceTypes) || {};
 
-  // Destructure the relevant fields from the absenceTypeRecord with default values
+  // Extract relevant fields from the absence type record, with default values
   const {
-    "AbsenceType-extID": extID = absenceType,
-    "AbsenceType-name": name = "",
-    "AbsenceType-policyText": policyText = "",
-    "AbsenceType-hourlyLeave": hourlyLeave = false,
-    "AbsenceType-displayInHours": displayInHours = false,
-    "AbsenceType-isFixedCalendar": isFixedCalendar = false,
+    "AbsenceType-extID": absenceTypeExtId = absenceType,
+    "AbsenceType-name": absenceTypeName = "",
+    "AbsenceType-policyText": absenceTypePolicyText = "",
+    "AbsenceType-hourlyLeave": absenceTypeHourlyLeave = false,
+    "AbsenceType-displayInHours": absenceTypeDisplayInHours = false,
+    "AbsenceType-fixedCalendar": absenceTypeFixedCalendar = "",
+    "AbsenceType-allowedInProbation": absenceTypeAllowedInProbation = false,
+    "AbsenceType-allowedInTermination": absenceTypeAllowedInTermination = false,
+    "AbsenceType-adminAdjustOnly": absenceTypeAdminAdjustOnly = false,
+    "AbsenceType-halfDaysNotAllowed": absenceTypeHalfDaysNotAllowed = false,
+    "AbsenceType-minRequest": absenceTypeMinRequest = null,
+    "AbsenceType-maxRequest": absenceTypeMaxRequest = null,
+    "AbsenceType-negativeDaysAllowed": negativeDaysAllowed = false,
+    "AbsenceType-negativeDays": negativeDays = 0,
+    "AbsenceType-projectedNextYear": projectedNextYear = 0,
   } = absenceTypeRecord;
 
   console.log("Absence Type Record: ", {
-    extID,
-    name,
-    policyText,
-    hourlyLeave,
-    displayInHours,
-    isFixedCalendar,
+    absenceTypeExtId,
+    absenceTypeName,
+    absenceTypePolicyText,
+    absenceTypeHourlyLeave,
+    absenceTypeDisplayInHours,
+    absenceTypeFixedCalendar,
+    absenceTypeAllowedInProbation,
+    absenceTypeAllowedInTermination,
+    absenceTypeAdminAdjustOnly,
+    absenceTypeHalfDaysNotAllowed,
+    absenceTypeMinRequest,
+    absenceTypeMaxRequest,
+    negativeDaysAllowed,
+    negativeDays,
+    projectedNextYear,
   });
 
-  // Construct the updated fields object
-  const updatedFields = {
-    localAbsenceStart: new Date(),
-    localAbsenceEnd: new Date(),
-    localAbsenceStartHalfDay: "1",
-    localAbsenceEndHalfDay: null,
-    localDuration: "1",
-    absenceTypeExtId: extID,
-    absenceTypeName: name,
-    absenceTypePolicyText: policyText,
-    absenceTypeHourlyLeave: hourlyLeave,
-    absenceTypeDisplayInHours: displayInHours,
-    absenceTypeIsFixedCalendar: isFixedCalendar,
+  // Construct and return the updated absence type details
+  return {
+    updatedFields: {
+      absenceTypeExtId,
+      absenceTypeName,
+      absenceTypePolicyText,
+      absenceTypeHourlyLeave,
+      absenceTypeDisplayInHours,
+      absenceTypeFixedCalendar,
+      absenceTypeAllowedInProbation,
+      absenceTypeAllowedInTermination,
+      absenceTypeAdminAdjustOnly,
+      absenceTypeHalfDaysNotAllowed,
+      absenceTypeMinRequest,
+      absenceTypeMaxRequest,
+      negativeDaysAllowed,
+      negativeDays,
+      projectedNextYear,
+    },
   };
-
-  // Return the updated fields
-  return { updatedFields };
 };
 
 /**
- * Checks if leave cancellation is allowed based on the configured number of days (adjustAfterDays).
- * The cancellation is not allowed if the end date is more than `adjustAfterDays` days ago.
+ * Checks if two date ranges overlap, considering fractional days.
  *
- * @param {number} adjustAfterDays - The number of days after which leave cancellation is not allowed.
- * @param {Date|string} endDate - The end date of the absence request, used to calculate the cancellation window.
- * @param {Function} t - Translation function used to show localized messages.
- * @returns {boolean} - Returns `true` if leave cancellation is allowed, otherwise `false`.
- *  - If no end date is provided, it returns `true` by default.
- *  - If the cancellation period has passed, it returns `false` and shows an error message.
- *  - If the cancellation period is within the allowed window, it returns `true`.
+ * The function accounts for partial overlaps by adjusting the start and end times
+ * based on fractional values (0 to 1), where 0 represents the start of the day and
+ * 1 represents the end of the day. The ranges are adjusted accordingly to check
+ * for overlaps, including the special case of same-day partial overlaps.
+ *
+ * @param {Date} startDate1 - Start date of the first range.
+ * @param {Date} endDate1 - End date of the first range.
+ * @param {number|string|null} [startDayFraction1=0] - Fraction of the first day for the first range (0 to 1).
+ * @param {number|string|null} [endDayFraction1=1] - Fraction of the last day for the first range (0 to 1).
+ * @param {Date} startDate2 - Start date of the second range.
+ * @param {Date} endDate2 - End date of the second range.
+ * @param {number|string|null} [startDayFraction2=0] - Fraction of the first day for the second range (0 to 1).
+ * @param {number|string|null} [endDayFraction2=1] - Fraction of the last day for the second range (0 to 1).
+ * @returns {boolean} - Returns true if the date ranges overlap, otherwise false.
+ *
+ * @throws {Error} If any date is invalid or if the start date is after the end date.
  */
-const isLeaveCancellationAllowed = (adjustAfterDays, endDate, t) => {
-  // If no endDate is provided, assume cancellation is allowed (return true)
-  if (!endDate) {
-    return true;
-  }
-
-  // Normalize the current date and the endDate to UTC format
-  const todayInUTC = normalizeDateToUTC(new Date()); // Current date normalized to UTC
-  const endDateInUTC = normalizeDateToUTC(new Date(endDate)); // End date normalized to UTC
-
-  // Calculate the difference in time (in milliseconds) and check if it exceeds the allowed cancellation period
+const isAbsencesOverlap = (
+  startDate1,
+  endDate1,
+  startDayFraction1 = "0",
+  endDayFraction1 = "1",
+  startDate2,
+  endDate2,
+  startDayFraction2 = "0",
+  endDayFraction2 = "1"
+) => {
+  // Validate dates
   if (
-    todayInUTC.getTime() - endDateInUTC.getTime() >
-    adjustAfterDays * 24 * 60 * 60 * 1000 // Convert adjustAfterDays to milliseconds for comparison
+    !(startDate1 instanceof Date && !isNaN(startDate1)) ||
+    !(endDate1 instanceof Date && !isNaN(endDate1)) ||
+    !(startDate2 instanceof Date && !isNaN(startDate2)) ||
+    !(endDate2 instanceof Date && !isNaN(endDate2))
   ) {
-    // If the cancellation period has passed, show an error message and return false
-    showToast(t("leave_cancellation_not_allowed", adjustAfterDays), "error");
-    console.log(
-      "Leave cancellation is not allowed after " + adjustAfterDays + " days."
-    );
-    return false;
+    throw new Error("Invalid date. Expected a valid Date object.");
   }
 
-  return true; // Cancellation is within the allowed period
+  // Convert fractions to valid numbers, clamp to range [0, 1]
+  const clampFraction = (value) =>
+    Math.min(Math.max(parseFloat(value) || 0, 0), 1);
+  startDayFraction1 = clampFraction(startDayFraction1);
+  endDayFraction1 = clampFraction(endDayFraction1);
+  startDayFraction2 = clampFraction(startDayFraction2);
+  endDayFraction2 = clampFraction(endDayFraction2);
+
+  // Ensure start dates are before or equal to end dates
+  if (startDate1 > endDate1 || startDate2 > endDate2) {
+    throw new Error("Start date cannot be after end date.");
+  }
+
+  // Adjust start and end dates based on fractions
+  const adjustedStart1 = new Date(startDate1);
+  adjustedStart1.setHours(adjustedStart1.getHours() + startDayFraction1 * 24);
+
+  const adjustedEnd1 = new Date(endDate1);
+  adjustedEnd1.setHours(adjustedEnd1.getHours() + endDayFraction1 * 24);
+
+  const adjustedStart2 = new Date(startDate2);
+  adjustedStart2.setHours(adjustedStart2.getHours() + startDayFraction2 * 24);
+
+  const adjustedEnd2 = new Date(endDate2);
+  adjustedEnd2.setHours(adjustedEnd2.getHours() + endDayFraction2 * 24);
+
+  /**
+   * Check for general date range overlap:
+   * - `adjustedStart1 < adjustedEnd2 && adjustedEnd1 > adjustedStart2`
+   *   ensures there is a valid overlap where the ranges intersect.
+   */
+  const rangesOverlap =
+    adjustedStart1 < adjustedEnd2 && adjustedEnd1 > adjustedStart2;
+
+  /**
+   * Check for fractional same-day overlap when date ranges are identical.
+   * - If the start and end dates for both ranges are the same,
+   *   ensure that the sum of fractions is at least 1.
+   */
+  const sameDayOverlap =
+    startDate1.toDateString() === endDate1.toDateString() &&
+    startDate2.toDateString() === endDate2.toDateString() &&
+    (startDayFraction1 + endDayFraction2 >= 1 ||
+      startDayFraction2 + endDayFraction1 >= 1);
+
+  return rangesOverlap || sameDayOverlap;
 };
 
 /**
- * Checks whether the given date is a holiday.
+ * Checks if leave is allowed during probation or notice period.
  *
- * @param {Date|string} date - The date to check.
- * @param {Object} employeeInfo - The employee information containing non-working dates and days.
- * @returns {boolean} - Returns `true` if the date is not a holiday, otherwise `false`.
+ * @param {Object} employee - The employee object containing relevant employee data.
+ * @param {boolean} allowedInProbation - Indicates if the absence type is allowed during the probation period.
+ * @param {boolean} allowedInNoticePeriod - Indicates if the absence type is allowed during the notice period.
+ * @param {Date|string} start - The start of the time-off request.
+ * @param {Date|string} end - The end of the time-off request.
+ * @param {Function} t - Translation function used to show localized messages.
+ * @returns {boolean} - Returns `true` if the time-off request is allowed, otherwise returns `false`.
  */
-const isNotHoliday = (date, employeeInfo) => {
-  const validDays = calculateValidDaysBetweenDates(date, date, employeeInfo);
-  return validDays !== 0;
-};
-
-/**
- * Validates whether a time-off request is allowed based on the employee's probation and notice period status.
- *
- * @param {Object} employeeInfo - The employee object containing relevant employee data.
- * @param {string} absenceTypeName - The name of the absence type (e.g., "Casual Leave", "Sick Leave").
- * @param {boolean} isAllowedInProbation - Indicates if the absence type is allowed during the probation period.
- * @param {boolean} isAllowedInNoticePeriod - Indicates if the absence type is allowed during the notice period.
- * @param {Date|string} startDate - The start date of the time-off request.
- * @param {Date|string} endDate - The end date of the time-off request.
- * @param {Function} t - The translation function for localized messages.
- * @returns {boolean} - Returns `true` if the time-off request is allowed, otherwise `false`.
- */
-const isTimeOffAllowedDuringProbationOrNoticePeriod = (
+const isLeaveAllowedInEmploymentPeriod = (
   employeeInfo,
-  absenceTypeName,
-  isAllowedInProbation,
-  isAllowedInNoticePeriod,
-  startDate,
-  endDate,
+  allowedInProbation,
+  allowedInNoticePeriod,
+  start,
+  end,
   t
 ) => {
-  // Helper function to check if two dates fall on the same calendar day
-  const isSameDay = (date1, date2) =>
-    date1.toDateString() === date2.toDateString();
-
-  const currentDate = new Date();
   const { confirmationDate, termDate, noticePeriod } = employeeInfo;
 
-  // Check if absence is disallowed during notice period
+  // Check if absence is allowed during the notice period
   if (
-    !isAllowedInNoticePeriod &&
-    noticePeriod &&
+    allowedInNoticePeriod === false &&
     noticePeriod > 0 &&
     termDate &&
-    termDate.getTime() >= currentDate.getTime()
+    termDate.getTime() >= new Date().getTime()
   ) {
-    showToast(t("notice_period_not_allowed", { absenceTypeName }), "error");
-    console.log(
-      absenceTypeName +
-        ": Time-off cannot be requested during the notice period."
-    );
+    showToast(t("notice_period_not_allowed"), "error");
     return false;
   }
 
-  // Check if time-off is requested after the termination date
-  if (
-    isAllowedInNoticePeriod &&
-    startDate &&
-    endDate &&
-    termDate &&
-    (isSameDay(termDate, startDate) ||
-      termDate.getTime() <= new Date(startDate).getTime() ||
-      isSameDay(termDate, endDate) ||
-      termDate.getTime() <= new Date(endDate).getTime())
-  ) {
-    showToast(
-      t("after_termination", {
-        termDate: termDate.toDateString(),
-      }),
-      "error"
-    );
-    console.log(
-      "Time-off cannot be requested after the termination date " +
-        termDate +
-        "."
-    );
-    return false;
+  // Check if absence is allowed after the termination date
+  if (allowedInNoticePeriod === true && start && end && termDate) {
+    const isStartDateAfterTermDate =
+      termDate.getTime() <= new Date(start).getTime() ||
+      datesAreForSameDay(termDate, new Date(start));
+    const isEndDateAfterTermDate =
+      termDate.getTime() <= new Date(end).getTime() ||
+      datesAreForSameDay(termDate, new Date(end));
+
+    if (isStartDateAfterTermDate || isEndDateAfterTermDate) {
+      showToast(
+        t("after_termination", { terminationDate: termDate.toDateString() }),
+        "error"
+      );
+      return false;
+    }
   }
 
-  // Check if absence is disallowed during probation period
+  // Check if absence is allowed during the probation period
   if (
-    !isAllowedInProbation &&
+    allowedInProbation === false &&
     confirmationDate &&
-    !isSameDay(confirmationDate, currentDate) &&
-    confirmationDate.getTime() >= currentDate.getTime()
+    !datesAreForSameDay(confirmationDate, new Date()) &&
+    confirmationDate.getTime() >= new Date().getTime()
   ) {
-    showToast(t("probation_period_not_allowed", { absenceTypeName }), "error");
-    console.log(
-      absenceTypeName +
-        ": Time-off cannot be requested during the probation period."
-    );
+    showToast(t("probation_period_not_allowed"), "error");
     return false;
   }
 
@@ -745,143 +1014,270 @@ const isTimeOffAllowedDuringProbationOrNoticePeriod = (
 };
 
 /**
- * Validates the absence dates to ensure there are no conflicts with existing absences.
+ * Checks if a given date is a non-working day (weekend or holiday).
  *
- * @param {Date|string} startDate - The start date of the absence.
- * @param {Date|string} endDate - The end date of the absence.
- * @param {number} startDayFraction - The fraction of the start day.
- * @param {number} endDayFraction - The fraction of the end day.
- * @param {string} employeeID - The ID of the employee.
- * @param {Object} t - Translation function used to show localized messages.
- * @returns {Promise<boolean>} - Returns `true` if validation passes, otherwise `false`.
+ * @param {Date} date - The date to check.
+ * @param {Object} employeeInfo - The employee information containing non-working dates and days.
+ * @returns {boolean} - True if the date is a non-working day, otherwise false.
  */
-const validateAbsenceDates = async (
+const isNonWorkingDay = (date, employeeInfo) => {
+  const { nonWorkingDates = [], nonWorkingDays = [] } = employeeInfo;
+  const dayOfWeek = date.getDay();
+  const currentDate = date.setHours(0, 0, 0, 0);
+
+  const uniqueNonWorkingDates = new Set(
+    nonWorkingDates.map((dateInfo) =>
+      new Date(dateInfo.date).setHours(0, 0, 0, 0)
+    )
+  );
+
+  return (
+    nonWorkingDays.includes(dayOfWeek) || uniqueNonWorkingDates.has(currentDate)
+  );
+};
+
+/**
+ * Checks if the hourly time-off request falls on holidays or non-working days.
+ *
+ * @param {Date|string} startDate - The start date of the time-off request.
+ * @param {Date|string} endDate - The end date of the time-off request.
+ * @param {Function} t - The translation function for localized messages.
+ * @param {Object} employeeInfo - The employee's non-working days (e.g., holidays, weekends).
+ * @param {string} [messageType='warning'] - Message type: "warning" or "error".
+ * @returns {boolean} - Returns `true` if the time-off request is valid, `false` if it falls on holidays or non-working days.
+ */
+const isTimeOffOnHoliday = (
   startDate,
   endDate,
-  startDayFraction,
-  endDayFraction,
-  employeeID,
+  t,
+  employeeInfo,
+  messageType = "warning"
+) => {
+  const validDaysCount = calculateValidDaysCount(
+    startDate,
+    endDate,
+    employeeInfo
+  );
+
+  if (validDaysCount <= 0) {
+    showToast(t("time_off_holiday_warning"), messageType);
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Helper function to update a field in state if the value has changed.
+ * This function compares the new value with the current value of the field.
+ * If they are different, it updates the state and records the change.
+ *
+ * @param {Object} values - The new values to compare and update.
+ * @param {string} fieldName - The field name to update.
+ * @param {any} newValue - The new value for the field.
+ * @param {Function} setState - The state setter function to update the field.
+ * @param {Object} changes - The object where updated values are stored.
+ * @param {string} changeKey - The key used to store updated values.
+ */
+const updateFieldInState = (
+  values,
+  fieldName,
+  newValue,
+  setState,
+  changes,
+  changeKey
+) => {
+  if (
+    values[fieldName] !== undefined &&
+    !isEqual(values[fieldName], newValue)
+  ) {
+    setState(values[fieldName]);
+    changes[changeKey] = values[fieldName];
+  }
+};
+
+/**
+ * Updates KPI balances based on the absence request details.
+ * This function makes two API calls:
+ * 1. To retrieve the current KPI balances.
+ * 2. To retrieve the projected KPI balances as of the year's end.
+ *
+ * @param {Object} absenceDetails - Details about the absence request.
+ * @param {string} absenceDetails.absenceType - The type of absence requested.
+ * @param {string} absenceDetails.absenceEmployeeId - The ID of the employee requesting the absence.
+ * @param {string} [absenceDetails.absenceEnd] - The end date of the absence.
+ * @param {number} [absenceDetails.absenceDuration] - The duration of the absence in days.
+ * @param {Function} updateKPIs - Callback function to update KPI values in the UI.
+ *   This function is called with an object containing the following properties:
+ *   - balance: The current balance of absence days.
+ *   - balanceAfter: The projected balance after considering the absence.
+ *   - projectedBalance: The projected balance as of the year's end.
+ *   - projectedCarryForward: The projected carry-forward days at year's end.
+ */
+const updateKPIBalances = async (absenceDetails, updateKPIs) => {
+  if (
+    !absenceDetails ||
+    !absenceDetails.absenceType ||
+    !absenceDetails.absenceEmployeeId
+  ) {
+    console.error("Invalid absence details provided to updateKPIBalances.");
+    return;
+  }
+
+  const { absenceType, absenceEmployeeId, absenceEnd, absenceDuration } =
+    absenceDetails;
+
+  const normalizedDate = normalizeDateToUTC(new Date());
+  const balanceCheckOnDate = sprintf(
+    "%d-%02d-%02dT%02d:%02d:%02d-0000",
+    normalizedDate.getUTCFullYear(),
+    normalizedDate.getUTCMonth() + 1,
+    normalizedDate.getUTCDate(),
+    normalizedDate.getUTCHours(),
+    normalizedDate.getUTCMinutes(),
+    normalizedDate.getUTCSeconds()
+  );
+
+  // Prepare the request payload for current balance
+  const requestBody = {
+    interfaceName: "AbsenceTypeBalanceReadApi",
+    methodName: "readAbsenceTypeBalances",
+    paramsMap: {
+      employeeId: absenceEmployeeId,
+      userId: APP.LOGIN_USER_ID,
+      hrDivisionId: null,
+      readDate: null,
+      languageId: APP.LOGIN_USER_LANGUAGE,
+      clientId: APP.LOGIN_USER_CLIENT,
+      hideZeroBalances: false,
+      balanceCheckOnDate,
+      absenceType: absenceType,
+      checkBalances: true,
+      absenceDuration,
+      employee: null,
+    },
+  };
+
+  try {
+    // First API call for current balance
+    const response = await fetchData(
+      API_ENDPOINTS.INVOKE,
+      "POST",
+      { "Content-Type": "application/json" },
+      JSON.stringify(requestBody)
+    );
+
+    let balance = "-",
+      balanceAfter = "-";
+
+    if (response.success && response.retVal && response.retVal.data) {
+      balance = response.retVal.data[0]?.projectedNextYear || 0;
+      balanceAfter = Math.max(balance - absenceDuration, 0);
+    }
+
+    // Correct the balanceCheckOnDate for the projected balance request
+    const endOfYearDate = sprintf(
+      "%d-12-31T00:00:00-0000",
+      new Date().getFullYear()
+    );
+
+    // Prepare the request payload for projected balance at year's end
+    const projectedBalanceRequest = {
+      ...requestBody,
+      paramsMap: {
+        ...requestBody.paramsMap,
+        balanceCheckOnDate: endOfYearDate,
+        absenceDuration: 0,
+      },
+    };
+
+    // Second API call for projected balance
+    const projectedResponse = await fetchData(
+      API_ENDPOINTS.INVOKE,
+      "POST",
+      { "Content-Type": "application/json" },
+      JSON.stringify(projectedBalanceRequest)
+    );
+
+    let projectedBalance = "-",
+      projectedCarryForward = "-";
+
+    if (
+      projectedResponse.success &&
+      projectedResponse.retVal &&
+      projectedResponse.retVal.data
+    ) {
+      projectedBalance =
+        projectedResponse.retVal.data[0]?.projectedNextYear || "-";
+      projectedCarryForward = Math.min(
+        projectedResponse.retVal.data[0]?.projectedNextYear || 0,
+        projectedResponse.retVal.data[0]?.maxCarryForwards || 0
+      );
+    }
+
+    // Update the UI with the fetched KPI data
+    updateKPIs({
+      balanceBefore: balance,
+      balanceAfter,
+      projectedBalance,
+      projectedCarryForward,
+    });
+  } catch (error) {
+    console.error("Error fetching KPI balances", error);
+    // Fallback UI update in case of errors
+    updateKPIs({
+      balanceBefore: "-",
+      balanceAfter: "-",
+      projectedBalance: "-",
+      projectedCarryForward: "-",
+    });
+  }
+};
+
+/**
+ * Validates absence adjustments based on various constraints.
+ *
+ * @param {number} absencePlannedDays - Number of planned days for the absence adjustment.
+ * @param {boolean} negativeDaysAllowed - Whether negative balances are allowed.
+ * @param {number} negativeDays - Maximum allowable negative days.
+ * @param {number} projectedNextYear - Available absence days projected for the next year.
+ * @param {string} absenceTypeName - Name of the absence type for error messages.
+ * @param {Function} t - Translation function for localized messages.
+ * @returns {boolean} - Returns true if the absence adjustment is valid, otherwise false.
+ */
+const validateAbsenceOnSaveWithAdjustment = (
+  absencePlannedDays,
+  negativeDaysAllowed,
+  negativeDays,
+  projectedNextYear,
+  absenceTypeName,
   t
 ) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  if (start.getTime() > end.getTime()) {
-    showToast(t("start_date_must_be_less_than_end_date"), "error");
-    console.log("Start date must be less than end date.");
+  if (!absencePlannedDays) {
+    showToast(t("please_input_number_of_days_to_be_adjusted"), "error");
     return false;
   }
 
-  const existingAbsences = await fetchExistingAbsences(
-    employeeID,
-    startDate,
-    endDate
-  );
+  let errorMessage = "";
 
-  let totalOfStartFractionDays = 0;
-  let totalOfEndFractionDays = 0;
+  const remainingBalance = projectedNextYear - absencePlannedDays;
 
-  for (const record of existingAbsences) {
-    if (
-      record.start &&
-      record.end &&
-      record.employeeID === employeeID &&
-      record.adjustAbsence !== true &&
-      record.redemption !== true &&
-      record.duration > 0 &&
-      record.plannedDays > 0
-    ) {
-      const recordStart = new Date(record.start);
-      const recordEnd = new Date(record.end);
-
-      if (
-        (start >= recordStart && start <= recordEnd) ||
-        (end >= recordStart && end <= recordEnd) ||
-        (recordStart >= start && recordStart <= end) ||
-        (recordEnd >= start && recordEnd <= end)
-      ) {
-        if (
-          (start.toDateString() === recordStart.toDateString() &&
-            end.getTime() === start.getTime()) ||
-          start.toDateString() === recordEnd.toDateString() ||
-          end.toDateString() === recordStart.toDateString() ||
-          (end.toDateString() === recordEnd.toDateString() &&
-            end.getTime() === start.getTime())
-        ) {
-          if (start.toDateString() === recordStart.toDateString()) {
-            totalOfStartFractionDays += parseFloat(record.startHalfDay) || 1;
-          } else if (start.toDateString() === recordEnd.toDateString()) {
-            totalOfStartFractionDays += parseFloat(record.endHalfDay) || 1;
-          }
-
-          let absenceExists = false;
-          if (
-            end.toDateString() === recordStart.toDateString() &&
-            parseFloat(endDayFraction) + parseFloat(record.startHalfDay) >= 1
-          ) {
-            absenceExists = true;
-          }
-          if (end.toDateString() === recordEnd.toDateString()) {
-            totalOfEndFractionDays += parseFloat(record.endHalfDay) || 0;
-          } else if (end.toDateString() === recordStart.toDateString()) {
-            totalOfEndFractionDays += parseFloat(record.startHalfDay) || 0;
-          }
-          if (
-            totalOfStartFractionDays + parseFloat(startDayFraction) > 1 ||
-            totalOfEndFractionDays + parseFloat(endDayFraction) > 1 ||
-            absenceExists === true
-          ) {
-            if (recordStart.toDateString() === recordEnd.toDateString()) {
-              showToast(
-                t("absence_exists_for_date", {
-                  date: recordStart.toDateString(),
-                }),
-                "error"
-              );
-              console.log(
-                `There is already Time Off Request for ${recordStart.toDateString()}.`
-              );
-            } else {
-              showToast(
-                t("absence_exists_for_period", {
-                  start: recordStart.toDateString(),
-                  end: recordEnd.toDateString(),
-                }),
-                "error"
-              );
-              console.log(
-                `There is already Time Off Request from ${recordStart.toDateString()} to ${recordEnd.toDateString()}, which overlaps with current Time Off Request.`
-              );
-            }
-            return false;
-          }
-        } else {
-          if (recordStart.toDateString() === recordEnd.toDateString()) {
-            showToast(
-              t("absence_exists_for_date", {
-                date: recordStart.toDateString(),
-              }),
-              "error"
-            );
-            console.log(
-              `There is already Time Off Request for ${recordStart.toDateString()}.`
-            );
-          } else {
-            showToast(
-              t("absence_exists_for_period", {
-                start: recordStart.toDateString(),
-                end: recordEnd.toDateString(),
-              }),
-              "error"
-            );
-            console.log(
-              `There is already Time Off Request from ${recordStart.toDateString()} to ${recordEnd.toDateString()}, which overlaps with current Time Off Request.`
-            );
-          }
-          return false;
-        }
-      }
+  if (negativeDaysAllowed) {
+    if (remainingBalance < 0 && Math.abs(remainingBalance) > negativeDays) {
+      errorMessage = `${t("only")} ${Math.abs(
+        projectedNextYear + negativeDays
+      )} ${t("days_of")} ${absenceTypeName} ${t("could_be_deducted")}`;
     }
+  } else {
+    if (remainingBalance < 0) {
+      errorMessage = `${t("only")} ${Math.abs(projectedNextYear)} ${t(
+        "days_of"
+      )} ${absenceTypeName} ${t("could_be_deducted")}`;
+    }
+  }
+
+  if (errorMessage) {
+    showToast(errorMessage, "error");
+    return false;
   }
 
   return true;
@@ -890,41 +1286,75 @@ const validateAbsenceDates = async (
 /**
  * Validates the duration of absence based on various conditions, ensuring it meets the necessary requirements.
  *
- * @param {number} val - The entered duration value to be validated.
+ * @param {number} value - The entered duration value to be validated.
  * @param {number} minValue - The minimum allowed value for the duration.
- * @param {boolean} allowDecimals - Flag to indicate if decimals are allowed for the duration.
+ * @param {number|null} maxValue - The maximum allowed value for the duration.
+ * @param {boolean} halfDaysNotAllowed - Flag to indicate if half days are not allowed for the duration.
  * @param {boolean} isHourlyAbsence - Flag indicating whether the absence is measured in hours.
  * @param {boolean} isDisplayInHours - Flag indicating if the duration is displayed in hours.
+ * @param {number} hoursPerDay - The number of work hours in a day.
  * @param {function} t - Translation function used to fetch localized strings for error messages.
+ * @param {number} minFraction - The minimum fraction value for the duration.
  * @returns {boolean} - Returns `false` if validation fails (duration is not in acceptable multiples), otherwise `true`.
- *
- * The function ensures that the entered duration is a multiple of `minValue` when decimals are allowed,
- * and that it's valid for daily absence (i.e., non-hourly or non-hourly display absence).
- * If the validation fails, it shows a toast error message.
  */
 const validateDuration = (
   value,
   minValue,
-  allowDecimals,
+  maxValue,
+  halfDaysNotAllowed,
   isHourlyAbsence,
   isDisplayInHours,
-  t
+  hoursPerDay,
+  t,
+  minFraction
 ) => {
-  console.debug("Validating duration:", {
+  console.log("Validating duration:", {
     value,
     minValue,
-    allowDecimals,
+    maxValue,
+    halfDaysNotAllowed,
     isHourlyAbsence,
     isDisplayInHours,
+    hoursPerDay,
+    minFraction,
   });
+
+  // Ensure the duration is greater than zero
+  if (parseFloat(value) <= 0) {
+    showToast(t("duration_must_be_positive"), "error");
+    return false;
+  }
+
+  // Ensure the duration meets the minimum requirement
+  if (minValue && parseFloat(value) < minValue) {
+    showToast(
+      "The minimum number of days to be applied for time off is " +
+        minValue +
+        " days.",
+      "error"
+    );
+    return false;
+  }
+
+  // Ensure the duration does not exceed the maximum requirement
+  if (maxValue && parseFloat(value) > maxValue) {
+    showToast(
+      "The maximum number of days you can apply for time off is " +
+        maxValue +
+        " days.",
+      "error"
+    );
+    return false;
+  }
+
   // Check for invalid durations when not using hourly absence or displaying duration in hours
   if (
     minValue < 1 && // minValue must be less than 1
-    allowDecimals && // Decimals are allowed
+    !halfDaysNotAllowed && // Half days are allowed
     !isHourlyAbsence && // Absence is not in hours
     !isDisplayInHours && // Duration is not displayed in hours
-    8 % minValue === 0 && // Ensure minValue is a multiple of 8
-    value % minValue !== 0 // Ensure val is a valid multiple of minValue
+    (hoursPerDay / minValue) % 1 === 0 && // Ensure minValue is a divisor of hoursPerDay
+    value % minFraction !== 0 // Ensure value is a valid multiple of minFraction
   ) {
     // Show error message via toast
     showToast(t("duration_multiple_error"), "error");
@@ -936,51 +1366,68 @@ const validateDuration = (
 };
 
 /**
- * Validates that hourly leaves are not booked on holidays.
- *
- * @param {Date|string} startDate - The start date of the leave.
- * @param {Date|string} endDate - The end date of the leave.
- * @param {Object} employeeInfo - The employee information containing non-working dates and days.
- * @param {Function} t - Translation function used to show localized messages.
- * @returns {boolean} - Returns `true` if the leave is valid, otherwise `false`.
+ * Validates the status change based on the process template.
+ * @param {Object} processTemplate - The process template containing steps.
+ * @param {Object} currentStatus - The current status of the absence.
+ * @param {number} maxCancellationDays - The configured number of days after which leave adjustment is restricted.
+ * @param {Date} endDate - The end date of the absence.
+ * @returns {boolean} - Returns true if the status change is valid, otherwise false.
  */
-const validateHourlyLeavesNotOnHoliday = (
-  startDate,
-  endDate,
-  employeeInfo,
-  t
+const validateStatusChange = (
+  processTemplate,
+  currentStatus,
+  maxCancellationDays,
+  endDate
 ) => {
-  const workingDays = calculateValidDaysBetweenDates(
-    startDate,
-    endDate,
-    employeeInfo
-  );
-  if (workingDays <= 0) {
-    showToast(t("time_off_holiday_warning"), "warning");
-    console.warn("Time Off starts/finishes on a holiday.");
-    return false;
+  if (!processTemplate || !currentStatus) {
+    return true;
   }
+
+  const steps = processTemplate["ProcessTemplate-steps"];
+  if (!steps || !Array.isArray(steps)) {
+    return true;
+  }
+
+  const submissionCancelledStepIds = steps
+    .filter((step) => step.eventID === "SUBMISSIONCANCELLEDAPI")
+    .map((step) => step.extID);
+
+  if (submissionCancelledStepIds.length === 0) {
+    return true;
+  }
+
+  // Validate if the current status is one of the cancellation steps
+  if (submissionCancelledStepIds.includes(currentStatus.statusID)) {
+    return canCancelLeave(maxCancellationDays, endDate);
+  }
+
   return true;
 };
 
 export {
-  adjustDurationForDayFractionsAndHolidays,
   booleanMap,
-  calculateValidDaysBetweenDates,
+  calculateDuration,
+  calculateEndDate,
+  calculateValidDaysCount,
+  canCancelLeave,
   fetchAbsenceTypes,
-  fetchExistingAbsences,
+  fetchEmployeeAbsences,
+  fetchEligibleAbsenceTypes,
   fetchListData,
   fetchProcessTemplate,
+  fetchWorkCalendar,
   formatLeaveDuration,
   getAbsenceMilliseconds,
   getAbsenceFields,
   getAbsenceTypeFields,
-  getAdjustedDuration,
   handleAbsenceTypeUpdate,
-  isLeaveCancellationAllowed,
-  isNotHoliday,
-  isTimeOffAllowedDuringProbationOrNoticePeriod,
-  validateAbsenceDates,
+  isAbsencesOverlap,
+  isLeaveAllowedInEmploymentPeriod,
+  isNonWorkingDay,
+  isTimeOffOnHoliday,
+  updateFieldInState,
+  updateKPIBalances,
+  validateAbsenceOnSaveWithAdjustment,
   validateDuration,
-  validateHourlyLeavesNotOnHoliday,
+  validateStatusChange,
 };

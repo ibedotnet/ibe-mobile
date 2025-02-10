@@ -736,7 +736,9 @@ const Timesheet = ({ route, navigation }) => {
         onEndReached={handleLoadMoreData}
         onEndReachedThreshold={1}
         ListFooterComponent={() => {
-          return isFetchingMore ? <Loader /> : null;
+          return isFetchingMore ? (
+            <ActivityIndicator size="small" color="#0000ff" />
+          ) : null;
         }}
         refreshControl={
           <RefreshControl
@@ -825,7 +827,7 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   firstColumnText: {
-    color: "#2f4F4f"
+    color: "#2f4F4f",
   },
   secondColumn: {
     flex: 4,

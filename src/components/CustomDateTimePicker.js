@@ -22,7 +22,8 @@ import { convertToDateFNSFormat } from "../utils/FormatUtils";
  */
 const CustomDateTimePicker = ({
   placeholder,
-  initialValue,
+  initialValue = "date", // Keep initialValue for the initial/default value
+  value, // Controlled value prop to update the date externally
   initialMode = "date",
   isTimePickerVisible = false,
   onFilter,
@@ -30,6 +31,15 @@ const CustomDateTimePicker = ({
   showClearButton = true,
   style = {}, // Default style prop for custom styling
 }) => {
+  if (initialValue && isNaN(new Date(initialValue).getTime())) {
+    initialValue = new Date();
+  }
+
+  // Check if value is a valid date
+  if (value && isNaN(new Date(value).getTime())) {
+    value = new Date();
+  }
+
   // Initialize useTranslation hook
   const { t } = useTranslation();
 
@@ -37,6 +47,13 @@ const CustomDateTimePicker = ({
   const [date, setDate] = useState(initialValue || null);
   const [mode, setMode] = useState(initialMode);
   const [show, setShow] = useState(false);
+
+  // Sync internal state with the external controlled value (if passed)
+  useEffect(() => {
+    if (value !== undefined) {
+      setDate(value); // If value is passed, update the date from the parent component
+    }
+  }, [value]);
 
   // Function to handle changes in the date picker
   const onChange = (event, selectedDate) => {
@@ -74,11 +91,6 @@ const CustomDateTimePicker = ({
       onFilter(null);
     }
   };
-
-  // Effect to update date value when initialValue changes
-  useEffect(() => {
-    setDate(initialValue || null);
-  }, [initialValue]);
 
   return (
     <View
