@@ -36,6 +36,7 @@ import {
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import {
+  convertToDateFNSFormat,
   getRemarkText,
   isEqual,
   normalizeDateToUTC,
@@ -57,7 +58,12 @@ import {
   isLeaveAllowedInEmploymentPeriod,
   fetchEmployeeAbsences,
   isAbsencesOverlap,
+  validateDuration,
+  mergeAbsenceData,
+  isTimeOffOnHoliday,
+  validateAbsenceOnSaveWithAdjustment,
 } from "../utils/AbsenceUtils";
+import { format } from "date-fns";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -97,6 +103,7 @@ const AbsenceDetail = ({ route, navigation }) => {
   const [listOfNextStatus, setListOfNextStatus] = useState([]);
   const [isLocked, setIsLocked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isKPIUpdating, setIsKPIUpdating] = useState(false);
   const [updatedValues, setUpdatedValues] = useState({});
 
   const [absenceFiles, setAbsenceFiles] = useState([]);
@@ -111,6 +118,8 @@ const AbsenceDetail = ({ route, navigation }) => {
   const [absencePlannedDays, setAbsencePlannedDays] = useState(null);
   const [absenceSubmittedOn, setAbsenceSubmittedOn] = useState(null);
   const [absenceAdjustAbsence, setAbsenceAdjustAbsence] = useState(false);
+  const [absenceIsNegativeBalance, setAbsenceIsNegativeBalance] =
+    useState(false);
   const [absenceAdjustTaken, setAbsenceAdjustTaken] = useState(false);
   const [absenceHoursByDay, setAbsenceHoursByDay] = useState([]);
   const [absenceExtStatus, setAbsenceExtStatus] = useState({});
@@ -137,6 +146,13 @@ const AbsenceDetail = ({ route, navigation }) => {
   const [isAddToBalance, setIsAddToBalance] = useState(true);
   const [processTemplate, setProcessTemplate] = useState(null);
   const [employeeAbsences, setEmployeeAbsences] = useState([]);
+
+  const [kpiValues, setKPIValues] = useState({
+    balanceBefore: "-",
+    balanceAfter: "-",
+    projectedBalance: "-",
+    projectedCarryForward: "-",
+  });
 
   // Use custom hook to get the employeeInfo based on openedFromApproval flag
   const employeeInfo = useEmployeeInfo(openedFromApproval);
@@ -321,18 +337,30 @@ const AbsenceDetail = ({ route, navigation }) => {
 
   /**
    * Updates the absence record with the provided updated values.
+   * This function sends a request to update the absence fields with the new values.
+   * It handles the response, updates the state, and shows appropriate messages based on the result.
    *
-   * @param {Object} updatedValues - The updated values for the absence record.
+   * @param {Object} updatedValues - The updated values for the absence fields.
+   * @param {boolean} isNegativeBalance - Indicates if the absence has a negative balance.
    */
-  const updateAbsence = async (updatedValues = {}) => {
+  const updateAbsence = async (
+    updatedValues = {},
+    isNegativeBalance = false
+  ) => {
     try {
+      // Prefix the updated values with the absence category prefix
       const prefixedUpdatedValues = {};
       for (const key in updatedValues) {
         prefixedUpdatedValues[`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-${key}`] =
           updatedValues[key];
       }
 
-      // Add the prefixed updated values to the formData
+      // Include the negative balance flag if applicable
+      if (isNegativeBalance) {
+        prefixedUpdatedValues["Absence-negative"] = isNegativeBalance;
+      }
+
+      // Prepare the form data with the prefixed updated values
       const formData = {
         data: {
           [`${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-id`]: absenceId,
@@ -340,6 +368,7 @@ const AbsenceDetail = ({ route, navigation }) => {
         },
       };
 
+      // Define query string parameters for the update request
       const queryStringParams = {
         userID: APP.LOGIN_USER_ID,
         client: APP.LOGIN_USER_CLIENT,
@@ -350,40 +379,60 @@ const AbsenceDetail = ({ route, navigation }) => {
         appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.ABSENCE)),
       };
 
+      // Send the update request and handle the response
       const updateResponse = await updateFields(formData, queryStringParams);
 
-      // Check if update was successful
-      if (updateResponse.success) {
-        // Extract the new ID from the response
-        const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
-        if (newId) {
-          setAbsenceId(newId); // Update the absenceId with the new ID
-          setIsEditMode(true);
-        }
-
-        // Clear updatedValuesRef.current and updatedValues state
-        updatedValuesRef.current = {};
-        setUpdatedValues({});
-
-        // force refresh absence data on list screen
-        updateForceRefresh(true);
-
-        // Notify that save was clicked
-        notifySave();
-
-        if (lang !== "en") {
-          showToast(t("update_success"));
-        }
-
-        updateForceRefresh(true);
-
-        if (updateResponse.message) {
-          showToast(updateResponse.message);
-        }
-      } else {
+      // If the update response indicates failure, show an error message and exit
+      if (!updateResponse.success) {
         showToast(t("update_failure"), "error");
+        return;
+      }
+
+      // Check if any detail object in the response has success: false
+      const details = updateResponse?.response?.details || [];
+      const hasFailure = details.some((detail) => detail.success === false);
+
+      if (hasFailure) {
+        // Extract and show the first error message from the response
+        const errorMessages = details.flatMap(
+          (detail) =>
+            detail.messages?.filter((msg) => msg.message_type === "error") || []
+        );
+
+        if (errorMessages.length > 0) {
+          // Not showing toast message here as it has been done centrally in fetchData
+          return;
+        }
+      }
+
+      // Extract the new ID from the response and update the absenceId state
+      const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
+      if (newId) {
+        setAbsenceId(newId);
+        setIsEditMode(true);
+      }
+
+      // Clear the updated values reference and state
+      updatedValuesRef.current = {};
+      setUpdatedValues({});
+
+      // Force refresh the absence data on the list screen
+      updateForceRefresh(true);
+
+      // Notify that the save action was clicked
+      notifySave();
+
+      // Show a success message if the language is not English
+      if (lang !== "en") {
+        showToast(t("update_success"));
+      }
+
+      // Show the header response message if available
+      if (updateResponse.message) {
+        showToast(updateResponse.message);
       }
     } catch (error) {
+      // Handle any errors that occur during the update process
       console.error("Error in updateAbsence of AbsenceDetail", error);
       showToast(t("unexpected_error"), "error");
     }
@@ -395,10 +444,10 @@ const AbsenceDetail = ({ route, navigation }) => {
    */
   const handleSave = async () => {
     try {
-      const isValidAbsence = validateAbsenceOnSave();
+      const { isValid, isNegativeBalance } = validateAbsenceOnSave();
 
-      if (isValidAbsence) {
-        await updateAbsence(updatedValues);
+      if (isValid) {
+        await updateAbsence(updatedValues, isNegativeBalance);
       }
     } catch (error) {
       console.error("Error in saving absence", error);
@@ -654,7 +703,7 @@ const AbsenceDetail = ({ route, navigation }) => {
    * Validates the absence details before saving.
    * Checks if the required fields are provided.
    *
-   * @returns {boolean} - Returns `true` if the absence details are valid, otherwise `false`.
+   * @returns {Object} - Returns an object containing a boolean `isValid` and a boolean `isNegativeBalance`.
    */
   const validateAbsenceOnSave = () => {
     const {
@@ -673,19 +722,19 @@ const AbsenceDetail = ({ route, navigation }) => {
     // Check if the absence type is provided
     if (!absenceType) {
       showToast(t("type_required_message"), "error");
-      return false;
+      return { isValid: false, isNegativeBalance: false };
     }
 
     // Check if the absence start date is provided
     if (!absenceStart) {
       showToast(t("start_required_message"), "error");
-      return false;
+      return { isValid: false, isNegativeBalance: false };
     }
 
     // Check if the absence end date is provided
     if (!absenceEnd) {
       showToast(t("end_required_message"), "error");
-      return false;
+      return { isValid: false, isNegativeBalance: false };
     }
 
     // Check if the start date is greater than the end date
@@ -695,25 +744,27 @@ const AbsenceDetail = ({ route, navigation }) => {
       new Date(absenceStart) > new Date(absenceEnd)
     ) {
       showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
-      return false;
+      return { isValid: false, isNegativeBalance: false };
     }
+
+    const absenceTypeData = allAbsenceTypes[absenceType] || {};
 
     // Validate adjustment fields
     if (absenceAdjustAbsence) {
-      const {
-        "AbsenceType-negativeDaysAllowed": negativeDaysAllowed = false,
-        "AbsenceType-negativeDays": negativeDays = 0,
-        "AbsenceType-projectedNextYear": projectedNextYear = 0,
-        "AbsenceType-name": absenceTypeName = "",
-      } = allAbsenceTypes[absenceType];
-      return validateAbsenceOnSaveWithAdjustment(
+      const negativeDays = absenceTypeData["AbsenceType-negativeDays"] || 0;
+      const projectedNextYear =
+        absenceTypeData["AbsenceType-projectedNextYear"] || 0;
+      const absenceTypeName = absenceTypeData["AbsenceType-name"] || "";
+
+      const isValid = validateAbsenceOnSaveWithAdjustment(
         absencePlannedDays,
-        negativeDaysAllowed,
         negativeDays,
         projectedNextYear,
         absenceTypeName,
         t
       );
+
+      return { isValid, isNegativeBalance: absenceIsNegativeBalance };
     }
 
     // Validate if the absence is allowed during probation or notice period
@@ -727,23 +778,28 @@ const AbsenceDetail = ({ route, navigation }) => {
         t
       )
     ) {
-      return false;
+      return { isValid: false, isNegativeBalance: false };
     }
 
     // Negative balance validation
-    const absenceTypeName = absenceTypeDetails?.absenceTypeName || "";
-    const isNegativeDaysAllowed =
-      absenceTypeDetails?.negativeDaysAllowed || false;
-    const maxNegativeDays = absenceTypeDetails?.negativeDays || 0;
-    const balance = kpiValues?.balanceAfter || 0;
+    const absenceTypeName = absenceTypeData["AbsenceType-name"] || "";
+    const maxNegativeDays = absenceTypeData["AbsenceType-negativeDays"] || 0;
+    const isNegativeDaysAllowed = maxNegativeDays > 0;
+
+    // Convert balanceAfter to a number, defaulting to 0 if it's not a valid number
+    const balance = isNaN(Number(kpiValues?.balanceAfter))
+      ? 0
+      : Number(kpiValues?.balanceAfter);
+
     const durationType =
-      absenceTypeDetails?.displayInHours || absenceTypeDetails?.hourlyLeave
+      absenceTypeDisplayInHours || absenceTypeHourlyLeave
         ? " hour(s)"
         : " days";
 
     if (!isNegativeDaysAllowed && balance < 0) {
+      console.log("Validation failed: Negative balance not allowed.");
       showToast(
-        `For ${absenceTypeName}, negative balance is not allowed`,
+        t("negative_balance_not_allowed", { absenceTypeName }),
         "error"
       );
       return false;
@@ -752,12 +808,16 @@ const AbsenceDetail = ({ route, navigation }) => {
     if (isNegativeDaysAllowed && balance < 0) {
       if (Math.abs(balance) > maxNegativeDays) {
         showToast(
-          `For ${absenceTypeName}, the maximum allowed negative balance is ${maxNegativeDays}${durationType}`,
+          t("max_negative_balance_exceeded", {
+            absenceTypeName,
+            maxNegativeDays,
+            durationType,
+          }),
           "error"
         );
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       } else {
-        setNegativeBalanceFlag(true); // Flag for negative balance
+        setAbsenceIsNegativeBalance(true);
       }
     }
 
@@ -782,23 +842,22 @@ const AbsenceDetail = ({ route, navigation }) => {
 
       // If absences overlap, show overlap message
       if (
-        isAbsencesOverlap(
-          absenceStart,
-          absenceEnd,
-          absenceStartDayFraction,
-          absenceEndDayFraction,
-          recordStart,
-          recordEnd
-        )
+        isAbsencesOverlap(absenceStart, absenceEnd, recordStart, recordEnd, t)
       ) {
         showToast(
           t("absence_exists_for_period", {
-            start: recordStart,
-            end: recordEnd,
+            start: format(
+              recordStart,
+              convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+            ),
+            end: format(
+              recordEnd,
+              convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
+            ),
           }),
           "error"
         );
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       }
     }
 
@@ -806,26 +865,26 @@ const AbsenceDetail = ({ route, navigation }) => {
     if (absenceTypeFixedCalendar) {
       if (absenceTypeDisplayInHours || absenceTypeHourlyLeave) {
         showToast(t("type_holiday_and_hourly_not_allowed"), "error");
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       }
 
       if (!selectedHoliday) {
         showToast(t("holiday_required_message"), "error");
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       }
     }
 
     if (absenceTypeHourlyLeave) {
       if (absencePlannedDays < 1) {
         showToast(t("accrue_by_hours_worked_min_duration"), "error");
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       }
 
       // Check if the hourly time-off request falls on holidays or non-working days
       if (
         !isTimeOffOnHoliday(absenceStart, absenceEnd, t, employeeInfo, "error")
       ) {
-        return false;
+        return { isValid: false, isNegativeBalance: false };
       }
     }
 
@@ -839,24 +898,19 @@ const AbsenceDetail = ({ route, navigation }) => {
         : 1;
 
     // Validate the duration
-    if (
-      !validateDuration(
-        absencePlannedDays,
-        absenceTypeMinRequest,
-        absenceTypeMaxRequest,
-        absenceTypeHalfDaysNotAllowed,
-        absenceTypeHourlyLeave,
-        absenceTypeDisplayInHours,
-        hoursPerDay,
-        t,
-        minFraction
-      )
-    ) {
-      return false;
-    }
+    const isValid = validateDuration(
+      absencePlannedDays,
+      absenceTypeMinRequest,
+      absenceTypeMaxRequest,
+      absenceTypeHalfDaysNotAllowed,
+      absenceTypeHourlyLeave,
+      absenceTypeDisplayInHours,
+      employeeInfo.dailyStdHours,
+      t,
+      minFraction
+    );
 
-    // If all validations pass, return true to proceed with saving
-    return true;
+    return { isValid, isNegativeBalance: absenceIsNegativeBalance };
   };
 
   /**
@@ -886,6 +940,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       updatedChanges["startHalfDay"] = "1";
       updatedChanges["endHalfDay"] = "0";
       updatedChanges["plannedDays"] = 1;
+      updatedChanges["negative"] = absenceIsNegativeBalance;
 
       // Update the ref
       updatedValuesRef.current = updatedChanges;
@@ -1068,12 +1123,6 @@ const AbsenceDetail = ({ route, navigation }) => {
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-maxRequest`
             ] || null,
-          negativeDaysAllowed:
-            data[
-              `${
-                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
-              }-type:AbsenceType-negativeDaysAllowed`
-            ] || false,
           negativeDays:
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-negativeDays`
@@ -1146,19 +1195,33 @@ const AbsenceDetail = ({ route, navigation }) => {
         fetchEmployeeAbsences(employeeIDRef.current),
       ]);
 
-      // Filter absence types to show only those present in eligibleAbsenceTypes
-      const filteredAbsenceTypes = Object.entries(absenceTypesMap).filter(
+      const mergedAbsenceTypes = mergeAbsenceData(
+        absenceTypesMap,
+        eligibleAbsenceTypes
+      );
+
+      // Filter to include only eligible absence types
+      const filteredAbsenceTypes = mergedAbsenceTypes.filter(
         ([key]) => eligibleAbsenceTypes[key]
       );
 
       // Update the state with the fetched data
       setItemStatusIDMap(processTemplate || {});
-      setAllAbsenceTypes(absenceTypesMap);
+      setAllAbsenceTypes(Object.fromEntries(filteredAbsenceTypes));
       setAbsenceTypeOptions(
-        filteredAbsenceTypes.map(([key, value]) => ({
-          label: value["AbsenceType-name"],
-          value: key,
-        }))
+        filteredAbsenceTypes.map(([key, value]) => {
+          const projected = value["AbsenceType-projectedNextYear"];
+          const negativeIndicator =
+            value["AbsenceType-negativeDays"] > 0 ? " (-ve)" : "";
+
+          return {
+            label:
+              `${value["AbsenceType-name"]}` +
+              `${` (${projected})`}` +
+              `${negativeIndicator}`,
+            value: key,
+          };
+        })
       );
       setDayFractionOptions(
         Object.entries(dayFractionsMap).map(([key, value]) => ({
@@ -1248,12 +1311,15 @@ const AbsenceDetail = ({ route, navigation }) => {
             size: 24,
           }}
           disabled={
-            loading || isLocked || Object.keys(updatedValues).length === 0
+            loading ||
+            isKPIUpdating ||
+            isLocked ||
+            Object.keys(updatedValues)?.length === 0
           }
         />
       </View>
     );
-  }, [isEditMode, isLocked, loading, updatedValues]);
+  }, [isEditMode, isLocked, loading, isKPIUpdating, updatedValues]);
 
   /**
    * Sets the header options for the screen, including the custom headerLeft and headerRight components.
@@ -1344,6 +1410,7 @@ const AbsenceDetail = ({ route, navigation }) => {
                       handleReload={handleReload}
                       loading={loading}
                       setLoading={setLoading}
+                      setIsKPIUpdating={setIsKPIUpdating}
                       onAbsenceDetailChange={handleAbsenceDetailChange}
                       allAbsenceTypes={allAbsenceTypes}
                       absenceTypeDetails={absenceTypeDetails}
@@ -1366,6 +1433,8 @@ const AbsenceDetail = ({ route, navigation }) => {
                         absenceRemark,
                         itemStatusIDMap,
                       }}
+                      kpiValues={kpiValues}
+                      setKPIValues={setKPIValues}
                       validateStatusChange={() =>
                         validateStatusChange(processTemplate, currentStatus)
                       }

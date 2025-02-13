@@ -1085,8 +1085,8 @@ const TimesheetDetailItemEditor = ({
   }, [editedItem.billable, editedItem.actualTime]);
 
   const isBillableDisabled =
-    // Disable if defaultAsHomeDefault is "*"
     defaultAsHomeDefault === "*" ||
+    isParentLocked ||
     // Disable if the client is explicitly listed in overrides and has forceDisableSwitch set to true
     clientOverrides[parseInt(APP.LOGIN_USER_CLIENT)]?.forceDisableSwitch ===
       true;

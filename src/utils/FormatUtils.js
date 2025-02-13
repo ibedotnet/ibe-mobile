@@ -305,13 +305,27 @@ const convertToMilliseconds = (number, unit) => {
 };
 
 /**
- * Helper function to check if two dates are the same day.
+ * Helper function to check if two dates represent the same calendar day.
+ *
+ * This function ensures that both inputs are valid `Date` objects
+ * and avoids runtime errors if invalid values are passed.
  *
  * @param {Date} date1 - The first date to compare.
  * @param {Date} date2 - The second date to compare.
- * @returns {boolean} - Returns `true` if the dates are the same day, otherwise `false`.
+ * @returns {boolean} - Returns `true` if the dates are the same calendar day, otherwise `false`.
  */
 const datesAreForSameDay = (date1, date2) => {
+  // Ensure both inputs are valid Date objects
+  if (
+    !(date1 instanceof Date) ||
+    isNaN(date1) ||
+    !(date2 instanceof Date) ||
+    isNaN(date2)
+  ) {
+    return false;
+  }
+
+  // Compare year, month, and day for equality
   return (
     date1.getFullYear() === date2.getFullYear() &&
     date1.getMonth() === date2.getMonth() &&

@@ -1065,15 +1065,23 @@ const TimesheetDetail = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Updates the timesheet with the provided updated values.
+   * This function sends a request to update the timesheet fields with the new values.
+   * It handles the response, updates the state, and shows appropriate messages based on the result.
+   *
+   * @param {Object} updatedValues - The updated values for the timesheet fields.
+   */
   const updateTimesheet = async (updatedValues = {}) => {
     try {
+      // Prefix the updated values with the timesheet category prefix
       const prefixedUpdatedValues = {};
       for (const key in updatedValues) {
         prefixedUpdatedValues[`${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-${key}`] =
           updatedValues[key];
       }
 
-      // Add the prefixed updated values to the formData
+      // Prepare the form data with the prefixed updated values
       const formData = {
         data: {
           [`${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-id`]: timesheetId,
@@ -1081,6 +1089,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         },
       };
 
+      // Define query string parameters for the update request
       const queryStringParams = {
         userID: APP.LOGIN_USER_ID,
         client: APP.LOGIN_USER_CLIENT,
@@ -1091,42 +1100,63 @@ const TimesheetDetail = ({ route, navigation }) => {
         appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.TIMESHEET)),
       };
 
+      // Send the update request and handle the response
       const updateResponse = await updateFields(formData, queryStringParams);
 
-      // Check if update was successful
-      if (updateResponse.success) {
-        // Extract the new ID from the response
-        const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
-        if (newId) {
-          setTimesheetId(newId); // Update the timesheetId with the new ID
-          setIsEditMode(true);
-        }
-
-        // Clear updatedValuesRef.current and updatedValues state
-        updatedValuesRef.current = {};
-        setUpdatedValues({});
-
-        handleReload(); // Call handleReload after saving
-
-        // force refresh timehseet data on list screen
-        updateForceRefresh(true);
-
-        // Notify that save was clicked
-        notifySave();
-
-        if (lang !== "en") {
-          showToast(t("update_success"));
-        }
-
-        updateForceRefresh(true);
-
-        if (updateResponse.message) {
-          showToast(updateResponse.message);
-        }
-      } else {
+      // If the update response indicates failure, show an error message and exit
+      if (!updateResponse.success) {
         showToast(t("update_failure"), "error");
+        return;
+      }
+
+      // Check if any detail object in the response has success: false
+      const details = updateResponse?.response?.details || [];
+      const hasFailure = details.some((detail) => detail.success === false);
+
+      if (hasFailure) {
+        // Extract and show the first error message from the response
+        const errorMessages = details.flatMap(
+          (detail) =>
+            detail.messages?.filter((msg) => msg.message_type === "error") || []
+        );
+
+        if (errorMessages.length > 0) {
+          // Not showing toast message here as it has been done centrally in fetchData
+          return;
+        }
+      }
+
+      // Extract the new ID from the response and update the timesheetId state
+      const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
+      if (newId) {
+        setTimesheetId(newId);
+        setIsEditMode(true);
+      }
+
+      // Clear the updated values reference and state
+      updatedValuesRef.current = {};
+      setUpdatedValues({});
+
+      // Reload the timesheet data after saving
+      handleReload();
+
+      // Force refresh the timesheet data on the list screen
+      updateForceRefresh(true);
+
+      // Notify that the save action was clicked
+      notifySave();
+
+      // Show a success message if the language is not English
+      if (lang !== "en") {
+        showToast(t("update_success"));
+      }
+
+      // Show the header response message if available
+      if (updateResponse.message) {
+        showToast(updateResponse.message);
       }
     } catch (error) {
+      // Handle any errors that occur during the update process
       console.error("Error in updateTimesheet of TimesheetDetail", error);
       showToast(t("unexpected_error"), "error");
     }

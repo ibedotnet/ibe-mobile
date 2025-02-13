@@ -36,7 +36,6 @@ const absenceTypeFields = [
   "AbsenceType-halfDaysNotAllowed",
   "AbsenceType-minRequest",
   "AbsenceType-maxRequest",
-  "AbsenceType-negativeDaysAllowed",
   "AbsenceType-negativeDays",
 ];
 
@@ -61,6 +60,9 @@ const booleanMap = {
  * @param {string|number|null} endDayFraction - The fraction of the last day used (0-1) as a string, number, or null.
  * @param {Object} absenceDetails - The details of the absence.
  * @param {Function} updateKPIs - Callback function to update KPI values.
+ * @param {Function} setLoading - Callback function to set the loading state.
+ * @param {Function} setIsKPIUpdating - Callback function to set the KPI updating state.
+ * @param {Function} t - Translation function used to show localized messages.
  * @returns {string} - The total working day equivalent (including fractions) as a string.
  *
  * @throws {Error} - Throws error if input dates or fractions are invalid.
@@ -72,26 +74,36 @@ const calculateDuration = (
   startDayFraction = "1",
   endDayFraction = "1",
   absenceDetails,
-  updateKPIs
+  updateKPIs,
+  setLoading,
+  setIsKPIUpdating,
+  t
 ) => {
   // Ensure fractions are parsed as valid numbers between 0 and 1
   startDayFraction =
     startDayFraction !== null && !isNaN(parseFloat(startDayFraction))
       ? Math.min(Math.max(parseFloat(startDayFraction), 0), 1)
       : 1;
-  endDayFraction =
-    endDayFraction !== null && !isNaN(parseFloat(endDayFraction))
-      ? Math.min(Math.max(parseFloat(endDayFraction), 0), 1)
-      : null;
+
+  // Handle same-day scenario: enforce endDayFraction as null
+  endDayFraction = datesAreForSameDay(startDate, endDate)
+    ? null
+    : endDayFraction !== null && !isNaN(parseFloat(endDayFraction))
+    ? Math.min(Math.max(parseFloat(endDayFraction), 0), 1)
+    : null;
 
   if (!(startDate instanceof Date) || isNaN(startDate)) {
-    throw new Error("Invalid startDate. Expected a valid Date object.");
+    console.error("Invalid startDate. Expected a valid Date object.");
+    return;
   }
   if (!(endDate instanceof Date) || isNaN(endDate)) {
-    throw new Error("Invalid endDate. Expected a valid Date object.");
+    console.error("Invalid endDate. Expected a valid Date object.");
+    return;
   }
   if (startDate > endDate) {
-    throw new Error("Start date cannot be after end date.");
+    console.error("Start date cannot be after end date.");
+    showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
+    return;
   }
 
   let duration = 0;
@@ -128,7 +140,8 @@ const calculateDuration = (
   // Update KPI balances with the calculated duration
   updateKPIBalances(
     { ...absenceDetails, absenceDuration: duration },
-    updateKPIs
+    updateKPIs,
+    setIsKPIUpdating
   );
 
   // Return the duration as a string to handle text box compatibility
@@ -145,6 +158,8 @@ const calculateDuration = (
  * @param {number|string|null} endDayFraction - The fraction of the last day used (0-1) as a number, string, or null.
  * @param {Object} absenceDetails - The details of the absence.
  * @param {Function} updateKPIs - Callback function to update KPI values.
+ * @param {Function} setLoading - Callback function to set the loading state.
+ * @param {Function} setIsKPIUpdating - Callback function to set the KPI updating state.
  * @returns {Date} - The calculated end date.
  *
  * @throws {Error} Throws an error if the start date is invalid, or if duration, startDayFraction, or endDayFraction are out of valid bounds.
@@ -160,28 +175,40 @@ const calculateEndDate = (
   startDayFraction = "1",
   endDayFraction = "1",
   absenceDetails,
-  updateKPIs
+  updateKPIs,
+  setLoading,
+  setIsKPIUpdating
 ) => {
   // Ensure the duration is a valid number
   const parsedDuration = parseFloat(duration);
   if (isNaN(parsedDuration) || parsedDuration < 0) {
-    throw new Error("Invalid duration. Expected a non-negative number.");
+    console.error("Invalid duration. Expected a non-negative number.");
+    showToast(
+      "Invalid duration. Expected a valid non-negative number.",
+      "error"
+    );
+    return;
   }
 
   // Convert fractions to valid numbers or defaults if null or invalid
   startDayFraction =
     startDayFraction !== null ? parseFloat(startDayFraction) || 0 : 0;
-  endDayFraction =
-    endDayFraction !== null ? parseFloat(endDayFraction) || 1 : 1;
+
+  endDayFraction = datesAreForSameDay(startDate, endDate)
+    ? null
+    : parseFloat(endDayFraction) || 1;
 
   if (!(startDate instanceof Date) || isNaN(startDate)) {
-    throw new Error("Invalid startDate. Expected a valid Date object.");
+    console.error("Invalid startDate. Expected a valid Date object.");
+    return;
   }
   if (startDayFraction < 0 || startDayFraction > 1) {
-    throw new Error("Invalid startDayFraction. Must be between 0 and 1.");
+    console.error("Invalid startDayFraction. Must be between 0 and 1.");
+    return;
   }
   if (endDayFraction < 0 || endDayFraction > 1) {
-    throw new Error("Invalid endDayFraction. Must be between 0 and 1.");
+    console.error("Invalid endDayFraction. Must be between 0 and 1.");
+    return;
   }
 
   if (parsedDuration === 0) return new Date(startDate);
@@ -216,7 +243,8 @@ const calculateEndDate = (
   // Update KPI balances in the UI
   updateKPIBalances(
     { ...absenceDetails, absenceEnd: endDate, absenceDuration: parsedDuration },
-    updateKPIs
+    updateKPIs,
+    setIsKPIUpdating
   );
 
   return endDate;
@@ -418,7 +446,7 @@ const fetchEmployeeAbsences = async (absenceEmployeeId) => {
           operator: "=",
           value: absenceEmployeeId,
         },
-        { fieldName: "Absence-start", operator: ">=", value: startOfYear },
+        { fieldName: "Absence-end", operator: ">=", value: startOfYear },
       ],
     };
 
@@ -440,7 +468,6 @@ const fetchEmployeeAbsences = async (absenceEmployeeId) => {
     );
 
     if (absencesResponse.success) {
-      console.debug(absencesResponse.data);
       return absencesResponse.data;
     } else {
       console.error("Failed to fetch employee absences.");
@@ -621,7 +648,8 @@ const getAbsenceFields = () => [
   `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-files`,
   // Comments associated with the absence
   `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-comments`,
-
+  // Absence negative field
+  "Absence-negative",
   // Include absence type fields from `getAbsenceTypeFields`
   ...getAbsenceTypeFields(),
 ];
@@ -816,9 +844,7 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     "AbsenceType-halfDaysNotAllowed": absenceTypeHalfDaysNotAllowed = false,
     "AbsenceType-minRequest": absenceTypeMinRequest = null,
     "AbsenceType-maxRequest": absenceTypeMaxRequest = null,
-    "AbsenceType-negativeDaysAllowed": negativeDaysAllowed = false,
     "AbsenceType-negativeDays": negativeDays = 0,
-    "AbsenceType-projectedNextYear": projectedNextYear = 0,
   } = absenceTypeRecord;
 
   console.log("Absence Type Record: ", {
@@ -834,9 +860,7 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     absenceTypeHalfDaysNotAllowed,
     absenceTypeMinRequest,
     absenceTypeMaxRequest,
-    negativeDaysAllowed,
     negativeDays,
-    projectedNextYear,
   });
 
   // Construct and return the updated absence type details
@@ -854,99 +878,50 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
       absenceTypeHalfDaysNotAllowed,
       absenceTypeMinRequest,
       absenceTypeMaxRequest,
-      negativeDaysAllowed,
       negativeDays,
-      projectedNextYear,
     },
   };
 };
 
 /**
- * Checks if two date ranges overlap, considering fractional days.
- *
- * The function accounts for partial overlaps by adjusting the start and end times
- * based on fractional values (0 to 1), where 0 represents the start of the day and
- * 1 represents the end of the day. The ranges are adjusted accordingly to check
- * for overlaps, including the special case of same-day partial overlaps.
+ * Checks if two date ranges overlap, ignoring time.
  *
  * @param {Date} startDate1 - Start date of the first range.
  * @param {Date} endDate1 - End date of the first range.
- * @param {number|string|null} [startDayFraction1=0] - Fraction of the first day for the first range (0 to 1).
- * @param {number|string|null} [endDayFraction1=1] - Fraction of the last day for the first range (0 to 1).
  * @param {Date} startDate2 - Start date of the second range.
  * @param {Date} endDate2 - End date of the second range.
- * @param {number|string|null} [startDayFraction2=0] - Fraction of the first day for the second range (0 to 1).
- * @param {number|string|null} [endDayFraction2=1] - Fraction of the last day for the second range (0 to 1).
+ * @param {Function} t - Translation function used to show localized messages.
  * @returns {boolean} - Returns true if the date ranges overlap, otherwise false.
- *
- * @throws {Error} If any date is invalid or if the start date is after the end date.
  */
-const isAbsencesOverlap = (
-  startDate1,
-  endDate1,
-  startDayFraction1 = "0",
-  endDayFraction1 = "1",
-  startDate2,
-  endDate2,
-  startDayFraction2 = "0",
-  endDayFraction2 = "1"
-) => {
+const isAbsencesOverlap = (startDate1, endDate1, startDate2, endDate2, t) => {
+  // Convert input to Date objects if they are not already
+  const parseDate = (date) =>
+    typeof date === "string" ? new Date(date) : date;
+
+  startDate1 = parseDate(startDate1);
+  endDate1 = parseDate(endDate1);
+  startDate2 = parseDate(startDate2);
+  endDate2 = parseDate(endDate2);
+
   // Validate dates
   if (
-    !(startDate1 instanceof Date && !isNaN(startDate1)) ||
-    !(endDate1 instanceof Date && !isNaN(endDate1)) ||
-    !(startDate2 instanceof Date && !isNaN(startDate2)) ||
-    !(endDate2 instanceof Date && !isNaN(endDate2))
+    [startDate1, endDate1, startDate2, endDate2].some(
+      (date) => !(date instanceof Date) || isNaN(date)
+    )
   ) {
-    throw new Error("Invalid date. Expected a valid Date object.");
+    console.error("Invalid date. Expected a valid Date object.");
+    return false;
   }
-
-  // Convert fractions to valid numbers, clamp to range [0, 1]
-  const clampFraction = (value) =>
-    Math.min(Math.max(parseFloat(value) || 0, 0), 1);
-  startDayFraction1 = clampFraction(startDayFraction1);
-  endDayFraction1 = clampFraction(endDayFraction1);
-  startDayFraction2 = clampFraction(startDayFraction2);
-  endDayFraction2 = clampFraction(endDayFraction2);
 
   // Ensure start dates are before or equal to end dates
   if (startDate1 > endDate1 || startDate2 > endDate2) {
-    throw new Error("Start date cannot be after end date.");
+    console.error("Start date cannot be after end date.");
+    showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
+    return false;
   }
 
-  // Adjust start and end dates based on fractions
-  const adjustedStart1 = new Date(startDate1);
-  adjustedStart1.setHours(adjustedStart1.getHours() + startDayFraction1 * 24);
-
-  const adjustedEnd1 = new Date(endDate1);
-  adjustedEnd1.setHours(adjustedEnd1.getHours() + endDayFraction1 * 24);
-
-  const adjustedStart2 = new Date(startDate2);
-  adjustedStart2.setHours(adjustedStart2.getHours() + startDayFraction2 * 24);
-
-  const adjustedEnd2 = new Date(endDate2);
-  adjustedEnd2.setHours(adjustedEnd2.getHours() + endDayFraction2 * 24);
-
-  /**
-   * Check for general date range overlap:
-   * - `adjustedStart1 < adjustedEnd2 && adjustedEnd1 > adjustedStart2`
-   *   ensures there is a valid overlap where the ranges intersect.
-   */
-  const rangesOverlap =
-    adjustedStart1 < adjustedEnd2 && adjustedEnd1 > adjustedStart2;
-
-  /**
-   * Check for fractional same-day overlap when date ranges are identical.
-   * - If the start and end dates for both ranges are the same,
-   *   ensure that the sum of fractions is at least 1.
-   */
-  const sameDayOverlap =
-    startDate1.toDateString() === endDate1.toDateString() &&
-    startDate2.toDateString() === endDate2.toDateString() &&
-    (startDayFraction1 + endDayFraction2 >= 1 ||
-      startDayFraction2 + endDayFraction1 >= 1);
-
-  return rangesOverlap || sameDayOverlap;
+  // Check for overlap: periods overlap if one does not end before the other starts
+  return !(endDate1 < startDate2 || endDate2 < startDate1);
 };
 
 /**
@@ -1067,6 +1042,29 @@ const isTimeOffOnHoliday = (
 };
 
 /**
+ * Merges additional data from eligible absence types into the absence types map.
+ *
+ * @param {Object} absenceTypesMap - The map of absence types.
+ * @param {Object} eligibleAbsenceTypes - The map of eligible absence types with additional data.
+ * @returns {Array} - An array of merged absence type data.
+ */
+const mergeAbsenceData = (absenceTypesMap, eligibleAbsenceTypes) => {
+  return Object.entries(absenceTypesMap).map(([key, value]) => {
+    // Merge additional data from eligibleAbsenceTypes if available
+    const eligibleData = eligibleAbsenceTypes[key] || {};
+    return [
+      key,
+      {
+        ...value,
+        "AbsenceType-projectedNextYear": eligibleData["projectedNextYear"] || 0,
+        "AbsenceType-negativeDays":
+          eligibleData["negativeDays"] || value["negativeDays"] || 0,
+      },
+    ];
+  });
+};
+
+/**
  * Helper function to update a field in state if the value has changed.
  * This function compares the new value with the current value of the field.
  * If they are different, it updates the state and records the change.
@@ -1107,13 +1105,19 @@ const updateFieldInState = (
  * @param {string} [absenceDetails.absenceEnd] - The end date of the absence.
  * @param {number} [absenceDetails.absenceDuration] - The duration of the absence in days.
  * @param {Function} updateKPIs - Callback function to update KPI values in the UI.
+ * @param {Function} setIsKPIUpdating - Callback function to set the loading state.
+ *
  *   This function is called with an object containing the following properties:
  *   - balance: The current balance of absence days.
  *   - balanceAfter: The projected balance after considering the absence.
  *   - projectedBalance: The projected balance as of the year's end.
  *   - projectedCarryForward: The projected carry-forward days at year's end.
  */
-const updateKPIBalances = async (absenceDetails, updateKPIs) => {
+const updateKPIBalances = async (
+  absenceDetails,
+  updateKPIs,
+  setIsKPIUpdating
+) => {
   if (
     !absenceDetails ||
     !absenceDetails.absenceType ||
@@ -1126,38 +1130,40 @@ const updateKPIBalances = async (absenceDetails, updateKPIs) => {
   const { absenceType, absenceEmployeeId, absenceEnd, absenceDuration } =
     absenceDetails;
 
-  const normalizedDate = normalizeDateToUTC(new Date());
-  const balanceCheckOnDate = sprintf(
-    "%d-%02d-%02dT%02d:%02d:%02d-0000",
-    normalizedDate.getUTCFullYear(),
-    normalizedDate.getUTCMonth() + 1,
-    normalizedDate.getUTCDate(),
-    normalizedDate.getUTCHours(),
-    normalizedDate.getUTCMinutes(),
-    normalizedDate.getUTCSeconds()
-  );
-
-  // Prepare the request payload for current balance
-  const requestBody = {
-    interfaceName: "AbsenceTypeBalanceReadApi",
-    methodName: "readAbsenceTypeBalances",
-    paramsMap: {
-      employeeId: absenceEmployeeId,
-      userId: APP.LOGIN_USER_ID,
-      hrDivisionId: null,
-      readDate: null,
-      languageId: APP.LOGIN_USER_LANGUAGE,
-      clientId: APP.LOGIN_USER_CLIENT,
-      hideZeroBalances: false,
-      balanceCheckOnDate,
-      absenceType: absenceType,
-      checkBalances: true,
-      absenceDuration,
-      employee: null,
-    },
-  };
-
   try {
+    setIsKPIUpdating(true);
+
+    const normalizedDate = normalizeDateToUTC(new Date());
+    const balanceCheckOnDate = sprintf(
+      "%d-%02d-%02dT%02d:%02d:%02d-0000",
+      normalizedDate.getUTCFullYear(),
+      normalizedDate.getUTCMonth() + 1,
+      normalizedDate.getUTCDate(),
+      normalizedDate.getUTCHours(),
+      normalizedDate.getUTCMinutes(),
+      normalizedDate.getUTCSeconds()
+    );
+
+    // Prepare the request payload for current balance
+    const requestBody = {
+      interfaceName: "AbsenceTypeBalanceReadApi",
+      methodName: "readAbsenceTypeBalances",
+      paramsMap: {
+        employeeId: absenceEmployeeId,
+        userId: APP.LOGIN_USER_ID,
+        hrDivisionId: null,
+        readDate: null,
+        languageId: APP.LOGIN_USER_LANGUAGE,
+        clientId: APP.LOGIN_USER_CLIENT,
+        hideZeroBalances: false,
+        balanceCheckOnDate,
+        absenceTypeExtId: absenceType,
+        checkBalances: true,
+        absenceDuration,
+        employee: null,
+      },
+    };
+
     // First API call for current balance
     const response = await fetchData(
       API_ENDPOINTS.INVOKE,
@@ -1171,7 +1177,7 @@ const updateKPIBalances = async (absenceDetails, updateKPIs) => {
 
     if (response.success && response.retVal && response.retVal.data) {
       balance = response.retVal.data[0]?.projectedNextYear || 0;
-      balanceAfter = Math.max(balance - absenceDuration, 0);
+      balanceAfter = balance - absenceDuration;
     }
 
     // Correct the balanceCheckOnDate for the projected balance request
@@ -1230,6 +1236,8 @@ const updateKPIBalances = async (absenceDetails, updateKPIs) => {
       projectedBalance: "-",
       projectedCarryForward: "-",
     });
+  } finally {
+    setIsKPIUpdating(false);
   }
 };
 
@@ -1237,7 +1245,6 @@ const updateKPIBalances = async (absenceDetails, updateKPIs) => {
  * Validates absence adjustments based on various constraints.
  *
  * @param {number} absencePlannedDays - Number of planned days for the absence adjustment.
- * @param {boolean} negativeDaysAllowed - Whether negative balances are allowed.
  * @param {number} negativeDays - Maximum allowable negative days.
  * @param {number} projectedNextYear - Available absence days projected for the next year.
  * @param {string} absenceTypeName - Name of the absence type for error messages.
@@ -1246,7 +1253,6 @@ const updateKPIBalances = async (absenceDetails, updateKPIs) => {
  */
 const validateAbsenceOnSaveWithAdjustment = (
   absencePlannedDays,
-  negativeDaysAllowed,
   negativeDays,
   projectedNextYear,
   absenceTypeName,
@@ -1261,7 +1267,7 @@ const validateAbsenceOnSaveWithAdjustment = (
 
   const remainingBalance = projectedNextYear - absencePlannedDays;
 
-  if (negativeDaysAllowed) {
+  if (negativeDays > 0) {
     if (remainingBalance < 0 && Math.abs(remainingBalance) > negativeDays) {
       errorMessage = `${t("only")} ${Math.abs(
         projectedNextYear + negativeDays
@@ -1304,7 +1310,7 @@ const validateDuration = (
   halfDaysNotAllowed,
   isHourlyAbsence,
   isDisplayInHours,
-  hoursPerDay,
+  hoursPerDay = 8,
   t,
   minFraction
 ) => {
@@ -1319,6 +1325,16 @@ const validateDuration = (
     minFraction,
   });
 
+  if (isNaN(parseFloat(value))) {
+    showToast(
+      t("invalid_duration_value", {
+        value: value || "0",
+      }),
+      "error"
+    );
+    return false;
+  }
+
   // Ensure the duration is greater than zero
   if (parseFloat(value) <= 0) {
     showToast(t("duration_must_be_positive"), "error");
@@ -1327,37 +1343,31 @@ const validateDuration = (
 
   // Ensure the duration meets the minimum requirement
   if (minValue && parseFloat(value) < minValue) {
-    showToast(
-      "The minimum number of days to be applied for time off is " +
-        minValue +
-        " days.",
-      "error"
-    );
+    showToast(t("duration_min_value", { minValue }), "error");
     return false;
   }
 
   // Ensure the duration does not exceed the maximum requirement
   if (maxValue && parseFloat(value) > maxValue) {
-    showToast(
-      "The maximum number of days you can apply for time off is " +
-        maxValue +
-        " days.",
-      "error"
-    );
+    showToast(t("duration_max_value", { maxValue }), "error");
+    return false;
+  }
+
+  // Check if half days are not allowed
+  if (halfDaysNotAllowed && value % 1 !== 0) {
+    showToast(t("fraction_not_allowed_error"), "error");
     return false;
   }
 
   // Check for invalid durations when not using hourly absence or displaying duration in hours
   if (
-    minValue < 1 && // minValue must be less than 1
-    !halfDaysNotAllowed && // Half days are allowed
-    !isHourlyAbsence && // Absence is not in hours
-    !isDisplayInHours && // Duration is not displayed in hours
-    (hoursPerDay / minValue) % 1 === 0 && // Ensure minValue is a divisor of hoursPerDay
-    value % minFraction !== 0 // Ensure value is a valid multiple of minFraction
+    minValue < 1 &&
+    !isHourlyAbsence &&
+    !isDisplayInHours &&
+    (hoursPerDay / minValue) % 1 === 0 &&
+    value % minFraction !== 0
   ) {
-    // Show error message via toast
-    showToast(t("duration_multiple_error"), "error");
+    showToast(t("duration_multiple_error", { minFraction }), "error");
     console.log("Duration is not a multiple of the minimum value.");
     return false;
   }
@@ -1425,6 +1435,7 @@ export {
   isLeaveAllowedInEmploymentPeriod,
   isNonWorkingDay,
   isTimeOffOnHoliday,
+  mergeAbsenceData,
   updateFieldInState,
   updateKPIBalances,
   validateAbsenceOnSaveWithAdjustment,

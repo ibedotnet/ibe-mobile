@@ -39,14 +39,18 @@ import { showToast } from "../utils/MessageUtils";
  * @param {Array} props.listOfNextStatus - List of next possible statuses.
  * @param {Function} props.handleReload - Callback function to reload data.
  * @param {boolean} props.loading - Flag indicating if data is loading.
+ * @param {Function} props.setLoading - Function to set the loading state.
+ * @param {Function} props.setIsKPIUpdating - Function to set the KPI updating state.
  * @param {Function} props.onAbsenceDetailChange - Callback function to handle updates to absence details.
  *   This function is called whenever an update is made to any field in the absence detail form.
  *   It accepts an object containing the field name and its new value.
  * @param {Object} props.allAbsenceTypes - Map of all available absence types.
  * @param {Object} props.absenceTypeDetails -  Contains information about the currently selected absence type, if applicable.
+ * @param {Object} props.employeeInfo - The employee information containing non-working dates and days.
  * @param {Object} props.pickerOptions - Picker options for custom pickers.
  * @param {Object} props.absenceDetails - The details of the absence.
- * @param {Object} props.employeeInfo - The employee information containing non-working dates and days.
+ * @param {Object} props.kpiValues - KPI metrics related to the absence.
+ * @param {Function} props.setKPIValues - Function to update KPI values.
  * @returns {JSX.Element} - The rendered component.
  */
 
@@ -59,12 +63,16 @@ const AbsenceDetailGeneral = ({
   listOfNextStatus,
   handleReload,
   loading,
+  setLoading,
+  setIsKPIUpdating,
   onAbsenceDetailChange,
   allAbsenceTypes,
   absenceTypeDetails,
   employeeInfo,
   pickerOptions,
   absenceDetails,
+  kpiValues,
+  setKPIValues,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -163,12 +171,6 @@ const AbsenceDetailGeneral = ({
     parseFloat(absencePlannedDays) > 0
   );
   const [adjustTaken, setAdjustTaken] = useState(absenceAdjustTaken);
-  const [kpiValues, setKPIValues] = useState({
-    balanceBefore: "-",
-    balanceAfter: "-",
-    projectedBalance: "-",
-    projectedCarryForward: "-",
-  });
 
   const balances = useMemo(
     () => [
@@ -180,9 +182,12 @@ const AbsenceDetailGeneral = ({
     [kpiValues, t]
   );
 
-  const updateKPIs = useCallback((kpiData) => {
-    setKPIValues(kpiData);
-  }, []);
+  const updateKPIs = useCallback(
+    (kpiData) => {
+      setKPIValues((prev) => ({ ...prev, ...kpiData }));
+    },
+    [setKPIValues]
+  );
 
   const currentDate = new Date();
   const endOfYear = new Date(currentDate.getFullYear(), 11, 31); // End of the current year (December 31st)
@@ -192,6 +197,15 @@ const AbsenceDetailGeneral = ({
       convertToDateFNSFormat(APP.LOGIN_USER_DATE_FORMAT)
     );
   }, []);
+
+  const getMinFraction = (dayFractionOptions) => {
+    return Array.isArray(dayFractionOptions) && dayFractionOptions.length > 0
+      ? dayFractionOptions.reduce((min, option) => {
+          const fractionValue = parseFloat(option.value);
+          return fractionValue < min ? fractionValue : min;
+        }, 1)
+      : 1;
+  };
 
   /**
    * Sets the visibility of various fields based on the absence type.
@@ -432,8 +446,6 @@ const AbsenceDetailGeneral = ({
    * 5. Adjusts UI visibility and behavior based on the selected type.
    */
   const handleAbsenceTypeChange = useCallback((value) => {
-    if (value === localAbsenceType) return;
-
     showToast(t("absence_fields_default_values_message"), "warning");
 
     setLocalAbsenceType(value);
@@ -466,23 +478,14 @@ const AbsenceDetailGeneral = ({
     // Update local state and propagate changes to the parent
     updateLocalStateAndHandleFieldChange(allChanges);
 
+    // Update the policy text
+    setLocalPolicyText(absenceTypeDetails.absenceTypePolicyText);
+
     // Adjust UI behavior based on the new absence type
     handleAbsenceTypeBehavior(
       absenceTypeDetails.absenceTypeFixedCalendar,
       absenceTypeDetails.absenceTypeHourlyLeave,
       absenceTypeDetails.absenceTypeDisplayInHours
-    );
-
-    updateKPIBalances(
-      {
-        absenceType: value,
-        absenceEmployeeId: absenceDetails.absenceEmployeeId,
-        absenceEnd: absenceDetails.absenceEnd,
-        absenceDuration: absenceDetails.absencePlannedDays,
-      },
-      (kpiData) => {
-        setKPIValues(kpiData);
-      }
     );
   }, []);
 
@@ -540,77 +543,87 @@ const AbsenceDetailGeneral = ({
    * Validates the start date and adjusts the duration if displayed in hours.
    * @param {Date} value - The new value for the start date.
    */
-  const handleAbsenceStartDateChange = (value) => {
-    console.log("Handling start date change:", value);
+  const handleAbsenceStartDateChange = useCallback(
+    (value) => {
+      console.log("Handling start date change:", value);
 
-    setLocalAbsenceStart(value);
-    handleFieldChange("absenceStartDate", value);
+      setLocalAbsenceStart(value);
 
-    // If the absence has a fixed calendar, exit the function
-    if (localAbsenceTypeFixedCalendar) {
-      console.log("Skipping further operations due to fixed calendar.");
-      return;
-    }
-
-    // If the absence is an adjustment, set the end date to the same value as the start date
-    if (absenceAdjustAbsence) {
-      console.log("Adjusting absence: setting end date to start date:", value);
-      setLocalAbsenceEnd(value);
-      handleFieldChange("absenceEndDate", value);
-      return;
-    }
-
-    // Validate the start date
-    const currentDate = new Date();
-    const startDate = new Date(value);
-    startDate.setHours(0, 0, 0, 0);
-    currentDate.setHours(0, 0, 0, 0);
-
-    // Show a warning message if the start date is in the past
-    if (startDate < currentDate) {
-      showToast(t("start_date_in_past_warning"), "warning");
-    }
-
-    // Additional validation for hourly leave
-    if (localAbsenceTypeHourlyLeave) {
-      console.log("Hourly leave detected. Validating leave period.");
-      if (localAbsenceEnd) {
-        isTimeOffOnHoliday(value, localAbsenceEnd, t, employeeInfo);
-      } else {
-        console.log("Cannot validate hourly leave: end date is missing.");
+      // If the absence has a fixed calendar, exit the function
+      if (localAbsenceTypeFixedCalendar) {
+        console.log("Skipping further operations due to fixed calendar.");
+        return;
       }
-      return;
-    }
 
-    // Adjust duration if displayed in hours
-    let adjustedDuration = parseFloat(localDuration) || 0;
-    if (localAbsenceTypeDisplayInHours) {
-      adjustedDuration = adjustedDuration / hoursPerDay;
-      console.log("Adjusted duration (in hours):", adjustedDuration);
-    }
+      // If the absence is an adjustment, set the end date to the same value as the start date
+      if (absenceAdjustAbsence) {
+        console.log(
+          "Adjusting absence: setting end date to start date:",
+          value
+        );
+        setLocalAbsenceEnd(value);
+        handleFieldChange({ absenceStartDate: value, absenceEndDate: value });
+        return;
+      }
 
-    if (adjustedDuration <= 0) {
-      showToast(t("duration_must_be_positive"), "error");
-      return;
-    }
+      // Validate the start date
+      const currentDate = new Date();
+      const startDate = new Date(value);
+      startDate.setHours(0, 0, 0, 0);
+      currentDate.setHours(0, 0, 0, 0);
 
-    console.log("Adjusted duration in start date change:", adjustedDuration);
+      // Show a warning message if the start date is in the past
+      if (startDate < currentDate) {
+        showToast(t("start_date_in_past_warning"), "warning");
+      }
 
-    // Calculate and update the end date based on the new start date and current duration
-    const newEndDate = calculateEndDate(
-      value,
-      adjustedDuration,
-      employeeInfo,
-      localAbsenceStartDayFraction,
-      localAbsenceEndDayFraction,
-      absenceDetails,
-      updateKPIs
-    );
-    console.log("Calculated new end date:", newEndDate);
+      // Additional validation for hourly leave
+      if (localAbsenceTypeHourlyLeave) {
+        console.log("Hourly leave detected. Validating leave period.");
+        if (localAbsenceEnd) {
+          isTimeOffOnHoliday(value, localAbsenceEnd, t, employeeInfo);
+        } else {
+          console.log("Cannot validate hourly leave: end date is missing.");
+        }
+        return;
+      }
 
-    setLocalAbsenceEnd(newEndDate);
-    handleFieldChange("absenceEndDate", newEndDate);
-  };
+      // Adjust duration if displayed in hours
+      let adjustedDuration = parseFloat(localDuration) || 0;
+      if (localAbsenceTypeDisplayInHours) {
+        adjustedDuration = adjustedDuration / hoursPerDay;
+        console.log("Adjusted duration (in hours):", adjustedDuration);
+      }
+
+      if (adjustedDuration <= 0) {
+        showToast(t("duration_must_be_positive"), "error");
+        return;
+      }
+
+      console.log("Adjusted duration in start date change:", adjustedDuration);
+
+      // Calculate and update the end date based on the new start date and current duration
+      const newEndDate = calculateEndDate(
+        value,
+        adjustedDuration,
+        employeeInfo,
+        localAbsenceStartDayFraction,
+        localAbsenceEndDayFraction,
+        absenceDetails,
+        updateKPIs,
+        setLoading,
+        setIsKPIUpdating
+      );
+      console.log("Calculated new end date:", newEndDate);
+
+      setLocalAbsenceEnd(newEndDate);
+      handleFieldChange({
+        absenceStartDate: value,
+        absenceEndDate: newEndDate,
+      });
+    },
+    [absenceAdjustAbsence, hoursPerDay, employeeInfo, handleFieldChange]
+  );
 
   /**
    * Handles changes to the end date of the absence.
@@ -622,7 +635,6 @@ const AbsenceDetailGeneral = ({
       console.log("Handling end date change:", value);
 
       setLocalAbsenceEnd(value);
-      handleFieldChange("absenceEndDate", value);
 
       if (absenceAdjustAbsence || localAbsenceTypeFixedCalendar) {
         console.log(
@@ -651,7 +663,10 @@ const AbsenceDetailGeneral = ({
           localAbsenceStartDayFraction,
           localAbsenceEndDayFraction,
           absenceDetails,
-          updateKPIs
+          updateKPIs,
+          setLoading,
+          setIsKPIUpdating,
+          t
         );
         console.log("New calculated duration (in days):", newDuration);
 
@@ -665,7 +680,10 @@ const AbsenceDetailGeneral = ({
         console.log("Adjusted duration in end date change:", adjustedDuration);
 
         setLocalDuration(adjustedDuration);
-        handleFieldChange("absenceDuration", adjustedDuration);
+        handleFieldChange({
+          absenceEndDate: value,
+          absenceDuration: adjustedDuration,
+        });
       }
     },
     [absenceAdjustAbsence, hoursPerDay, employeeInfo, handleFieldChange]
@@ -682,41 +700,11 @@ const AbsenceDetailGeneral = ({
 
       // Update local duration state and notify parent component
       setLocalDuration(value);
-      handleFieldChange("absenceDuration", value);
 
       if (absenceAdjustAbsence || localAbsenceTypeFixedCalendar) {
         console.log(
           "Exit: Absence adjustment or fixed calendar type detected."
         );
-        return;
-      }
-
-      // Find the minimum fraction value from dayFractionOptions
-      const minFraction =
-        Array.isArray(dayFractionOptions) && dayFractionOptions.length > 0
-          ? dayFractionOptions.reduce((min, option) => {
-              const fractionValue = parseFloat(option.value);
-              return fractionValue < min ? fractionValue : min;
-            }, 1)
-          : 1;
-
-      // Validate the duration value
-      const isValidDuration = validateDuration(
-        value,
-        localAbsenceTypeMinRequest,
-        localAbsenceTypeMaxRequest,
-        localAbsenceTypeHalfDaysNotAllowed,
-        localAbsenceTypeHourlyLeave,
-        localAbsenceTypeDisplayInHours,
-        hoursPerDay,
-        t,
-        minFraction
-      );
-
-      if (!isValidDuration) {
-        console.log("Invalid duration value:", value);
-        setLocalAbsenceStartDayFraction(null);
-        setLocalAbsenceEndDayFraction(null);
         return;
       }
 
@@ -741,14 +729,18 @@ const AbsenceDetailGeneral = ({
           localAbsenceStartDayFraction,
           localAbsenceEndDayFraction,
           absenceDetails,
-          updateKPIs
+          updateKPIs,
+          setLoading,
+          setIsKPIUpdating
         );
         console.log("Calculated new end date:", newEndDate);
       }
 
       // Update local end date state and notify parent component
       setLocalAbsenceEnd(newEndDate);
-      handleFieldChange("absenceEndDate", newEndDate);
+      handleFieldChange({ absenceDuration: value, absenceEndDate: newEndDate });
+
+      const minFraction = getMinFraction(dayFractionOptions);
 
       const parsedDuration = parseFloat(value);
       if (localAbsenceTypeHalfDaysNotAllowed || parsedDuration === 1) {
@@ -799,7 +791,10 @@ const AbsenceDetailGeneral = ({
         fraction,
         localAbsenceEndDayFraction,
         absenceDetails,
-        updateKPIs
+        updateKPIs,
+        setLoading,
+        setIsKPIUpdating,
+        t
       );
       console.log(
         "Updated Duration after Start Day Fraction Change:",
@@ -837,7 +832,10 @@ const AbsenceDetailGeneral = ({
         localAbsenceStartDayFraction,
         fraction,
         absenceDetails,
-        updateKPIs
+        updateKPIs,
+        setLoading,
+        setIsKPIUpdating,
+        t
       );
       console.log(
         "Updated Duration after End Day Fraction Change:",
@@ -953,6 +951,31 @@ const AbsenceDetailGeneral = ({
     handleFieldChange("adjustTaken", newValue);
   };
 
+  useEffect(() => {
+    if (!localAbsenceType) {
+      updateKPIs({
+        balanceBefore: "-",
+        balanceAfter: "-",
+        projectedBalance: "-",
+        projectedCarryForward: "-",
+      });
+      return;
+    }
+
+    console.log(
+      "Updating KPI Balances due to absence type change with absenceDuration = 1"
+    );
+
+    updateKPIBalances(
+      {
+        ...absenceDetails,
+        absenceDuration: "1", // Always set absence duration to "1"
+      },
+      updateKPIs,
+      setIsKPIUpdating // Track KPI update status to disable UI interactions if needed
+    );
+  }, [localAbsenceType, setIsKPIUpdating]);
+
   // Handle absence type validation when absenceTypeOptions are available
   useEffect(() => {
     if (isEditMode && absenceType && absenceTypeOptions?.length) {
@@ -1028,6 +1051,41 @@ const AbsenceDetailGeneral = ({
 
     updateNonWorkingDates();
   }, [localAbsenceTypeFixedCalendar, employeeInfo.calendarExtId]);
+
+  useEffect(() => {
+    // Calculate the minimum fraction value from dayFractionOptions
+    const minFraction = getMinFraction(dayFractionOptions);
+
+    // Validate the duration based on the current state and minimum fraction
+    const isValidDuration = validateDuration(
+      localDuration,
+      localAbsenceTypeMinRequest,
+      localAbsenceTypeMaxRequest,
+      localAbsenceTypeHalfDaysNotAllowed,
+      localAbsenceTypeHourlyLeave,
+      localAbsenceTypeDisplayInHours,
+      hoursPerDay,
+      t,
+      minFraction
+    );
+
+    // If the duration is not valid, set the start and end day fractions to null
+    if (!isValidDuration) {
+      console.log("Invalid duration value:", localDuration);
+      setLocalAbsenceStartDayFraction(null);
+      setLocalAbsenceEndDayFraction(null);
+    }
+  }, [
+    localDuration,
+    localAbsenceTypeMinRequest,
+    localAbsenceTypeMaxRequest,
+    localAbsenceTypeHalfDaysNotAllowed,
+    localAbsenceTypeHourlyLeave,
+    localAbsenceTypeDisplayInHours,
+    hoursPerDay,
+    t,
+    dayFractionOptions,
+  ]);
 
   return (
     <View style={styles.container}>
