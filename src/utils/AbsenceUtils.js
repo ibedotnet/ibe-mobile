@@ -37,6 +37,7 @@ const absenceTypeFields = [
   "AbsenceType-minRequest",
   "AbsenceType-maxRequest",
   "AbsenceType-negativeDays",
+  "AbsenceType-adjustAfterDays",
 ];
 
 /**
@@ -60,9 +61,11 @@ const booleanMap = {
  * @param {string|number|null} endDayFraction - The fraction of the last day used (0-1) as a string, number, or null.
  * @param {Object} absenceDetails - The details of the absence.
  * @param {Function} updateKPIs - Callback function to update KPI values.
- * @param {Function} setLoading - Callback function to set the loading state.
  * @param {Function} setIsKPIUpdating - Callback function to set the KPI updating state.
  * @param {Function} t - Translation function used to show localized messages.
+ * @param {boolean} localAbsenceTypeHourlyLeave - Indicates if the absence type is based on hourly leave.
+ * @param {boolean} localAbsenceTypeDisplayInHours - Indicates if the absence should be displayed in hours.
+ * @param {number} hoursPerDay - The number of working hours per day.
  * @returns {string} - The total working day equivalent (including fractions) as a string.
  *
  * @throws {Error} - Throws error if input dates or fractions are invalid.
@@ -75,9 +78,11 @@ const calculateDuration = (
   endDayFraction = "1",
   absenceDetails,
   updateKPIs,
-  setLoading,
   setIsKPIUpdating,
-  t
+  t,
+  localAbsenceTypeDisplayInHours,
+  localAbsenceTypeHourlyLeave,
+  hoursPerDay
 ) => {
   // Ensure fractions are parsed as valid numbers between 0 and 1
   startDayFraction =
@@ -100,7 +105,12 @@ const calculateDuration = (
     console.error("Invalid endDate. Expected a valid Date object.");
     return;
   }
-  if (startDate > endDate) {
+
+  // Compare only the date part to avoid time differences
+  const startDateString = startDate.toDateString();
+  const endDateString = endDate.toDateString();
+
+  if (startDateString > endDateString) {
     console.error("Start date cannot be after end date.");
     showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
     return;
@@ -110,16 +120,11 @@ const calculateDuration = (
   const currentDate = new Date(startDate);
   let isFirstDay = true;
 
-  if (isNonWorkingDay(startDate, employeeInfo)) {
-    showToast(t("non_working_day_start_date_warning"), "error");
-    return "0";
-  }
-
   while (currentDate <= endDate) {
     if (!isNonWorkingDay(currentDate, employeeInfo)) {
       if (isFirstDay) {
         // Handle same-day case by taking max of fractions
-        if (startDate.toDateString() === endDate.toDateString()) {
+        if (startDateString === endDateString) {
           const effectiveEndFraction =
             endDayFraction !== null ? endDayFraction : startDayFraction;
           duration += Math.max(startDayFraction, effectiveEndFraction);
@@ -128,7 +133,7 @@ const calculateDuration = (
           duration += startDayFraction;
           isFirstDay = false;
         }
-      } else if (currentDate.toDateString() === endDate.toDateString()) {
+      } else if (currentDate.toDateString() === endDateString) {
         duration += endDayFraction !== null ? endDayFraction : 1;
       } else {
         duration++;
@@ -137,15 +142,28 @@ const calculateDuration = (
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Update KPI balances with the calculated duration
+  // Handle case where startDate is a non-working day
+  if (duration === 0 && isNonWorkingDay(startDate, employeeInfo)) {
+    showToast(t("non_working_day_start_date_warning"), "error");
+    showToast(t("duration_must_be_positive"), "error");
+  }
+
+  let adjustedDuration = duration;
+  // Adjust duration if displayed in hours
+  if (localAbsenceTypeDisplayInHours || localAbsenceTypeHourlyLeave) {
+    adjustedDuration = adjustedDuration * hoursPerDay;
+    console.log("Adjusted duration (in hours):", adjustedDuration);
+  }
+
+  // Update KPI balances with the calculated (adjusted if applicable) duration
   updateKPIBalances(
-    { ...absenceDetails, absenceDuration: duration },
+    { ...absenceDetails, absenceDuration: adjustedDuration },
     updateKPIs,
     setIsKPIUpdating
   );
 
-  // Return the duration as a string to handle text box compatibility
-  return duration.toString();
+  // Return the duration (if adjusted) as a string to handle text box compatibility
+  return adjustedDuration.toString();
 };
 
 /**
@@ -158,8 +176,10 @@ const calculateDuration = (
  * @param {number|string|null} endDayFraction - The fraction of the last day used (0-1) as a number, string, or null.
  * @param {Object} absenceDetails - The details of the absence.
  * @param {Function} updateKPIs - Callback function to update KPI values.
- * @param {Function} setLoading - Callback function to set the loading state.
  * @param {Function} setIsKPIUpdating - Callback function to set the KPI updating state.
+ * @param {boolean} localAbsenceTypeHourlyLeave - Indicates if the absence type is based on hourly leave.
+ * @param {boolean} localAbsenceTypeDisplayInHours - Indicates if the absence should be displayed in hours.
+ * @param {number} hoursPerDay - The number of working hours per day.
  * @returns {Date} - The calculated end date.
  *
  * @throws {Error} Throws an error if the start date is invalid, or if duration, startDayFraction, or endDayFraction are out of valid bounds.
@@ -176,11 +196,13 @@ const calculateEndDate = (
   endDayFraction = "1",
   absenceDetails,
   updateKPIs,
-  setLoading,
-  setIsKPIUpdating
+  setIsKPIUpdating,
+  localAbsenceTypeHourlyLeave,
+  localAbsenceTypeDisplayInHours,
+  hoursPerDay
 ) => {
   // Ensure the duration is a valid number
-  const parsedDuration = parseFloat(duration);
+  let parsedDuration = parseFloat(duration);
   if (isNaN(parsedDuration) || parsedDuration < 0) {
     console.error("Invalid duration. Expected a non-negative number.");
     showToast(
@@ -188,6 +210,12 @@ const calculateEndDate = (
       "error"
     );
     return;
+  }
+
+  // Adjust duration if displayed in hours
+  if (localAbsenceTypeDisplayInHours || localAbsenceTypeHourlyLeave) {
+    parsedDuration = parsedDuration / hoursPerDay;
+    console.log("Adjusted duration (in days):", parsedDuration);
   }
 
   // Convert fractions to valid numbers or defaults if null or invalid
@@ -242,7 +270,11 @@ const calculateEndDate = (
 
   // Update KPI balances in the UI
   updateKPIBalances(
-    { ...absenceDetails, absenceEnd: endDate, absenceDuration: parsedDuration },
+    {
+      ...absenceDetails,
+      absenceEnd: endDate,
+      absenceDuration: parsedDuration,
+    },
     updateKPIs,
     setIsKPIUpdating
   );
@@ -251,23 +283,28 @@ const calculateEndDate = (
 };
 
 /**
- * Calculates the number of valid working days between the start and end date, excluding non-working days (e.g., weekends, holidays).
+ * Calculates the number of valid working days between the start and end date,
+ * excluding non-working days (e.g., weekends, holidays).
  *
  * @param {Date|string} startDate - The start date of the period.
  * @param {Date|string} endDate - The end date of the period.
  * @param {Object} employeeInfo - The employee's non-working days (e.g., holidays, weekends).
  * @returns {number} - The count of valid working days between the two dates.
- *
  */
 const calculateValidDaysCount = (startDate, endDate, employeeInfo) => {
   let validDaysCount = 0;
-  let currentDate = new Date(startDate);
 
-  while (currentDate <= endDate) {
+  // Normalize both dates to UTC
+  let currentDate = normalizeDateToUTC(new Date(startDate));
+  let normalizedEndDate = normalizeDateToUTC(new Date(endDate));
+
+  while (currentDate <= normalizedEndDate) {
     if (!isNonWorkingDay(currentDate, employeeInfo)) {
       validDaysCount++;
     }
-    currentDate.setDate(currentDate.getDate() + 1);
+
+    // Move to the next day safely
+    currentDate = new Date(currentDate.getTime() + 86400000);
   }
 
   return validDaysCount;
@@ -844,7 +881,8 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     "AbsenceType-halfDaysNotAllowed": absenceTypeHalfDaysNotAllowed = false,
     "AbsenceType-minRequest": absenceTypeMinRequest = null,
     "AbsenceType-maxRequest": absenceTypeMaxRequest = null,
-    "AbsenceType-negativeDays": negativeDays = 0,
+    "AbsenceType-negativeDays": absenceTypeNegativeDays = 0,
+    "AbsenceType-adjustAfterDays": absenceTypeAdjustAfterDays = 0,
   } = absenceTypeRecord;
 
   console.log("Absence Type Record: ", {
@@ -860,7 +898,8 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     absenceTypeHalfDaysNotAllowed,
     absenceTypeMinRequest,
     absenceTypeMaxRequest,
-    negativeDays,
+    absenceTypeNegativeDays,
+    absenceTypeAdjustAfterDays,
   });
 
   // Construct and return the updated absence type details
@@ -878,7 +917,8 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
       absenceTypeHalfDaysNotAllowed,
       absenceTypeMinRequest,
       absenceTypeMaxRequest,
-      negativeDays,
+      absenceTypeNegativeDays,
+      absenceTypeAdjustAfterDays,
     },
   };
 };
@@ -1061,6 +1101,81 @@ const mergeAbsenceData = (absenceTypesMap, eligibleAbsenceTypes) => {
           eligibleData["negativeDays"] || value["negativeDays"] || 0,
       },
     ];
+  });
+};
+
+/**
+ * Updates the start and end day fractions based on the parsed duration.
+ *
+ * This function ensures correct handling of full-day, partial-day, and multi-day absences.
+ * It correctly assigns the `absenceStartDayFraction` and `absenceEndDayFraction` based on:
+ *  - Whether half-days are allowed
+ *  - The duration of the absence
+ *  - The minimum selectable fraction
+ *  - Ensuring the duration is a valid multiple of `minFraction`
+ *
+ * @param {string|number} duration - The calculated absence duration (string or number).
+ * @param {number} minFraction - The smallest available fraction for a day (e.g., 0.5 or 0.25).
+ * @param {boolean} halfDaysNotAllowed - Indicates whether half-day absences are restricted.
+ * @param {Function} setStartFraction - State setter for the start day fraction.
+ * @param {Function} setEndFraction - State setter for the end day fraction.
+ * @param {Function} handleFieldChange - Callback to update absence-related fields in the state.
+ */
+const updateDayFractionsBasedOnDuration = (
+  duration,
+  minFraction,
+  halfDaysNotAllowed,
+  setStartFraction,
+  setEndFraction,
+  handleFieldChange
+) => {
+  // Ensure duration is parsed as a number
+  const parsedDuration = parseFloat(duration);
+
+  // Check for invalid duration: NaN, empty, zero, negative, or not a multiple of minFraction
+  if (
+    isNaN(parsedDuration) ||
+    parsedDuration <= 0 ||
+    parsedDuration % minFraction !== 0
+  ) {
+    setStartFraction("1"); // Default to full day
+    setEndFraction(null); // No end fraction
+    handleFieldChange({
+      absenceStartDayFraction: "1",
+      absenceEndDayFraction: null,
+    });
+    return;
+  }
+
+  let newStartFraction = "1"; // Default: Full start day
+  let newEndFraction = null; // Default: No end fraction
+
+  // Case 1: Full-day absence or half-days not allowed
+  if (halfDaysNotAllowed || parsedDuration === 1) {
+    newStartFraction = "1";
+    newEndFraction = null;
+  }
+  // Case 2: Multi-day absence (greater than 1 day)
+  else if (parsedDuration > 1) {
+    newStartFraction = "1";
+    // If duration is a whole number, end fraction remains "1"
+    // Otherwise, it should take the minimum fraction
+    newEndFraction = parsedDuration % 1 === 0 ? "1" : minFraction.toString();
+  }
+  // Case 3: Partial-day absence (less than 1 day)
+  else {
+    newStartFraction = parsedDuration.toString(); // Assign the valid duration fraction
+    newEndFraction = null; // No end fraction needed
+  }
+
+  // Update state values
+  setStartFraction(newStartFraction);
+  setEndFraction(newEndFraction);
+
+  // Notify parent component about the changes
+  handleFieldChange({
+    absenceStartDayFraction: newStartFraction,
+    absenceEndDayFraction: newEndFraction,
   });
 };
 
@@ -1301,6 +1416,7 @@ const validateAbsenceOnSaveWithAdjustment = (
  * @param {number} hoursPerDay - The number of work hours in a day.
  * @param {function} t - Translation function used to fetch localized strings for error messages.
  * @param {number} minFraction - The minimum fraction value for the duration.
+ * @param {boolean} checkInvalidDuration - Flag indicating whether to check for invalid duration values.
  * @returns {boolean} - Returns `false` if validation fails (duration is not in acceptable multiples), otherwise `true`.
  */
 const validateDuration = (
@@ -1312,7 +1428,8 @@ const validateDuration = (
   isDisplayInHours,
   hoursPerDay = 8,
   t,
-  minFraction
+  minFraction,
+  checkInvalidDuration
 ) => {
   console.log("Validating duration:", {
     value,
@@ -1323,9 +1440,10 @@ const validateDuration = (
     isDisplayInHours,
     hoursPerDay,
     minFraction,
+    checkInvalidDuration,
   });
 
-  if (isNaN(parseFloat(value))) {
+  if (checkInvalidDuration && isNaN(parseFloat(value))) {
     showToast(
       t("invalid_duration_value", {
         value: value || "0",
@@ -1336,7 +1454,7 @@ const validateDuration = (
   }
 
   // Ensure the duration is greater than zero
-  if (parseFloat(value) <= 0) {
+  if (checkInvalidDuration && parseFloat(value) <= 0) {
     showToast(t("duration_must_be_positive"), "error");
     return false;
   }
@@ -1436,6 +1554,7 @@ export {
   isNonWorkingDay,
   isTimeOffOnHoliday,
   mergeAbsenceData,
+  updateDayFractionsBasedOnDuration,
   updateFieldInState,
   updateKPIBalances,
   validateAbsenceOnSaveWithAdjustment,

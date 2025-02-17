@@ -315,7 +315,7 @@
   "holiday_required_message": "Holiday is required.",
   "no_eligible_absence_types_found": "No eligible absence types found.",
   "error_fetching_absence_data": "An error occurred while fetching absence data. Please try again later.",
-  "employee_not_eligible_for_absence_type": "Employee is not eligible for the absence type: {{absenceTypeName}} anymore.",
+  "employee_not_eligible_for_absence_type": "Employee is not eligible for the absence type: {{absenceType}} anymore.",
   "accrue_by_hours_worked_min_duration": "When 'Accrue by Hours Worked' is enabled, the minimum duration must be at least 1.",
   "request_date": "Request Date",
   "number_of_days": "Number of Days",
@@ -332,8 +332,9 @@
   "non_working_day_start_date_warning": "The selected start date is a non-working day. Please choose another date.",
   "duration_min_value": "The minimum number of days to be applied for time off is {{minValue}} days.",
   "duration_max_value": "The maximum number of days you can apply for time off is {{maxValue}} days.",
-  "invalid_duration_value": "Invalid duration value: {{value}}.",
+  "invalid_duration_value": "Invalid duration value: {{value}}",
   "fraction_not_allowed_error": "Fractional duration is not allowed.",
   "negative_balance_not_allowed": "For {{absenceTypeName}}, negative balance is not allowed",
-  "max_negative_balance_exceeded": "For {{absenceTypeName}}, the maximum allowed negative balance is {{maxNegativeDays}}{{durationType}}"
+  "max_negative_balance_exceeded": "For {{absenceTypeName}}, the maximum allowed negative balance is {{maxNegativeDays}}{{durationType}}",
+  "fetching_balance_details": "Fetching balance details"
 }

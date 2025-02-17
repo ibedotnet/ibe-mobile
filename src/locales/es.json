@@ -313,7 +313,7 @@
   "no_eligible_absence_types_found": "No se encontraron tipos de ausencia elegibles.",
   "error_fetching_absence_data": "Se produjo un error al recuperar los datos de ausencia. Por favor, inténtelo de nuevo más tarde.",
   "selected_absence_type_not_eligible": "El tipo de ausencia seleccionado ya no es elegible.",
-  "employee_not_eligible_for_absence_type": "El empleado ya no es elegible para el tipo de ausencia: {{absenceTypeName}}.",
+  "employee_not_eligible_for_absence_type": "El empleado ya no es elegible para el tipo de ausencia: {{absenceType}}.",
   "accrue_by_hours_worked_min_duration": "Cuando 'Acumular por horas trabajadas' está habilitado, la duración mínima debe ser al menos 1.",
   "request_date": "Fecha de solicitud",
   "number_of_days": "Número de días",
@@ -329,8 +329,9 @@
   "non_working_day_start_date_warning": "La fecha de inicio seleccionada es un día no laborable. Por favor, elija otra fecha.",
   "duration_min_value": "El número mínimo de días para solicitar tiempo libre es {{minValue}} días.",
   "duration_max_value": "El número máximo de días que puede solicitar es {{maxValue}} días.",
-  "invalid_duration_value": "Valor de duración no válido: {{value}}.",
+  "invalid_duration_value": "Valor de duración no válido: {{value}}",
   "fraction_not_allowed_error": "No se permite la duración fraccionada.",
   "negative_balance_not_allowed": "Para {{absenceTypeName}}, no se permite saldo negativo",
-  "max_negative_balance_exceeded": "Para {{absenceTypeName}}, el saldo negativo máximo permitido es de {{maxNegativeDays}}{{durationType}}"
+  "max_negative_balance_exceeded": "Para {{absenceTypeName}}, el saldo negativo máximo permitido es de {{maxNegativeDays}}{{durationType}}",
+  "fetching_balance_details": "Obteniendo detalles del saldo"  
 }

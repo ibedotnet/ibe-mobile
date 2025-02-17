@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { ScrollView, StyleSheet, View, Text, Switch } from "react-native";
 
 import { useTranslation } from "react-i18next";
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 
 import CustomStatus from "../components/CustomStatus";
 import CustomPicker from "../components/CustomPicker";
@@ -17,11 +17,13 @@ import {
   calculateDuration,
   fetchWorkCalendar,
   validateStatusChange,
-  isTimeOffOnHoliday,
   updateKPIBalances,
+  updateDayFractionsBasedOnDuration,
+  isNonWorkingDay,
 } from "../utils/AbsenceUtils";
 import {
   convertToDateFNSFormat,
+  datesAreForSameDay,
   getRemarkText,
   setRemarkText,
 } from "../utils/FormatUtils";
@@ -37,8 +39,10 @@ import { showToast } from "../utils/MessageUtils";
  * @param {boolean} props.isEditMode - Flag indicating if the form is in edit mode.
  * @param {string} props.currentStatus - The current status of the absence.
  * @param {Array} props.listOfNextStatus - List of next possible statuses.
+ * @param {Object} props.processTemplate - The process template for the absence.
  * @param {Function} props.handleReload - Callback function to reload data.
  * @param {boolean} props.loading - Flag indicating if data is loading.
+ * @param {boolean} props.isKPIUpdating - Flag indicating if KPI data is loading.
  * @param {Function} props.setLoading - Function to set the loading state.
  * @param {Function} props.setIsKPIUpdating - Function to set the KPI updating state.
  * @param {Function} props.onAbsenceDetailChange - Callback function to handle updates to absence details.
@@ -61,8 +65,10 @@ const AbsenceDetailGeneral = ({
   isEditMode,
   currentStatus,
   listOfNextStatus,
+  processTemplate,
   handleReload,
   loading,
+  isKPIUpdating,
   setLoading,
   setIsKPIUpdating,
   onAbsenceDetailChange,
@@ -102,6 +108,8 @@ const AbsenceDetailGeneral = ({
     absenceTypeAllowedInTermination,
     absenceTypeMinRequest,
     absenceTypeMaxRequest,
+    absenceTypeNegativeDays,
+    absenceTypeAdjustAfterDays,
   } = absenceTypeDetails;
 
   const { absenceTypeOptions = {}, dayFractionOptions = {} } = pickerOptions;
@@ -124,7 +132,9 @@ const AbsenceDetailGeneral = ({
   const [localAbsenceEndDayFraction, setLocalAbsenceEndDayFraction] = useState(
     absenceEndDayFraction || null
   );
-  const [localPolicyText, setLocalPolicyText] = useState(absenceTypePolicyText);
+  const [localAbsenceTypePolicyText, setLocalAbsenceTypePolicyText] = useState(
+    absenceTypePolicyText
+  );
   const [localRemark, setLocalRemark] = useState(
     getRemarkText(absenceRemark, lang, PREFERRED_LANGUAGES)
   );
@@ -134,8 +144,9 @@ const AbsenceDetailGeneral = ({
       : "";
   });
   const [hoursPerDay, setHoursPerDay] = useState(
-    employeeInfo.dailyStdHours || 8
+    employeeInfo?.dailyStdHours ? employeeInfo.dailyStdHours / 3600000 : 8
   );
+
   const [
     localAbsenceTypeHalfDaysNotAllowed,
     setLocalAbsenceTypeHalfDaysNotAllowed,
@@ -154,6 +165,10 @@ const AbsenceDetailGeneral = ({
   const [localAbsenceTypeMaxRequest, setLocalAbsenceTypeMaxRequest] = useState(
     absenceTypeMaxRequest
   );
+  const [localAbsenceTypeNegativeDays, setLocalAbsenceTypeNegativeDays] =
+    useState(absenceTypeNegativeDays);
+  const [localAbsenceTypeAdjustAfterDays, setLocalAbsenceTypeAdjustAfterDays] =
+    useState(absenceTypeAdjustAfterDays);
   const [showDateFields, setShowDateFields] = useState({
     showStart: true,
     showEnd: true,
@@ -335,6 +350,16 @@ const AbsenceDetailGeneral = ({
         setter: setLocalAbsenceTypeMaxRequest,
         batchKey: "absenceTypeMaxRequest",
       },
+      {
+        key: "absenceTypeNegativeDays",
+        setter: setLocalAbsenceTypeNegativeDays,
+        batchKey: "absenceTypeNegativeDays",
+      },
+      {
+        key: "absenceTypeAdjustAfterDays",
+        setter: setLocalAbsenceTypeAdjustAfterDays,
+        batchKey: "absenceTypeAdjustAfterDays",
+      },
     ];
 
     const batchedChanges = {};
@@ -359,13 +384,19 @@ const AbsenceDetailGeneral = ({
    * @param {boolean} absenceTypeFixedCalendar - Indicates if the absence type has a fixed calendar.
    * @param {boolean} absenceTypeHourlyLeave - Indicates if the absence type is hourly leave.
    * @param {boolean} absenceTypeDisplayInHours - Indicates if the absence type is displayed in hours.
+   * @param {string} absenceTypePolicyText - The policy text for the absence type.
+   * @param {boolean} absenceTypeHalfDaysNotAllowed - Indicates if half-day absences are not allowed for this absence type.
    */
   const handleAbsenceTypeBehavior = useCallback(
     (
       absenceTypeFixedCalendar,
       absenceTypeHourlyLeave,
-      absenceTypeDisplayInHours
+      absenceTypeDisplayInHours,
+      absenceTypePolicyText,
+      absenceTypeHalfDaysNotAllowed
     ) => {
+      setLocalAbsenceTypePolicyText(absenceTypePolicyText);
+
       if (absenceTypeFixedCalendar) {
         setFieldVisibility(
           true,
@@ -404,30 +435,6 @@ const AbsenceDetailGeneral = ({
           setLocalAbsenceStartDayFraction("1");
           setLocalAbsenceEndDayFraction(null);
         }
-
-        setFieldVisibility(
-          true,
-          {
-            showStart: true,
-            showEnd: true,
-            showStartDayFraction: false,
-            showEndDayFraction: false,
-          },
-          false,
-          false
-        );
-      } else {
-        setFieldVisibility(
-          true,
-          {
-            showStart: true,
-            showEnd: true,
-            showStartDayFraction: true,
-            showEndDayFraction: true,
-          },
-          false,
-          false
-        );
       }
     },
     []
@@ -478,14 +485,13 @@ const AbsenceDetailGeneral = ({
     // Update local state and propagate changes to the parent
     updateLocalStateAndHandleFieldChange(allChanges);
 
-    // Update the policy text
-    setLocalPolicyText(absenceTypeDetails.absenceTypePolicyText);
-
     // Adjust UI behavior based on the new absence type
     handleAbsenceTypeBehavior(
       absenceTypeDetails.absenceTypeFixedCalendar,
       absenceTypeDetails.absenceTypeHourlyLeave,
-      absenceTypeDetails.absenceTypeDisplayInHours
+      absenceTypeDetails.absenceTypeDisplayInHours,
+      absenceTypeDetails.absenceTypePolicyText,
+      absenceTypeDetails.absenceTypeHalfDaysNotAllowed
     );
   }, []);
 
@@ -577,42 +583,24 @@ const AbsenceDetailGeneral = ({
         showToast(t("start_date_in_past_warning"), "warning");
       }
 
-      // Additional validation for hourly leave
-      if (localAbsenceTypeHourlyLeave) {
-        console.log("Hourly leave detected. Validating leave period.");
-        if (localAbsenceEnd) {
-          isTimeOffOnHoliday(value, localAbsenceEnd, t, employeeInfo);
-        } else {
-          console.log("Cannot validate hourly leave: end date is missing.");
-        }
+      if (isNonWorkingDay(startDate, employeeInfo)) {
+        showToast(t("non_working_day_start_date_warning"), "error");
         return;
       }
-
-      // Adjust duration if displayed in hours
-      let adjustedDuration = parseFloat(localDuration) || 0;
-      if (localAbsenceTypeDisplayInHours) {
-        adjustedDuration = adjustedDuration / hoursPerDay;
-        console.log("Adjusted duration (in hours):", adjustedDuration);
-      }
-
-      if (adjustedDuration <= 0) {
-        showToast(t("duration_must_be_positive"), "error");
-        return;
-      }
-
-      console.log("Adjusted duration in start date change:", adjustedDuration);
 
       // Calculate and update the end date based on the new start date and current duration
       const newEndDate = calculateEndDate(
         value,
-        adjustedDuration,
+        localDuration,
         employeeInfo,
         localAbsenceStartDayFraction,
         localAbsenceEndDayFraction,
         absenceDetails,
         updateKPIs,
-        setLoading,
-        setIsKPIUpdating
+        setIsKPIUpdating,
+        localAbsenceTypeHourlyLeave,
+        localAbsenceTypeDisplayInHours,
+        hoursPerDay
       );
       console.log("Calculated new end date:", newEndDate);
 
@@ -643,17 +631,6 @@ const AbsenceDetailGeneral = ({
         return;
       }
 
-      // Additional validation for hourly leave
-      if (localAbsenceTypeHourlyLeave) {
-        console.log("Hourly leave detected. Validating hourly leave.");
-        if (localAbsenceStart) {
-          isTimeOffOnHoliday(localAbsenceStart, value, t, employeeInfo);
-        } else {
-          console.log("Cannot validate hourly leave: start date is missing.");
-        }
-        return;
-      }
-
       // Calculate and update the duration based on the new end date and current start date
       if (localAbsenceStart) {
         const newDuration = calculateDuration(
@@ -664,26 +641,29 @@ const AbsenceDetailGeneral = ({
           localAbsenceEndDayFraction,
           absenceDetails,
           updateKPIs,
-          setLoading,
           setIsKPIUpdating,
-          t
+          t,
+          localAbsenceTypeHourlyLeave,
+          localAbsenceTypeDisplayInHours,
+          hoursPerDay
         );
         console.log("New calculated duration (in days):", newDuration);
 
-        // Adjust duration if displayed in hours
-        let adjustedDuration = newDuration;
-        if (localAbsenceTypeDisplayInHours) {
-          adjustedDuration = newDuration * hoursPerDay;
-          console.log("Adjusted duration (in hours):", adjustedDuration);
-        }
-
-        console.log("Adjusted duration in end date change:", adjustedDuration);
-
-        setLocalDuration(adjustedDuration);
+        setLocalDuration(newDuration);
         handleFieldChange({
           absenceEndDate: value,
-          absenceDuration: adjustedDuration,
+          absenceDuration: newDuration,
         });
+
+        // Use the refactored function to update fractions
+        updateDayFractionsBasedOnDuration(
+          newDuration,
+          getMinFraction(dayFractionOptions),
+          localAbsenceTypeHalfDaysNotAllowed,
+          setLocalAbsenceStartDayFraction,
+          setLocalAbsenceEndDayFraction,
+          handleFieldChange
+        );
       }
     },
     [absenceAdjustAbsence, hoursPerDay, employeeInfo, handleFieldChange]
@@ -708,55 +688,46 @@ const AbsenceDetailGeneral = ({
         return;
       }
 
-      if (value === ".") {
-        console.log("Duration value is just a dot; ignoring update.");
+      const parsedDuration = parseFloat(value);
+
+      if (isNaN(parsedDuration) || parsedDuration <= 0) {
+        showToast(
+          t("invalid_duration_value", {
+            value: value || "0",
+          }),
+          "error"
+        );
         return;
       }
 
-      // Determine the new end date based on the duration value
-      let newEndDate;
-      if (!value) {
-        newEndDate = localAbsenceStart;
-        console.log(
-          "No duration value provided. Using start date as end date:",
-          newEndDate
-        );
-      } else {
-        newEndDate = calculateEndDate(
-          localAbsenceStart,
-          value,
-          employeeInfo,
-          localAbsenceStartDayFraction,
-          localAbsenceEndDayFraction,
-          absenceDetails,
-          updateKPIs,
-          setLoading,
-          setIsKPIUpdating
-        );
-        console.log("Calculated new end date:", newEndDate);
-      }
+      newEndDate = calculateEndDate(
+        localAbsenceStart,
+        value,
+        employeeInfo,
+        localAbsenceStartDayFraction,
+        localAbsenceEndDayFraction,
+        absenceDetails,
+        updateKPIs,
+        setIsKPIUpdating,
+        localAbsenceTypeDisplayInHours,
+        localAbsenceTypeHourlyLeave,
+        hoursPerDay
+      );
+      console.log("Calculated new end date:", newEndDate);
 
       // Update local end date state and notify parent component
       setLocalAbsenceEnd(newEndDate);
       handleFieldChange({ absenceDuration: value, absenceEndDate: newEndDate });
 
-      const minFraction = getMinFraction(dayFractionOptions);
-
-      const parsedDuration = parseFloat(value);
-      if (localAbsenceTypeHalfDaysNotAllowed || parsedDuration === 1) {
-        setLocalAbsenceStartDayFraction("1");
-        setLocalAbsenceEndDayFraction(null);
-      } else if (parsedDuration > 1) {
-        setLocalAbsenceStartDayFraction("1");
-        setLocalAbsenceEndDayFraction("1");
-      } else {
-        setLocalAbsenceStartDayFraction(
-          parsedDuration <= minFraction ? minFraction.toString() : "1"
-        );
-        setLocalAbsenceEndDayFraction(
-          parsedDuration <= minFraction ? null : minFraction.toString()
-        );
-      }
+      // Update fractions using the new function
+      updateDayFractionsBasedOnDuration(
+        value,
+        getMinFraction(dayFractionOptions),
+        localAbsenceTypeHalfDaysNotAllowed,
+        setLocalAbsenceStartDayFraction,
+        setLocalAbsenceEndDayFraction,
+        handleFieldChange
+      );
     },
     [
       absenceAdjustAbsence,
@@ -792,9 +763,11 @@ const AbsenceDetailGeneral = ({
         localAbsenceEndDayFraction,
         absenceDetails,
         updateKPIs,
-        setLoading,
         setIsKPIUpdating,
-        t
+        t,
+        localAbsenceTypeDisplayInHours,
+        localAbsenceTypeHourlyLeave,
+        hoursPerDay
       );
       console.log(
         "Updated Duration after Start Day Fraction Change:",
@@ -833,9 +806,11 @@ const AbsenceDetailGeneral = ({
         fraction,
         absenceDetails,
         updateKPIs,
-        setLoading,
         setIsKPIUpdating,
-        t
+        t,
+        localAbsenceTypeDisplayInHours,
+        localAbsenceTypeHourlyLeave,
+        hoursPerDay
       );
       console.log(
         "Updated Duration after End Day Fraction Change:",
@@ -872,6 +847,13 @@ const AbsenceDetailGeneral = ({
   const setBehaviourOfUIForHourlyLeaves = useCallback(() => {
     setLocalAbsenceStartDayFraction("1");
     setLocalAbsenceEndDayFraction(null);
+
+    // Notify parent component about the fraction changes
+    handleFieldChange({
+      absenceStartDayFraction: "1",
+      absenceEndDayFraction: null,
+    });
+
     setFieldVisibility(
       true,
       {
@@ -937,6 +919,12 @@ const AbsenceDetailGeneral = ({
       false,
       true
     );
+
+    // Notify parent component
+    handleFieldChange({
+      absenceStartDayFraction: null,
+      absenceEndDayFraction: null,
+    });
   }, []);
 
   const toggleAddToBalance = () => {
@@ -969,7 +957,7 @@ const AbsenceDetailGeneral = ({
     updateKPIBalances(
       {
         ...absenceDetails,
-        absenceDuration: "1", // Always set absence duration to "1"
+        absenceDuration: localDuration || "1",
       },
       updateKPIs,
       setIsKPIUpdating // Track KPI update status to disable UI interactions if needed
@@ -983,11 +971,10 @@ const AbsenceDetailGeneral = ({
         (option) => option.value === absenceType
       );
       if (!isEligible) {
-        const absenceTypeName =
-          allAbsenceTypes[absenceType]?.["AbsenceType-name"] || "unknown";
+        setLocalAbsenceTypeHourlyLeave(null);
         showToast(
           t("employee_not_eligible_for_absence_type", {
-            absenceTypeName,
+            absenceType,
           }),
           "error"
         );
@@ -1004,7 +991,9 @@ const AbsenceDetailGeneral = ({
         handleAbsenceTypeBehavior(
           localAbsenceTypeFixedCalendar,
           localAbsenceTypeHourlyLeave,
-          localAbsenceTypeDisplayInHours
+          localAbsenceTypeDisplayInHours,
+          localAbsenceTypePolicyText,
+          localAbsenceTypeHalfDaysNotAllowed
         );
       }
     }
@@ -1111,7 +1100,7 @@ const AbsenceDetailGeneral = ({
                 validateStatusChange(
                   processTemplate,
                   currentStatus,
-                  maxCancellationDays,
+                  localAbsenceTypeAdjustAfterDays,
                   localAbsenceEnd
                 )
               }
@@ -1126,9 +1115,17 @@ const AbsenceDetailGeneral = ({
           {absenceEmployeeName}
         </Text>
       )}
+
       {/* Conditionally Render the Balance Section */}
       {!absenceAdjustAbsence && !isParentLocked && (
         <View style={styles.kpiContainer}>
+          {isKPIUpdating && (
+            <View styles={styles.fetchUpdateTextContainer}>
+              <Text style={styles.fetchUpdateText}>
+                {t("fetching_balance_details")}...
+              </Text>
+            </View>
+          )}
           {/* Titles for Balance */}
           <View style={styles.titleRow}>
             <View style={styles.titleBox}>
@@ -1238,7 +1235,9 @@ const AbsenceDetailGeneral = ({
                 />
                 <View style={styles.unitPickerContainer}>
                   <Text style={styles.unitText}>
-                    {`${t(localAbsenceTypeHourlyLeave ? "hour" : "day")}(s)`}
+                    {localAbsenceTypeHourlyLeave === null
+                      ? t("unit_label")
+                      : `${t(localAbsenceTypeHourlyLeave ? "hour" : "day")}(s)`}
                   </Text>
                 </View>
               </View>
@@ -1334,7 +1333,8 @@ const AbsenceDetailGeneral = ({
                       absenceAdjustAbsence ||
                       !localAbsenceType ||
                       localAbsenceTypeHalfDaysNotAllowed ||
-                      localAbsenceTypeHourlyLeave
+                      localAbsenceTypeHourlyLeave ||
+                      datesAreForSameDay(localAbsenceStart, localAbsenceEnd)
                     }
                     accessibilityLabel="End Day Fraction picker"
                     accessibilityRole="dropdownlist"
@@ -1390,12 +1390,19 @@ const AbsenceDetailGeneral = ({
             <View style={styles.row}>
               <View style={styles.firstColumn}>
                 <Text style={styles.label}>
-                  {isAddToBalance
-                    ? t("add_to_remaining_balance")
-                    : t("deduct_from_remaining_balance")}
+                  {t("add_to_remaining_balance")}
                 </Text>
                 <View style={styles.switchContainer}>
                   <Switch
+                    trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
+                    thumbColor={
+                      isParentLocked
+                        ? "#bcbcbc" // Greyed out when disabled
+                        : isAddToBalance
+                        ? "#ffffff"
+                        : "#a0a0a0"
+                    }
+                    ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAddToBalance}
                     value={isAddToBalance}
                     disabled={isParentLocked}
@@ -1406,6 +1413,15 @@ const AbsenceDetailGeneral = ({
                 <Text style={styles.label}>{t("adjust_taken")}</Text>
                 <View style={styles.switchContainer}>
                   <Switch
+                    trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
+                    thumbColor={
+                      isParentLocked
+                        ? "#bcbcbc" // Greyed out when disabled
+                        : isAddToBalance
+                        ? "#ffffff"
+                        : "#a0a0a0"
+                    }
+                    ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAdjustTaken}
                     value={adjustTaken}
                     disabled={isParentLocked}
@@ -1437,10 +1453,12 @@ const AbsenceDetailGeneral = ({
         </View>
 
         {/* Policy */}
-        {localPolicyText && (
+        {localAbsenceTypePolicyText && (
           <View style={styles.detailItem}>
             <Text style={styles.label}>{t("policy")}</Text>
-            <Text style={[styles.value, styles.value]}>{localPolicyText}</Text>
+            <Text style={[styles.value, styles.value]}>
+              {localAbsenceTypePolicyText}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -1595,11 +1613,20 @@ const styles = StyleSheet.create({
   },
   note: {
     margin: "10 0 0 0",
-    color: "#333",
+    color: "#00f",
     fontSize: 14,
   },
   switchContainer: {
     alignItems: "flex-start",
+  },
+  fetchUpdateTextContainer: {
+    height: 100,
+  },
+  fetchUpdateText: {
+    color: "#005eb8",
+    fontWeight: "bold",
+    alignSelf: "center",
+    paddingVertical: "4%",
   },
 });
 

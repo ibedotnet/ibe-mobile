@@ -1297,7 +1297,13 @@ const TimesheetDetailItemEditor = ({
                 <Text style={styles.modalInputLabel}>{t("billable")}</Text>
                 <Switch
                   trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
-                  thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
+                  thumbColor={
+                    isBillableDisabled
+                      ? "#bcbcbc" // Greyed out when disabled
+                      : editedItem.billable
+                      ? "#ffffff"
+                      : "#a0a0a0"
+                  }
                   ios_backgroundColor="#d3d3d3"
                   value={editedItem.billable}
                   onValueChange={handleBillableChange}

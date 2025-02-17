@@ -54,7 +54,6 @@ import {
   updateFieldInState,
   fetchEligibleAbsenceTypes,
   fetchAbsenceTypes,
-  validateStatusChange,
   isLeaveAllowedInEmploymentPeriod,
   fetchEmployeeAbsences,
   isAbsencesOverlap,
@@ -215,7 +214,7 @@ const AbsenceDetail = ({ route, navigation }) => {
    */
   const handleReload = () => {
     const reloadData = () => {
-      loadAbsenceDetail(); // Fetch the latest absence data
+      fetchAbsenceAndAuxiliaryData();
     };
 
     hasUnsavedChanges() ? showUnsavedChangesAlert(reloadData) : reloadData();
@@ -416,6 +415,9 @@ const AbsenceDetail = ({ route, navigation }) => {
       updatedValuesRef.current = {};
       setUpdatedValues({});
 
+      // Reload the absence data after saving
+      handleReload();
+
       // Force refresh the absence data on the list screen
       updateForceRefresh(true);
 
@@ -444,7 +446,7 @@ const AbsenceDetail = ({ route, navigation }) => {
    */
   const handleSave = async () => {
     try {
-      const { isValid, isNegativeBalance } = validateAbsenceOnSave();
+      const { isValid, isNegativeBalance = false } = validateAbsenceOnSave();
 
       if (isValid) {
         await updateAbsence(updatedValues, isNegativeBalance);
@@ -465,31 +467,37 @@ const AbsenceDetail = ({ route, navigation }) => {
       `Received updated values in Absence Detail: ${JSON.stringify(values)}`
     );
 
-    const updatedChanges = { ...updatedValues };
+    const updatedChanges = { ...updatedValuesRef.current };
+    let newValues = { ...values }; // Avoid mutating original values
 
     // Normalize start and end dates before updating
-    if (values.absenceStartDate) {
-      values.absenceStartDate = normalizeDateToUTC(values.absenceStartDate);
+    if (newValues.absenceStartDate) {
+      newValues.absenceStartDate = normalizeDateToUTC(
+        newValues.absenceStartDate
+      );
     }
-    if (values.absenceEndDate) {
-      values.absenceEndDate = normalizeDateToUTC(values.absenceEndDate);
-    }
-
-    // Parse plannedDays from values
-    if (values.absenceDuration) {
-      values.absenceDuration = parseFloat(values.absenceDuration);
+    if (newValues.absenceEndDate) {
+      newValues.absenceEndDate = normalizeDateToUTC(newValues.absenceEndDate);
     }
 
-    // Update isAddToBalance if it exists in values and adjust absenceDuration if necessary
-    if (values.isAddToBalance !== undefined) {
-      setIsAddToBalance(values.isAddToBalance);
-      if (absenceAdjustAbsence && values.isAddToBalance < 0) {
-        values.absenceDuration = parseFloat(values.absenceDuration * -1);
+    // Parse absence duration if it exists
+    if (newValues.absenceDuration) {
+      newValues.absenceDuration = parseFloat(newValues.absenceDuration);
+    }
+
+    // Handle Add to Balance update if it exists
+    if (newValues.isAddToBalance !== undefined) {
+      setIsAddToBalance(newValues.isAddToBalance);
+
+      // Ensure correct deduction logic
+      if (absenceAdjustAbsence && !newValues.isAddToBalance) {
+        newValues.absenceDuration = parseFloat(newValues.absenceDuration * -1);
       }
     }
 
+    // Directly update state fields as before
     updateFieldInState(
-      values,
+      newValues,
       "absenceType",
       absenceType,
       setAbsenceType,
@@ -497,7 +505,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "type"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceStartDate",
       absenceStart,
       setAbsenceStart,
@@ -505,7 +513,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "start"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceEndDate",
       absenceEnd,
       setAbsenceEnd,
@@ -513,7 +521,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "end"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceStartDayFraction",
       absenceStartDayFraction,
       setAbsenceStartDayFraction,
@@ -521,7 +529,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "startHalfDay"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceEndDayFraction",
       absenceEndDayFraction,
       setAbsenceEndDayFraction,
@@ -529,7 +537,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "endHalfDay"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceDuration",
       absencePlannedDays,
       setAbsencePlannedDays,
@@ -537,7 +545,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "plannedDays"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceFiles",
       absenceFiles,
       setAbsenceFiles,
@@ -545,7 +553,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "files"
     );
     updateFieldInState(
-      values,
+      newValues,
       "absenceComments",
       absenceComments,
       setAbsenceComments,
@@ -555,131 +563,43 @@ const AbsenceDetail = ({ route, navigation }) => {
 
     // Special handling for remark
     if (
-      values.absenceRemark !== undefined &&
-      !isEqual(values.absenceRemark, absenceRemark)
+      newValues.absenceRemark !== undefined &&
+      !isEqual(newValues.absenceRemark, absenceRemark)
     ) {
-      setAbsenceRemark(values.absenceRemark);
+      setAbsenceRemark(newValues.absenceRemark);
       updatedChanges["remark:text"] = getRemarkText(
-        values.absenceRemark,
+        newValues.absenceRemark,
         lang,
         PREFERRED_LANGUAGES
       );
     }
 
-    // Log updated changes
-    console.log(
-      `Updated changes after processing (for saving): ${JSON.stringify(
-        updatedChanges
-      )}`
-    );
-
     // Prepare and update behavior fields
     let newBehaviorFields = { ...behaviorFields };
+    const behaviorFieldsKeys = [
+      "selectedHoliday",
+      "absenceTypeFixedCalendar",
+      "absenceTypeAllowedInProbation",
+      "absenceTypeAllowedInTermination",
+      "absenceTypeDisplayInHours",
+      "absenceTypeHourlyLeave",
+      "absenceTypeAdminAdjustOnly",
+      "absenceTypeHalfDaysNotAllowed",
+      "absenceTypeMinRequest",
+      "absenceTypeMaxRequest",
+      "absenceTypeNegativeDays",
+      "absenceTypeAdjustAfterDays",
+    ];
 
-    if (
-      values.selectedHoliday !== undefined &&
-      !isEqual(values.selectedHoliday, newBehaviorFields.selectedHoliday)
-    ) {
-      newBehaviorFields.selectedHoliday = values.selectedHoliday;
-    }
+    behaviorFieldsKeys.forEach((field) => {
+      if (
+        newValues[field] !== undefined &&
+        !isEqual(newValues[field], newBehaviorFields[field])
+      ) {
+        newBehaviorFields[field] = newValues[field];
+      }
+    });
 
-    if (
-      values.absenceTypeFixedCalendar !== undefined &&
-      !isEqual(
-        values.absenceTypeFixedCalendar,
-        newBehaviorFields.absenceTypeFixedCalendar
-      )
-    ) {
-      newBehaviorFields.absenceTypeFixedCalendar =
-        values.absenceTypeFixedCalendar;
-    }
-
-    if (
-      values.absenceTypeAllowedInProbation !== undefined &&
-      !isEqual(
-        values.absenceTypeAllowedInProbation,
-        newBehaviorFields.absenceTypeAllowedInProbation
-      )
-    ) {
-      newBehaviorFields.absenceTypeAllowedInProbation =
-        values.absenceTypeAllowedInProbation;
-    }
-
-    if (
-      values.absenceTypeAllowedInTermination !== undefined &&
-      !isEqual(
-        values.absenceTypeAllowedInTermination,
-        newBehaviorFields.absenceTypeAllowedInTermination
-      )
-    ) {
-      newBehaviorFields.absenceTypeAllowedInTermination =
-        values.absenceTypeAllowedInTermination;
-    }
-
-    if (
-      values.absenceTypeDisplayInHours !== undefined &&
-      !isEqual(
-        values.absenceTypeDisplayInHours,
-        newBehaviorFields.absenceTypeDisplayInHours
-      )
-    ) {
-      newBehaviorFields.absenceTypeDisplayInHours =
-        values.absenceTypeDisplayInHours;
-    }
-
-    if (
-      values.absenceTypeHourlyLeave !== undefined &&
-      !isEqual(
-        values.absenceTypeHourlyLeave,
-        newBehaviorFields.absenceTypeHourlyLeave
-      )
-    ) {
-      newBehaviorFields.absenceTypeHourlyLeave = values.absenceTypeHourlyLeave;
-    }
-
-    if (
-      values.absenceTypeAdminAdjustOnly !== undefined &&
-      !isEqual(
-        values.absenceTypeAdminAdjustOnly,
-        newBehaviorFields.absenceTypeAdminAdjustOnly
-      )
-    ) {
-      newBehaviorFields.absenceTypeAdminAdjustOnly =
-        values.absenceTypeAdminAdjustOnly;
-    }
-
-    if (
-      values.absenceTypeHalfDaysNotAllowed !== undefined &&
-      !isEqual(
-        values.absenceTypeHalfDaysNotAllowed,
-        newBehaviorFields.absenceTypeHalfDaysNotAllowed
-      )
-    ) {
-      newBehaviorFields.absenceTypeHalfDaysNotAllowed =
-        values.absenceTypeHalfDaysNotAllowed;
-    }
-
-    if (
-      values.absenceTypeMinRequest !== undefined &&
-      !isEqual(
-        values.absenceTypeMinRequest,
-        newBehaviorFields.absenceTypeMinRequest
-      )
-    ) {
-      newBehaviorFields.absenceTypeMinRequest = values.absenceTypeMinRequest;
-    }
-
-    if (
-      values.absenceTypeMaxRequest !== undefined &&
-      !isEqual(
-        values.absenceTypeMaxRequest,
-        newBehaviorFields.absenceTypeMaxRequest
-      )
-    ) {
-      newBehaviorFields.absenceTypeMaxRequest = values.absenceTypeMaxRequest;
-    }
-
-    // Log and set updated behavior fields
     console.log(
       `Updated behavior fields after processing: ${JSON.stringify(
         newBehaviorFields
@@ -688,22 +608,21 @@ const AbsenceDetail = ({ route, navigation }) => {
     setBehaviorFields(newBehaviorFields);
 
     // Update reference object and state for non-behavior fields
-    updatedValuesRef.current = {
-      ...updatedValuesRef.current,
-      ...updatedChanges,
-    };
+    updatedValuesRef.current = updatedChanges;
+    setUpdatedValues(updatedChanges);
 
-    setUpdatedValues((prevValues) => ({
-      ...prevValues,
-      ...updatedChanges,
-    }));
+    console.log(
+      `Updated changes after processing (for saving): ${JSON.stringify(
+        updatedChanges
+      )}`
+    );
   };
 
   /**
    * Validates the absence details before saving.
    * Checks if the required fields are provided.
    *
-   * @returns {Object} - Returns an object containing a boolean `isValid` and a boolean `isNegativeBalance`.
+   * @returns {Object} - Returns an object containing a boolean `isValid` and a boolean `isNegativeBalance` if applicable.
    */
   const validateAbsenceOnSave = () => {
     const {
@@ -722,19 +641,19 @@ const AbsenceDetail = ({ route, navigation }) => {
     // Check if the absence type is provided
     if (!absenceType) {
       showToast(t("type_required_message"), "error");
-      return { isValid: false, isNegativeBalance: false };
+      return { isValid: false };
     }
 
     // Check if the absence start date is provided
     if (!absenceStart) {
       showToast(t("start_required_message"), "error");
-      return { isValid: false, isNegativeBalance: false };
+      return { isValid: false };
     }
 
     // Check if the absence end date is provided
     if (!absenceEnd) {
       showToast(t("end_required_message"), "error");
-      return { isValid: false, isNegativeBalance: false };
+      return { isValid: false };
     }
 
     // Check if the start date is greater than the end date
@@ -744,27 +663,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       new Date(absenceStart) > new Date(absenceEnd)
     ) {
       showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
-      return { isValid: false, isNegativeBalance: false };
-    }
-
-    const absenceTypeData = allAbsenceTypes[absenceType] || {};
-
-    // Validate adjustment fields
-    if (absenceAdjustAbsence) {
-      const negativeDays = absenceTypeData["AbsenceType-negativeDays"] || 0;
-      const projectedNextYear =
-        absenceTypeData["AbsenceType-projectedNextYear"] || 0;
-      const absenceTypeName = absenceTypeData["AbsenceType-name"] || "";
-
-      const isValid = validateAbsenceOnSaveWithAdjustment(
-        absencePlannedDays,
-        negativeDays,
-        projectedNextYear,
-        absenceTypeName,
-        t
-      );
-
-      return { isValid, isNegativeBalance: absenceIsNegativeBalance };
+      return { isValid: false };
     }
 
     // Validate if the absence is allowed during probation or notice period
@@ -778,10 +677,80 @@ const AbsenceDetail = ({ route, navigation }) => {
         t
       )
     ) {
-      return { isValid: false, isNegativeBalance: false };
+      return { isValid: false };
+    }
+
+    const absenceTypeData = allAbsenceTypes[absenceType] || {};
+
+    // Validate adjustment fields
+    if (absenceAdjustAbsence) {
+      const negativeDays = absenceTypeData["AbsenceType-negativeDays"] || 0;
+      const projectedNextYear =
+        absenceTypeData["AbsenceType-projectedNextYear"] || 0;
+      const absenceTypeName = absenceTypeData["AbsenceType-name"] || "";
+
+      if (
+        !validateAbsenceOnSaveWithAdjustment(
+          absencePlannedDays,
+          negativeDays,
+          projectedNextYear,
+          absenceTypeName,
+          t
+        )
+      ) {
+        return { isValid: false };
+      }
+    }
+
+    // Validate fixed calendar fields
+    if (absenceTypeFixedCalendar) {
+      if (absenceTypeDisplayInHours || absenceTypeHourlyLeave) {
+        showToast(t("type_holiday_and_hourly_not_allowed"), "error");
+        return { isValid: false };
+      }
+
+      if (!selectedHoliday) {
+        showToast(t("holiday_required_message"), "error");
+        return { isValid: false };
+      }
+    }
+
+    // Check if the time-off request falls on holidays or non-working days
+    if (
+      !isTimeOffOnHoliday(absenceStart, absenceEnd, t, employeeInfo, "error")
+    ) {
+      return { isValid: false };
+    }
+
+    // Find the minimum fraction value from dayFractionOptions
+    const minFraction =
+      Array.isArray(dayFractionOptions) && dayFractionOptions.length > 0
+        ? dayFractionOptions.reduce((min, option) => {
+            const fractionValue = parseFloat(option.value);
+            return fractionValue < min ? fractionValue : min;
+          }, 1)
+        : 1;
+
+    // Validate the duration
+    if (
+      !validateDuration(
+        absencePlannedDays,
+        absenceTypeMinRequest,
+        absenceTypeMaxRequest,
+        absenceTypeHalfDaysNotAllowed,
+        absenceTypeHourlyLeave,
+        absenceTypeDisplayInHours,
+        employeeInfo.dailyStdHours,
+        t,
+        minFraction,
+        true
+      )
+    ) {
+      return { isValid: false };
     }
 
     // Negative balance validation
+    let absenceIsNegativeBalance = false;
     const absenceTypeName = absenceTypeData["AbsenceType-name"] || "";
     const maxNegativeDays = absenceTypeData["AbsenceType-negativeDays"] || 0;
     const isNegativeDaysAllowed = maxNegativeDays > 0;
@@ -802,7 +771,7 @@ const AbsenceDetail = ({ route, navigation }) => {
         t("negative_balance_not_allowed", { absenceTypeName }),
         "error"
       );
-      return false;
+      return { isValid: false };
     }
 
     if (isNegativeDaysAllowed && balance < 0) {
@@ -815,8 +784,9 @@ const AbsenceDetail = ({ route, navigation }) => {
           }),
           "error"
         );
-        return { isValid: false, isNegativeBalance: false };
+        return { isValid: false };
       } else {
+        absenceIsNegativeBalance = true;
         setAbsenceIsNegativeBalance(true);
       }
     }
@@ -857,60 +827,18 @@ const AbsenceDetail = ({ route, navigation }) => {
           }),
           "error"
         );
-        return { isValid: false, isNegativeBalance: false };
-      }
-    }
-
-    // Check if the absence type is fixed calendar and also hourly or display in hours
-    if (absenceTypeFixedCalendar) {
-      if (absenceTypeDisplayInHours || absenceTypeHourlyLeave) {
-        showToast(t("type_holiday_and_hourly_not_allowed"), "error");
-        return { isValid: false, isNegativeBalance: false };
-      }
-
-      if (!selectedHoliday) {
-        showToast(t("holiday_required_message"), "error");
-        return { isValid: false, isNegativeBalance: false };
+        return { isValid: false };
       }
     }
 
     if (absenceTypeHourlyLeave) {
       if (absencePlannedDays < 1) {
         showToast(t("accrue_by_hours_worked_min_duration"), "error");
-        return { isValid: false, isNegativeBalance: false };
-      }
-
-      // Check if the hourly time-off request falls on holidays or non-working days
-      if (
-        !isTimeOffOnHoliday(absenceStart, absenceEnd, t, employeeInfo, "error")
-      ) {
-        return { isValid: false, isNegativeBalance: false };
+        return { isValid: false };
       }
     }
 
-    // Find the minimum fraction value from dayFractionOptions
-    const minFraction =
-      Array.isArray(dayFractionOptions) && dayFractionOptions.length > 0
-        ? dayFractionOptions.reduce((min, option) => {
-            const fractionValue = parseFloat(option.value);
-            return fractionValue < min ? fractionValue : min;
-          }, 1)
-        : 1;
-
-    // Validate the duration
-    const isValid = validateDuration(
-      absencePlannedDays,
-      absenceTypeMinRequest,
-      absenceTypeMaxRequest,
-      absenceTypeHalfDaysNotAllowed,
-      absenceTypeHourlyLeave,
-      absenceTypeDisplayInHours,
-      employeeInfo.dailyStdHours,
-      t,
-      minFraction
-    );
-
-    return { isValid, isNegativeBalance: absenceIsNegativeBalance };
+    return { isValid: true, isNegativeBalance: absenceIsNegativeBalance };
   };
 
   /**
@@ -1123,9 +1051,15 @@ const AbsenceDetail = ({ route, navigation }) => {
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-maxRequest`
             ] || null,
-          negativeDays:
+          absenceTypeNegativeDays:
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-negativeDays`
+            ] || 0,
+          absenceTypeAdjustAfterDays:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-adjustAfterDays`
             ] || 0,
         });
 
@@ -1407,8 +1341,10 @@ const AbsenceDetail = ({ route, navigation }) => {
                       isEditMode={isEditMode}
                       currentStatus={currentStatus}
                       listOfNextStatus={listOfNextStatus}
+                      processTemplate={processTemplate}
                       handleReload={handleReload}
                       loading={loading}
+                      isKPIUpdating={isKPIUpdating}
                       setLoading={setLoading}
                       setIsKPIUpdating={setIsKPIUpdating}
                       onAbsenceDetailChange={handleAbsenceDetailChange}
@@ -1435,9 +1371,6 @@ const AbsenceDetail = ({ route, navigation }) => {
                       }}
                       kpiValues={kpiValues}
                       setKPIValues={setKPIValues}
-                      validateStatusChange={() =>
-                        validateStatusChange(processTemplate, currentStatus)
-                      }
                     />
                   </GestureHandlerRootView>
                 )}
