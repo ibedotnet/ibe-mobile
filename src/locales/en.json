@@ -330,11 +330,13 @@
   "days_of": "days of",
   "could_be_deducted": "could be deducted",
   "non_working_day_start_date_warning": "The selected start date is a non-working day. Please choose another date.",
+  "start_date_invalid_duration_zero": "Since the selected start date is invalid (non-working day), the duration has been set to zero. Please choose a valid working day.",
   "duration_min_value": "The minimum number of days to be applied for time off is {{minValue}} days.",
   "duration_max_value": "The maximum number of days you can apply for time off is {{maxValue}} days.",
   "invalid_duration_value": "Invalid duration value: {{value}}",
   "fraction_not_allowed_error": "Fractional duration is not allowed.",
   "negative_balance_not_allowed": "For {{absenceTypeName}}, negative balance is not allowed",
   "max_negative_balance_exceeded": "For {{absenceTypeName}}, the maximum allowed negative balance is {{maxNegativeDays}}{{durationType}}",
-  "fetching_balance_details": "Fetching balance details"
+  "fetching_balance_details": "Fetching balance details",
+  "user_select_theme": "Select Theme"
 }

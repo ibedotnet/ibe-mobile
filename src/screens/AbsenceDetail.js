@@ -214,7 +214,7 @@ const AbsenceDetail = ({ route, navigation }) => {
    */
   const handleReload = () => {
     const reloadData = () => {
-      fetchAbsenceAndAuxiliaryData();
+      fetchAbsenceAndAuxiliaryData(true);
     };
 
     hasUnsavedChanges() ? showUnsavedChangesAlert(reloadData) : reloadData();
@@ -415,9 +415,6 @@ const AbsenceDetail = ({ route, navigation }) => {
       updatedValuesRef.current = {};
       setUpdatedValues({});
 
-      // Reload the absence data after saving
-      handleReload();
-
       // Force refresh the absence data on the list screen
       updateForceRefresh(true);
 
@@ -433,6 +430,9 @@ const AbsenceDetail = ({ route, navigation }) => {
       if (updateResponse.message) {
         showToast(updateResponse.message);
       }
+
+      // Reload the absence data after saving
+      handleReload();
     } catch (error) {
       // Handle any errors that occur during the update process
       console.error("Error in updateAbsence of AbsenceDetail", error);
@@ -785,10 +785,10 @@ const AbsenceDetail = ({ route, navigation }) => {
           "error"
         );
         return { isValid: false };
-      } else {
-        absenceIsNegativeBalance = true;
-        setAbsenceIsNegativeBalance(true);
       }
+
+      absenceIsNegativeBalance = true;
+      setAbsenceIsNegativeBalance(true);
     }
 
     // Check for overlapping absences
@@ -1095,12 +1095,21 @@ const AbsenceDetail = ({ route, navigation }) => {
    * Fetches the absence data and related auxiliary data (e.g., process templates, absence types, day fractions).
    * This function handles both the "create" and "edit" modes and loads the corresponding absence details first
    * before fetching auxiliary data concurrently.
+   *
+   * * The `forceLoadAbsenceDetail` parameter is added to ensure that `loadAbsenceDetail` is always called,
+   * since when this function is called from `handleReload`, it will always be in "edit" mode.
+   *
+   * @param {boolean} forceLoadAbsenceDetail - Ensures `loadAbsenceDetail` is always called when true,
+   * especially when the function is triggered from `handleReload` in "edit" mode
    */
-  const fetchAbsenceAndAuxiliaryData = async () => {
+  const fetchAbsenceAndAuxiliaryData = async (
+    forceLoadAbsenceDetail = false
+  ) => {
     setLoading(true);
 
     try {
-      if (isEditMode) {
+      if (isEditMode || forceLoadAbsenceDetail) {
+        // If in edit mode or forceLoadAbsenceDetail is true, always load absence detail
         await loadAbsenceDetail();
         if (!employeeIDRef.current) {
           throw new Error("Employee ID not found after loading absence detail");
@@ -1371,6 +1380,7 @@ const AbsenceDetail = ({ route, navigation }) => {
                       }}
                       kpiValues={kpiValues}
                       setKPIValues={setKPIValues}
+                      openedFromApproval={openedFromApproval}
                     />
                   </GestureHandlerRootView>
                 )}

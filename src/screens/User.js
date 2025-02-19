@@ -5,14 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from "react-native";
+import { Alert, ScrollView, Switch, Text, View } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
@@ -32,7 +25,8 @@ import { parseUserComms } from "../utils/UserUtils";
 import { API_ENDPOINTS, APP } from "../constants";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useRequestQueueContext } from "../../context/RequestQueueContext";
-import { useTheme } from "../../context/ThemeContext";
+import { ThemeContext } from "../theme/ThemeContext";
+import { useThemeStyles } from "../theme/useThemeStyles";
 
 /**
  * Component to display and manage user preferences (e.g., language, request queue settings).
@@ -48,19 +42,23 @@ const User = ({ route, navigation }) => {
 
   const { t, i18n } = useTranslation();
 
+  const styles = useThemeStyles().user;
+
   const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
+  const { themeName, updateTheme } = useContext(ThemeContext);
 
   const [initialSelectedLanguage, setInitialSelectedLanguage] = useState(null);
   const [initialIsRequestQueueEnabled, setInitialIsRequestQueueEnabled] =
     useState(false);
+  const [initialSelectedTheme, setInitialSelectedTheme] =
+    useState("Blue-White");
 
   const [selectedLanguage, setSelectedLanguage] = useState(null);
+  const [selectedTheme, setSelectedTheme] = useState(themeName);
 
   // Use the custom hook to access the request queue context
   const { isRequestQueueEnabled, setIsRequestQueueEnabled } =
     useRequestQueueContext(); // Provides access to request queue context for managing request queue feature.
-
-  const { isDarkMode, toggleTheme } = useTheme();
 
   const [changes, setChanges] = useState([]); // Track changes made to user preferences.
 
@@ -69,7 +67,12 @@ const User = ({ route, navigation }) => {
     { label: "English", value: "en" },
     { label: "Spanish", value: "es" },
     { label: "Hindi", value: "hi" },
-    // Add more languages as needed
+  ];
+
+  // Language options for language selection dropdown.
+  const themes = [
+    { label: "Blue-White", value: "Blue-White" },
+    { label: "Yellow-Black", value: "Yellow-Black" },
   ];
 
   // Check if any preferences have been changed.
@@ -107,6 +110,17 @@ const User = ({ route, navigation }) => {
     setSelectedLanguage(language);
 
     updateChangeTracking("language", language, initialSelectedLanguage);
+  };
+
+  /**
+   * Handle theme selection changes and track if there are any modifications.
+   * @param {string} theme - The selected theme.
+   */
+  const handleThemeChange = (theme) => {
+    console.log("Theme changed to:", theme);
+    setSelectedTheme(theme);
+
+    updateChangeTracking("theme", theme, initialSelectedTheme);
   };
 
   /**
@@ -224,7 +238,9 @@ const User = ({ route, navigation }) => {
         "Saving preferences. Selected language:",
         selectedLanguage,
         "Request queue enabled:",
-        isRequestQueueEnabled
+        isRequestQueueEnabled,
+        "Selected theme:",
+        selectedTheme
       );
 
       // Save selected language in AsyncStorage or remove if null.
@@ -245,9 +261,15 @@ const User = ({ route, navigation }) => {
         JSON.stringify(isRequestQueueEnabled)
       );
 
+      // Save selected theme in AsyncStorage.
+      await AsyncStorage.setItem("preferredTheme", selectedTheme);
+
       // Update the initial values after saving.
       setInitialSelectedLanguage(selectedLanguage);
       setInitialIsRequestQueueEnabled(isRequestQueueEnabled);
+      setInitialSelectedTheme(selectedTheme);
+
+      updateTheme(selectedTheme);
 
       // Clear the change tracking state as preferences have been saved.
       setChanges([]);
@@ -260,7 +282,7 @@ const User = ({ route, navigation }) => {
       // Display an alert to the user indicating that saving failed.
       Alert.alert(t("error"), t("save_preferences_failed"));
     }
-  }, [selectedLanguage, isRequestQueueEnabled, changes]);
+  }, [selectedLanguage, isRequestQueueEnabled, selectedTheme, changes]);
 
   /**
    * Calls the logout API to log the user out from the backend.
@@ -329,10 +351,12 @@ const User = ({ route, navigation }) => {
   useEffect(() => {
     const fetchDataFromStorage = async () => {
       try {
-        const [preferredLanguage, isQueueEnabled] = await Promise.all([
-          AsyncStorage.getItem("preferredLanguage"),
-          AsyncStorage.getItem("isRequestQueueEnabled"),
-        ]);
+        const [preferredLanguage, isQueueEnabled, preferredTheme] =
+          await Promise.all([
+            AsyncStorage.getItem("preferredLanguage"),
+            AsyncStorage.getItem("isRequestQueueEnabled"),
+            AsyncStorage.getItem("preferredTheme"),
+          ]);
         if (preferredLanguage) {
           setSelectedLanguage(preferredLanguage);
           setInitialSelectedLanguage(preferredLanguage);
@@ -340,6 +364,10 @@ const User = ({ route, navigation }) => {
         if (isQueueEnabled) {
           setIsRequestQueueEnabled(JSON.parse(isQueueEnabled));
           setInitialIsRequestQueueEnabled(JSON.parse(isQueueEnabled));
+        }
+        if (preferredTheme) {
+          setSelectedTheme(preferredTheme);
+          setInitialSelectedTheme(preferredTheme);
         }
       } catch (error) {
         console.error("Error fetching data from AsyncStorage:", error);
@@ -516,25 +544,16 @@ const User = ({ route, navigation }) => {
               accessibilityState={{ checked: isRequestQueueEnabled }}
             />
           </View>
-          <View style={styles.toggleContainer}>
-            <Text
-              style={styles.toggleLabel}
-              accessibilityLabel="Enable dark mode label"
-              accessibilityRole="text"
-            >
-              {t("enable_dark_mode")}
-            </Text>
-            <Switch
-              trackColor={{ false: "#767577", true: "#005eb8" }}
-              thumbColor={isDarkMode ? "#f5dd4b" : "#f4f3f4"}
-              ios_backgroundColor="#3e3e3e"
-              onValueChange={toggleTheme}
-              value={isDarkMode}
-              accessibilityLabel="Enable dark mode toggle"
-              accessibilityRole="switch"
-              accessibilityState={{ checked: isDarkMode }}
-            />
-          </View>
+          <CustomPicker
+            placeholder={t("user_select_theme")}
+            items={themes}
+            initialValue={selectedTheme}
+            onFilter={handleThemeChange}
+            useModalInIOS={false}
+            accessibilityLabel="Theme picker"
+            accessibilityRole="dropdownlist"
+            testID="theme-picker"
+          />
           <CustomPicker
             placeholder={t("user_select_language")}
             items={languages}
@@ -568,75 +587,5 @@ const User = ({ route, navigation }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#e5eef7",
-  },
-  headerRightContainer: {
-    width: screenDimension.width / 2,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  preferenceContainer: {
-    padding: "4%",
-  },
-  logoutButtonText: {
-    textDecorationLine: "underline",
-    textDecorationColor: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-    color: "#000",
-  },
-  sectionContainer: {
-    marginVertical: "4%",
-    padding: "4%",
-    backgroundColor: "white",
-    borderRadius: 8,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-  },
-  saveButtonContainer: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "2%",
-  },
-  toggleLabel: {
-    fontSize: 16,
-  },
-  userInfoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    fontSize: 16,
-    marginBottom: "2%",
-  },
-  userInfoLabel: {
-    marginRight: 5,
-    fontSize: 16,
-  },
-  userInfo: {
-    fontWeight: "bold",
-  },
-  buttonLabelWhite: {
-    color: "#fff",
-  },
-  note: {
-    fontSize: 12,
-    color: "#00f",
-    marginTop: 10,
-  },
-});
 
 export default User;

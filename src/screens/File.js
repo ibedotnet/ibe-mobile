@@ -34,7 +34,7 @@ import {
   VALID_FILE_EXTENSIONS,
 } from "../constants";
 
-import { common, disableOpacity } from "../styles/common";
+import { disableOpacity, useCommonStyles } from "../styles/common";
 
 const File = ({
   busObjCat,
@@ -44,6 +44,8 @@ const File = ({
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
+
+  const common = useCommonStyles();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

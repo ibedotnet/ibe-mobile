@@ -327,11 +327,13 @@
   "days_of": "días de",
   "could_be_deducted": "podrían ser deducidos",
   "non_working_day_start_date_warning": "La fecha de inicio seleccionada es un día no laborable. Por favor, elija otra fecha.",
+  "start_date_invalid_duration_zero": "Dado que la fecha de inicio seleccionada no es válida (día no laborable), la duración se ha establecido en cero. Por favor, elija un día laborable válido.",
   "duration_min_value": "El número mínimo de días para solicitar tiempo libre es {{minValue}} días.",
   "duration_max_value": "El número máximo de días que puede solicitar es {{maxValue}} días.",
   "invalid_duration_value": "Valor de duración no válido: {{value}}",
   "fraction_not_allowed_error": "No se permite la duración fraccionada.",
   "negative_balance_not_allowed": "Para {{absenceTypeName}}, no se permite saldo negativo",
   "max_negative_balance_exceeded": "Para {{absenceTypeName}}, el saldo negativo máximo permitido es de {{maxNegativeDays}}{{durationType}}",
-  "fetching_balance_details": "Obteniendo detalles del saldo"  
+  "fetching_balance_details": "Obteniendo detalles del saldo",
+  "user_select_theme": "Seleccionar tema"
 }

@@ -27,7 +27,7 @@ import {
   isSmallDevice,
   screenDimension,
 } from "../utils/ScreenUtils";
-import { common } from "../styles/common";
+import { useCommonStyles } from "../styles/common";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 /**
@@ -38,6 +38,9 @@ import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
  */
 const Login = ({ navigation }) => {
   const { t } = useTranslation();
+
+  const common = useCommonStyles();
+
   const { loggedInUserInfo = {}, setLoggedInUserInfo } = useContext(
     LoggedInUserInfoContext
   );

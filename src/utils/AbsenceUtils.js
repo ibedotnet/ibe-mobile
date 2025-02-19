@@ -106,11 +106,14 @@ const calculateDuration = (
     return;
   }
 
-  // Compare only the date part to avoid time differences
-  const startDateString = startDate.toDateString();
-  const endDateString = endDate.toDateString();
+  // Set both startDate and endDate to midnight to compare only the date part
+  const startDateAtMidnight = new Date(startDate);
+  startDateAtMidnight.setHours(0, 0, 0, 0); // Reset time to 00:00:00
 
-  if (startDateString > endDateString) {
+  const endDateAtMidnight = new Date(endDate);
+  endDateAtMidnight.setHours(0, 0, 0, 0); // Reset time to 00:00:00
+
+  if (startDateAtMidnight > endDateAtMidnight) {
     console.error("Start date cannot be after end date.");
     showToast(t("start_date_must_be_less_than_equal_to_end_date"), "error");
     return;
@@ -124,7 +127,7 @@ const calculateDuration = (
     if (!isNonWorkingDay(currentDate, employeeInfo)) {
       if (isFirstDay) {
         // Handle same-day case by taking max of fractions
-        if (startDateString === endDateString) {
+        if (startDateAtMidnight.getTime() === endDateAtMidnight.getTime()) {
           const effectiveEndFraction =
             endDayFraction !== null ? endDayFraction : startDayFraction;
           duration += Math.max(startDayFraction, effectiveEndFraction);
@@ -133,7 +136,9 @@ const calculateDuration = (
           duration += startDayFraction;
           isFirstDay = false;
         }
-      } else if (currentDate.toDateString() === endDateString) {
+      } else if (
+        currentDate.toDateString() === endDateAtMidnight.toDateString()
+      ) {
         duration += endDayFraction !== null ? endDayFraction : 1;
       } else {
         duration++;
@@ -144,8 +149,7 @@ const calculateDuration = (
 
   // Handle case where startDate is a non-working day
   if (duration === 0 && isNonWorkingDay(startDate, employeeInfo)) {
-    showToast(t("non_working_day_start_date_warning"), "error");
-    showToast(t("duration_must_be_positive"), "error");
+    showToast(t("start_date_invalid_duration_zero"), "error");
   }
 
   let adjustedDuration = duration;

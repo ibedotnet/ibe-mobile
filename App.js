@@ -23,7 +23,7 @@ import {
   ExpenseSaveProvider,
   TimesheetSaveProvider,
 } from "./context/SaveContext";
-import { ThemeProvider } from "./context/ThemeContext";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 
 import OfflineView from "./src/components/offline/OfflineView";
 

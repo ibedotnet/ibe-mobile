@@ -55,6 +55,7 @@ import { showToast } from "../utils/MessageUtils";
  * @param {Object} props.absenceDetails - The details of the absence.
  * @param {Object} props.kpiValues - KPI metrics related to the absence.
  * @param {Function} props.setKPIValues - Function to update KPI values.
+ * @param {boolean} props.openedFromApproval - Flag indicating if the absence was opened from the approval screen.
  * @returns {JSX.Element} - The rendered component.
  */
 
@@ -79,6 +80,7 @@ const AbsenceDetailGeneral = ({
   absenceDetails,
   kpiValues,
   setKPIValues,
+  openedFromApproval,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -553,13 +555,13 @@ const AbsenceDetailGeneral = ({
     (value) => {
       console.log("Handling start date change:", value);
 
-      setLocalAbsenceStart(value);
-
       // If the absence has a fixed calendar, exit the function
       if (localAbsenceTypeFixedCalendar) {
         console.log("Skipping further operations due to fixed calendar.");
         return;
       }
+
+      setLocalAbsenceStart(value);
 
       // If the absence is an adjustment, set the end date to the same value as the start date
       if (absenceAdjustAbsence) {
@@ -572,20 +574,22 @@ const AbsenceDetailGeneral = ({
         return;
       }
 
-      // Validate the start date
       const currentDate = new Date();
       const startDate = new Date(value);
       startDate.setHours(0, 0, 0, 0);
       currentDate.setHours(0, 0, 0, 0);
 
+      if (isNonWorkingDay(startDate, employeeInfo)) {
+        handleFieldChange({
+          absenceStartDate: value,
+        });
+        showToast(t("non_working_day_start_date_warning"), "error");
+        return;
+      }
+
       // Show a warning message if the start date is in the past
       if (startDate < currentDate) {
         showToast(t("start_date_in_past_warning"), "warning");
-      }
-
-      if (isNonWorkingDay(startDate, employeeInfo)) {
-        showToast(t("non_working_day_start_date_warning"), "error");
-        return;
       }
 
       // Calculate and update the end date based on the new start date and current duration
@@ -622,14 +626,14 @@ const AbsenceDetailGeneral = ({
     (value) => {
       console.log("Handling end date change:", value);
 
-      setLocalAbsenceEnd(value);
-
       if (absenceAdjustAbsence || localAbsenceTypeFixedCalendar) {
         console.log(
           "Skipping duration calculation due to fixed calendar or absence adjustment."
         );
         return;
       }
+
+      setLocalAbsenceEnd(value);
 
       // Calculate and update the duration based on the new end date and current start date
       if (localAbsenceStart) {
@@ -678,9 +682,6 @@ const AbsenceDetailGeneral = ({
     (value) => {
       console.log("Duration change triggered with value:", value);
 
-      // Update local duration state and notify parent component
-      setLocalDuration(value);
-
       if (absenceAdjustAbsence || localAbsenceTypeFixedCalendar) {
         console.log(
           "Exit: Absence adjustment or fixed calendar type detected."
@@ -688,9 +689,12 @@ const AbsenceDetailGeneral = ({
         return;
       }
 
+      setLocalDuration(value);
+
       const parsedDuration = parseFloat(value);
 
       if (isNaN(parsedDuration) || parsedDuration <= 0) {
+        handleFieldChange({ absenceDuration: value });
         showToast(
           t("invalid_duration_value", {
             value: value || "0",
@@ -919,12 +923,6 @@ const AbsenceDetailGeneral = ({
       false,
       true
     );
-
-    // Notify parent component
-    handleFieldChange({
-      absenceStartDayFraction: null,
-      absenceEndDayFraction: null,
-    });
   }, []);
 
   const toggleAddToBalance = () => {
@@ -1119,13 +1117,6 @@ const AbsenceDetailGeneral = ({
       {/* Conditionally Render the Balance Section */}
       {!absenceAdjustAbsence && !isParentLocked && (
         <View style={styles.kpiContainer}>
-          {isKPIUpdating && (
-            <View styles={styles.fetchUpdateTextContainer}>
-              <Text style={styles.fetchUpdateText}>
-                {t("fetching_balance_details")}...
-              </Text>
-            </View>
-          )}
           {/* Titles for Balance */}
           <View style={styles.titleRow}>
             <View style={styles.titleBox}>
@@ -1179,6 +1170,12 @@ const AbsenceDetailGeneral = ({
             </View>
           </View>
         </View>
+      )}
+
+      {isKPIUpdating && !showAdjustmentFields && (
+        <Text style={styles.fetchUpdateText}>
+          {t("fetching_balance_details")}...
+        </Text>
       )}
 
       {/* Main Scrollable Content */}
@@ -1357,7 +1354,7 @@ const AbsenceDetailGeneral = ({
                   value={localAbsenceStart}
                   isTimePickerVisible={false}
                   showClearButton={false}
-                  isDisabled={isParentLocked}
+                  isDisabled={isParentLocked || !openedFromApproval}
                   onFilter={handleAbsenceStartDateChange}
                   style={{ pickerContainer: styles.pickerContainer }}
                 />
@@ -1377,7 +1374,7 @@ const AbsenceDetailGeneral = ({
                     showClearButton={false}
                     keyboardType="numeric"
                     containerStyle={styles.durationInput}
-                    editable={!isParentLocked}
+                    editable={!isParentLocked && Boolean(openedFromApproval)}
                   />
                   <View style={styles.unitPickerContainer}>
                     <Text style={styles.unitText}>
@@ -1405,7 +1402,7 @@ const AbsenceDetailGeneral = ({
                     ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAddToBalance}
                     value={isAddToBalance}
-                    disabled={isParentLocked}
+                    disabled={isParentLocked || !openedFromApproval}
                   />
                 </View>
               </View>
@@ -1424,7 +1421,7 @@ const AbsenceDetailGeneral = ({
                     ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAdjustTaken}
                     value={adjustTaken}
-                    disabled={isParentLocked}
+                    disabled={isParentLocked || !openedFromApproval}
                   />
                 </View>
               </View>
@@ -1619,14 +1616,11 @@ const styles = StyleSheet.create({
   switchContainer: {
     alignItems: "flex-start",
   },
-  fetchUpdateTextContainer: {
-    height: 100,
-  },
   fetchUpdateText: {
     color: "#005eb8",
     fontWeight: "bold",
     alignSelf: "center",
-    paddingVertical: "4%",
+    paddingVertical: "1%",
   },
 });
 
