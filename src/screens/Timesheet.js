@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { useTranslation } from "react-i18next";
 
 import { format, isValid } from "date-fns";
@@ -61,8 +62,9 @@ const Timesheet = ({ route, navigation }) => {
   const navigationTimeoutRef = useRef(null); // Ref to store the timeout ID
 
   // State variables
-  const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh
+  const [isFetchingMore, setIsFetchingMore] = useState(false); // Infinite scroll loader
+  const [isLoadingInCreate, setIsLoadingInCreate] = useState(false);
   const [error, setError] = useState(null);
   const [timesheets, setTimesheets] = useState([]);
   const [expandedItems, setExpandedItems] = useState({});
@@ -78,8 +80,7 @@ const Timesheet = ({ route, navigation }) => {
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [isModalVisibleInCreate, setModalVisibleInCreate] = useState(false);
-  const [selectedDateInCreate, setSelectedDateInCreate] = useState(new Date()); // Default to today's date
-  const [isLoadingInCreate, setIsLoadingInCreate] = useState(false); // To track if a network call is in progress
+  const [selectedDateInCreate, setSelectedDateInCreate] = useState(new Date());
   const [errorMessageInCreate, setErrorMessageInCreate] = useState(null);
   const [infoMessageInCreate, setInfoMessageInCreate] = useState(null);
 
@@ -126,7 +127,7 @@ const Timesheet = ({ route, navigation }) => {
       return;
     }
 
-    setIsLoadingInCreate(true); // Indicate that network call is in progress
+    setIsLoadingInCreate(true);
 
     try {
       // Make network call to check if timesheet exists for the selected date
@@ -336,7 +337,7 @@ const Timesheet = ({ route, navigation }) => {
       showToast(t("no_more_data"), "warning");
       return;
     }
-    
+
     // Proceed to load more data only if there are no errors
     if (!error) {
       // Call utility function to load more data
@@ -349,11 +350,10 @@ const Timesheet = ({ route, navigation }) => {
         orConditions,
         sortConditions,
         setTimesheets,
-        setIsLoading,
+        setIsFetchingMore,
         setError
       ).finally(() => {
-        // Update page for the next load
-        setPage(page + 1);
+        setPage(page + 1); // Update page for the next load
       });
     }
   }, [
@@ -735,9 +735,10 @@ const Timesheet = ({ route, navigation }) => {
         }}
         onEndReached={handleLoadMoreData}
         onEndReachedThreshold={1}
-        refreshing={isLoading}
         ListFooterComponent={() => {
-          return isLoading ? <Loader /> : null;
+          return isFetchingMore ? (
+            <ActivityIndicator size="small" color="#0000ff" />
+          ) : null;
         }}
         refreshControl={
           <RefreshControl
@@ -825,7 +826,9 @@ const styles = StyleSheet.create({
   firstColumn: {
     flex: 2,
   },
-  firstColumnText: {},
+  firstColumnText: {
+    color: "#2f4F4f",
+  },
   secondColumn: {
     flex: 4,
     color: "#34495e",
@@ -952,10 +955,6 @@ const styles = StyleSheet.create({
   infoMessageInCreate: {
     color: "#00f",
     marginVertical: "8%",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  longPressInfo: {
     fontSize: 16,
     textAlign: "center",
   },

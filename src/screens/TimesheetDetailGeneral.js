@@ -72,7 +72,10 @@ const TimesheetDetailGeneral = ({
 
   console.log(
     `Employee Info Loaded in TimesheetDetailGeneral: `,
-    JSON.stringify(employeeInfo)
+    JSON.stringify({
+      ...employeeInfo,
+      nonWorkingDates: `Array of length ${nonWorkingDates.length}`,
+    })
   );
 
   const dateListRef = useRef(null);
@@ -490,11 +493,6 @@ const TimesheetDetailGeneral = ({
       );
     });
 
-    console.log("updatedDayTotalMap:");
-    updatedDayTotalMap.forEach((value, key) => {
-      console.log(`date: ${key}, total time: ${value / 3600000} h`);
-    });
-
     // Update dayTotalMap state
     setDayTotalMap(new Map(updatedDayTotalMap));
 
@@ -547,6 +545,7 @@ const TimesheetDetailGeneral = ({
           productive,
           end,
           remark,
+          "remark:text": remarkText,
           start,
         } = item;
 
@@ -573,6 +572,7 @@ const TimesheetDetailGeneral = ({
           productive: productive || false,
           actualQuantity: actualQuantity || { quantity: 0, unit: "" },
           remark: remark || [],
+          remarkText: remarkText || "",
           extStatus: extStatus || {},
           statusLabel: itemStatusIDMap?.[extStatus?.statusID] || "",
           timeItemTypeExtId: timeType || "",
@@ -677,12 +677,12 @@ const TimesheetDetailGeneral = ({
           billableTime,
           start: start || normalizeDateToUTC(originalDate),
           end: end || normalizeDateToUTC(originalDate),
-          remark,
-          // TODO: The backend currently only processes remarks in the "en" language.
-          // As a temporary workaround, we are sending the remark using "remark:text".
+          // Temporary workaround to send the remark in "en" language
+          // Backend currently only processes remarks in the "en" language.
           // Once the backend supports multiple languages for remarks,
           // uncomment the full "remark" array and remove the "remark:text" property.
-          //"remark:text": getRemarkText(remark, lang, PREFERRED_LANGUAGES),
+          "remark:text": getRemarkText(remark, lang, PREFERRED_LANGUAGES),
+          // remark
           extStatus,
           statusID: itemStatusIDMap?.[statusLabel] || "",
         });
@@ -851,13 +851,13 @@ const TimesheetDetailGeneral = ({
     if (timesheetItemsMap instanceof Map) {
       // Iterate over the values of the map
       for (let item of timesheetItemsMap.values()) {
-        console.debug(JSON.stringify(item, null, 2));
+        console.log(JSON.stringify(item, null, 2));
 
         // Check if 'item' is an array
         if (Array.isArray(item)) {
           // Iterate through the array and check if any item in the array has isDirty set to true
           for (let subItem of item) {
-            console.debug(subItem.isDirty);
+            console.log(`subItem.isDirty: ${subItem.isDirty}`);
             if (subItem.isDirty) {
               hasUnsavedChanges = true;
               break;
@@ -865,7 +865,7 @@ const TimesheetDetailGeneral = ({
           }
         } else {
           // Handle the case where 'item' is an object (not an array)
-          console.debug(item.isDirty);
+          console.log(`item.isDirty: ${item.isDirty}`);
           if (item.isDirty) {
             hasUnsavedChanges = true;
             break;
@@ -879,7 +879,7 @@ const TimesheetDetailGeneral = ({
       }
     }
 
-    console.debug(hasUnsavedChanges);
+    console.log(`hasUnsavedChanges: ${hasUnsavedChanges}`);
     // If there are unsaved changes, display an alert asking the user whether to proceed or cancel
     if (hasUnsavedChanges) {
       Alert.alert(
@@ -1254,9 +1254,15 @@ const TimesheetDetailGeneral = ({
   };
 
   const handleDeleteItemClick = (item) => {
+    const taskNameWithExtId = item.taskExtId
+      ? `${item.taskText} (${item.taskExtId})`
+      : item.taskText;
+
     Alert.alert(
       t("delete_item"),
-      t("delete_item_confirmation"),
+      t("delete_item_confirmation_with_task", {
+        taskName: taskNameWithExtId || "",
+      }),
       [
         {
           text: "Cancel",
@@ -1275,10 +1281,10 @@ const TimesheetDetailGeneral = ({
       ? [...timesheetItemsMap.get(selectedDateFormatted)]
       : [];
 
-    // Find the index based on either departmentId or taskId
+    // Find the index based on a unique combination of taskId and departmentId
     const index = items.findIndex(
       (item) =>
-        item.taskId === itemToDelete.taskId ||
+        item.taskId === itemToDelete.taskId &&
         item.departmentId === itemToDelete.departmentId
     );
 
@@ -1491,6 +1497,7 @@ const TimesheetDetailGeneral = ({
               <View style={styles.remarkContainer}>
                 <Text numberOfLines={1} ellipsizeMode="tail">
                   {getRemarkText(item.remark, lang, PREFERRED_LANGUAGES) ||
+                    item.remarkText ||
                     `${t("no_remarks_available")}...`}
                 </Text>
               </View>

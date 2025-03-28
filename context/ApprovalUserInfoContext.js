@@ -19,6 +19,8 @@ export const ApprovalUserInfoProvider = ({ children }) => {
     timeConfirmationType: "",
     hireDate: null,
     termDate: null,
+    confirmationDate: null,
+    noticePeriod: null,
     personId: null,
     companyId: null,
     workScheduleExtId: null,

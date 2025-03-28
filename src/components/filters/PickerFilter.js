@@ -27,7 +27,9 @@ const PickerFilter = ({
 
   // Sort pickerOptions by label if available
   const pickerItems = pickerOptions
-    ? [...pickerOptions].sort((a, b) => a.label.localeCompare(b.label))
+    ? [...pickerOptions]
+        .filter((item) => item.label)
+        .sort((a, b) => a.label.localeCompare(b.label))
     : [];
 
   // Effect to clear selected value when clearValue changes

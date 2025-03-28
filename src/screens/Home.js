@@ -1,12 +1,5 @@
-import React, { useCallback, useContext, useEffect, useMemo } from "react"; // React and hooks
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  Alert,
-} from "react-native";
+import React, { useCallback, useEffect, useMemo } from "react"; // React and hooks
+import { View, Text, TouchableOpacity } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -23,11 +16,15 @@ import { useTranslation } from "react-i18next";
 import { fetchAndCacheResource } from "../utils/APIUtils";
 import { screenDimension } from "../utils/ScreenUtils";
 
-import { common } from "../styles/common";
+import { useCommonStyles } from "../styles/common";
 import { useClientPaths } from "../../context/ClientPathsContext";
+import { useThemeStyles } from "../theme/useThemeStyles";
 
 const Home = ({ route, navigation }) => {
   const { t } = useTranslation();
+
+  const styles = useThemeStyles().home;
+  const common = useCommonStyles();
 
   const logoDimension = useMemo(() => screenDimension.width / 2, []);
 
@@ -270,7 +267,6 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity
             onPress={onPressAbsences}
             accessibilityLabel={t("navigate_to_absences")}
-            disabled={true}
           >
             <View style={styles.card}>
               <MaterialCommunityIcons
@@ -307,74 +303,5 @@ const Home = ({ route, navigation }) => {
     </SafeAreaView>
   );
 };
-
-// Styles for the Home screen
-const styles = StyleSheet.create({
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  headerRight: {
-    paddingVertical: 8,
-  },
-  userPhoto: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: "white",
-    marginRight: 12,
-    ...Platform.select({
-      ios: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-      },
-    }),
-  },
-  userName: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-    textDecorationLine: "underline",
-  },
-  logoContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  main: {
-    flex: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  row: {
-    flexDirection: "row",
-    marginBottom: "4%",
-    columnGap: 18,
-  },
-  card: {
-    flex: 1,
-    aspectRatio: 1,
-    maxWidth: screenDimension.width,
-    backgroundColor: "#f0f8ff",
-    padding: "16%",
-    borderWidth: 0.5,
-    borderColor: "#005eb8",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 2,
-  },
-  cardText: {
-    fontWeight: "bold",
-    color: "#000",
-  },
-});
 
 export default Home;

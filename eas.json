@@ -3,6 +3,12 @@
     "version": ">= 7.3.0"
   },
   "build": {
+    "simulator": {
+      "ios": {
+        "distribution": "internal",
+        "simulator": true
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal"

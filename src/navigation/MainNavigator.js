@@ -7,6 +7,7 @@ import Expense from "../screens/Expense";
 import Home from "../screens/Home";
 import Login from "../screens/Login";
 import Timesheet from "../screens/Timesheet";
+import AbsenceDetail from "../screens/AbsenceDetail";
 import TimesheetDetail from "../screens/TimesheetDetail";
 import User from "../screens/User";
 import Approval from "../screens/Approval";
@@ -15,7 +16,7 @@ import Help from "../screens/Help";
 import CustomImagePicker from "../components/CustomImagePicker";
 import Filters from "../components/filters/Filters";
 
-import { common } from "../styles/common";
+import { useThemeStyles } from "../theme/useThemeStyles";
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,8 @@ const Stack = createNativeStackNavigator();
  * It defines all the routes (screens) in the app and how they can be navigated.
  */
 const MainNavigator = () => {
+  const styles = useThemeStyles();
+
   // useEffect hook to log when the MainNavigator component is mounted and unmounted.
   useEffect(() => {
     console.log("MainNavigator mounted");
@@ -59,7 +62,7 @@ const MainNavigator = () => {
           screenOptions sets default options (like header style) for all screens. */}
       <Stack.Navigator
         initialRouteName="Login"
-        screenOptions={{ ...common.header, gestureEnabled: false }} // Applying the common header style to all screens
+        screenOptions={{ ...styles.common.header, gestureEnabled: false }} // Applying the common header style to all screens
       >
         {/* Stack.Screen: Defines each screen in the stack.
             name is the unique name for the route.
@@ -84,6 +87,7 @@ const MainNavigator = () => {
         <Stack.Screen name="TimesheetDetail" component={TimesheetDetail} />
         <Stack.Screen name="Expense" component={Expense} />
         <Stack.Screen name="Absence" component={Absence} />
+        <Stack.Screen name="AbsenceDetail" component={AbsenceDetail} />
         <Stack.Screen name="User" component={User} />
         <Stack.Screen name="Approval" component={Approval} />
 

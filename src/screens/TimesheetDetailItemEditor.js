@@ -26,6 +26,7 @@ import {
 import { getRemarkText, setRemarkText } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 import { fetchData } from "../utils/APIUtils";
+import clientOverrides from "../config/clientOverrides";
 
 const TimesheetDetailItemEditor = ({
   item,
@@ -80,8 +81,8 @@ const TimesheetDetailItemEditor = ({
     useState(false);
 
   const timeUnitOptions = [
-    { label: "Hours", value: "hours" },
-    { label: "Minutes", value: "minutes" },
+    { label: "hour(s)", value: "hours" },
+    { label: "minute(s)", value: "minutes" },
   ];
 
   /**
@@ -1083,6 +1084,13 @@ const TimesheetDetailItemEditor = ({
     }));
   }, [editedItem.billable, editedItem.actualTime]);
 
+  const isBillableDisabled =
+    defaultAsHomeDefault === "*" ||
+    isParentLocked ||
+    // Disable if the client is explicitly listed in overrides and has forceDisableSwitch set to true
+    clientOverrides[parseInt(APP.LOGIN_USER_CLIENT)]?.forceDisableSwitch ===
+      true;
+
   return (
     <Modal
       visible={true}
@@ -1289,11 +1297,17 @@ const TimesheetDetailItemEditor = ({
                 <Text style={styles.modalInputLabel}>{t("billable")}</Text>
                 <Switch
                   trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
-                  thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
+                  thumbColor={
+                    isBillableDisabled
+                      ? "#bcbcbc" // Greyed out when disabled
+                      : editedItem.billable
+                      ? "#ffffff"
+                      : "#a0a0a0"
+                  }
                   ios_backgroundColor="#d3d3d3"
                   value={editedItem.billable}
                   onValueChange={handleBillableChange}
-                  disabled={defaultAsHomeDefault === "*"}
+                  disabled={isBillableDisabled}
                 />
               </View>
             )}

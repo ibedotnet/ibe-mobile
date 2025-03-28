@@ -40,6 +40,7 @@ import {
  * @param {Array} props.listOfNextStatus - List of possible next statuses.
  * @param {Function} props.handleReload - Function to handle reloading of the parent detail screen.
  * @param {boolean} props.loading - Loading state flag.
+ * @param {Function} [props.validate] - Optional validation function to be called before changing status.
  */
 const CustomStatus = ({
   busObjCat,
@@ -52,6 +53,7 @@ const CustomStatus = ({
   listOfNextStatus = [],
   handleReload,
   loading,
+  validate,
 }) => {
   // Check if both currentStatus and listOfNextStatus are empty
   const isEmpty =
@@ -190,6 +192,12 @@ const CustomStatus = ({
    */
   const onClickStatus = async (nextStateId) => {
     try {
+      // Check if validation is required and fails
+      if (validate && typeof validate === "function" && !validate()) {
+        console.warn("Validation failed. Cannot proceed with status change.");
+        return;
+      }
+
       // If the user clicks either on save or one of the next status buttons, it updates the external status
       // using the updateFields API, which internally calls the setDocStatus API.
       // In display mode, since the save functionality is disabled, we have to explicitly call the setDocStatus API directly.
@@ -248,7 +256,11 @@ const CustomStatus = ({
               textDecorationLine: loading ? "none" : "underline",
             }}
             disabled={loading || !isEditMode}
-            style={{ marginRight: 5, paddingHorizontal: "1%", paddingVertical: 0 }}
+            style={{
+              marginRight: 5,
+              paddingHorizontal: "1%",
+              paddingVertical: 0,
+            }}
           />
         ))}
       </View>

@@ -34,7 +34,7 @@ import {
   VALID_FILE_EXTENSIONS,
 } from "../constants";
 
-import { common, disableOpacity } from "../styles/common";
+import { disableOpacity, useCommonStyles } from "../styles/common";
 
 const File = ({
   busObjCat,
@@ -44,6 +44,8 @@ const File = ({
 }) => {
   // Initialize useTranslation hook
   const { t } = useTranslation();
+
+  const common = useCommonStyles();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -907,12 +909,18 @@ const File = ({
           <Text style={common.loadingText}>{t("update_in_progress")}...</Text>
         </View>
       )}
-      <FlatList
-        data={files}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.flatList}
-      />
+      {files.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.noFilesText}>{t("no_files")}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={files}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.flatList}
+        />
+      )}
     </View>
   );
 };
@@ -980,6 +988,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#ccc",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noFilesText: {
+    fontSize: 18,
+    color: "#555",
   },
 });
 
