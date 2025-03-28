@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,10 +23,10 @@ import {
   PREFERRED_LANGUAGES,
   TEST_MODE,
 } from "../constants";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { getRemarkText, setRemarkText } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
 import { fetchData } from "../utils/APIUtils";
+import clientOverrides from "../config/clientOverrides";
 
 const TimesheetDetailItemEditor = ({
   item,
@@ -36,10 +36,18 @@ const TimesheetDetailItemEditor = ({
   onCancel,
   isItemEditMode,
   isParentLocked,
+  employeeInfo,
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
+
+  const { personId } = employeeInfo;
+
+  console.log(
+    `Employee Info Loaded in TimesheetDetailItemEditor: `,
+    JSON.stringify(employeeInfo, null, 2)
+  );
+
   const {
     defaultAsHomeDefault,
     itemCommentRequired,
@@ -73,8 +81,8 @@ const TimesheetDetailItemEditor = ({
     useState(false);
 
   const timeUnitOptions = [
-    { label: "Hours", value: "hours" },
-    { label: "Minutes", value: "minutes" },
+    { label: "hour(s)", value: "hours" },
+    { label: "minute(s)", value: "minutes" },
   ];
 
   /**
@@ -603,7 +611,7 @@ const TimesheetDetailItemEditor = ({
       {
         fieldName: "ProjectWBS-assigned",
         operator: "in",
-        value: loggedInUserInfo.personId,
+        value: personId,
       },
       { fieldName: "ProjectWBS-percentComplete", operator: "!=", value: 100 },
     ],
@@ -686,7 +694,7 @@ const TimesheetDetailItemEditor = ({
           {
             fieldName: "Task-assigned",
             operator: "in",
-            value: loggedInUserInfo.personId,
+            value: personId,
           },
           { fieldName: "Task-allResources", operator: "=", value: true },
         ],
@@ -984,7 +992,7 @@ const TimesheetDetailItemEditor = ({
 
     // Find the resource matching the logged-in person.
     const resource = taskResources?.find(
-      (resource) => resource.personID === loggedInUserInfo.personId
+      (resource) => resource.personID === personId
     );
 
     // Return the billable status of the matched resource, or false if no resource is found.
@@ -1075,6 +1083,13 @@ const TimesheetDetailItemEditor = ({
       billableTime: prevItem.billable ? prevItem.actualTime : 0,
     }));
   }, [editedItem.billable, editedItem.actualTime]);
+
+  const isBillableDisabled =
+    defaultAsHomeDefault === "*" ||
+    isParentLocked ||
+    // Disable if the client is explicitly listed in overrides and has forceDisableSwitch set to true
+    clientOverrides[parseInt(APP.LOGIN_USER_CLIENT)]?.forceDisableSwitch ===
+      true;
 
   return (
     <Modal
@@ -1282,11 +1297,17 @@ const TimesheetDetailItemEditor = ({
                 <Text style={styles.modalInputLabel}>{t("billable")}</Text>
                 <Switch
                   trackColor={{ false: "#d3d3d3", true: "#81b0ff" }}
-                  thumbColor={editedItem.billable ? "#b0b0b0" : "#d3d3d3"}
+                  thumbColor={
+                    isBillableDisabled
+                      ? "#bcbcbc" // Greyed out when disabled
+                      : editedItem.billable
+                      ? "#ffffff"
+                      : "#a0a0a0"
+                  }
                   ios_backgroundColor="#d3d3d3"
                   value={editedItem.billable}
                   onValueChange={handleBillableChange}
-                  disabled={defaultAsHomeDefault === "*"}
+                  disabled={isBillableDisabled}
                 />
               </View>
             )}

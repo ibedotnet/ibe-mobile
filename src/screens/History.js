@@ -28,7 +28,7 @@ import CollapsiblePanel from "../components/CollapsiblePanel";
 import CustomButton from "../components/CustomButton";
 import CustomPicker from "../components/CustomPicker";
 
-import { common, disableOpacity } from "../styles/common";
+import { disableOpacity, useCommonStyles } from "../styles/common";
 
 /**
  * History Component
@@ -44,6 +44,8 @@ import { common, disableOpacity } from "../styles/common";
 
 const History = ({ busObjCat, busObjID }) => {
   const { t } = useTranslation();
+
+  const common = useCommonStyles();
 
   const scrollViewRef = useRef(null); // Ref for ScrollView
 

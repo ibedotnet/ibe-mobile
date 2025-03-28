@@ -535,7 +535,7 @@ const CustomImagePicker = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.imageContainer}>
-        <Image source={imageSource} style={styles.image} resizeMode="contain" />
+        <Image source={imageSource} style={styles.image} contentFit="contain" />
         {hasChanged && (
           <CustomButton
             onPress={onReset}

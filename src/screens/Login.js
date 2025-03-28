@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useTranslation } from "react-i18next";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import Checkbox from "expo-checkbox";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -26,7 +27,7 @@ import {
   isSmallDevice,
   screenDimension,
 } from "../utils/ScreenUtils";
-import { common } from "../styles/common";
+import { useCommonStyles } from "../styles/common";
 import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 
 /**
@@ -37,6 +38,9 @@ import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
  */
 const Login = ({ navigation }) => {
   const { t } = useTranslation();
+
+  const common = useCommonStyles();
+
   const { loggedInUserInfo = {}, setLoggedInUserInfo } = useContext(
     LoggedInUserInfoContext
   );
@@ -53,6 +57,11 @@ const Login = ({ navigation }) => {
 
   const { username, password, clientId, showPassword, rememberMe } = formData;
   const logoWidth = screenDimension.width / 2;
+
+  const version =
+    Constants.expoConfig?.version || // Use this for local development and standalone builds
+    Constants.manifest2?.extra?.expoClient?.version || // Use this for EAS builds
+    "";
 
   /**
    * Updates the formData state with the given name and value.
@@ -223,12 +232,15 @@ const Login = ({ navigation }) => {
     // Create a new object for user info
     const newUserInfo = {
       personId: user["Person-id"] || "",
-      timeConfirmationType: empWorkSchedue.timeConfirmationType || "",
+      userType: user["User-type"] || "",
       hireDate: user["Resource-core-hireDate"] || null,
       termDate: user["Resource-core-termDate"] || null,
+      confirmationDate: user["Resource-core-confirmationDate"] || null,
+      noticePeriod: user["Resource-core-noticePeriod"] || null,
       companyId: user["Resource-companyID"] || "",
       workScheduleExtId: empWorkSchedue.extID || "",
       workScheduleName: empWorkSchedue.name || "",
+      timeConfirmationType: empWorkSchedue.timeConfirmationType || "",
       dailyStdHours: empWorkSchedue.dailyStdHours || 28800000,
       stdWorkHours: empWorkSchedue.stdWorkHours || 28800000,
       minWorkHours: empWorkSchedue.minWorkHours || 28800000,
@@ -238,7 +250,10 @@ const Login = ({ navigation }) => {
       calendarExtId: empWorkCalendar.extID || "",
       nonWorkingDates: empWorkCalendar.nonWorkingDates || [],
       nonWorkingDays: empWorkCalendar.nonWorkingDays || [],
-      startOfWeek: empWorkCalendar.startOfWeek || 1,
+      startOfWeek:
+        empWorkCalendar.startOfWeek !== undefined
+          ? empWorkCalendar.startOfWeek
+          : 1,
     };
 
     // Update context or state with user information
@@ -250,7 +265,7 @@ const Login = ({ navigation }) => {
     // Log the details of the user information without nonWorkingDates
     console.log(
       "Logged in details without nonWorkingDates:",
-      JSON.stringify(userInfoWithoutNonWorkingDates, null, 2)
+      userInfoWithoutNonWorkingDates
     );
   };
 
@@ -427,7 +442,7 @@ const Login = ({ navigation }) => {
       {!isKeyboardVisible && (
         <View style={styles.footer}>
           <Text>
-            {t("login_version_text")} {APP.VERSION}
+            {t("login_version_text")} {version}
           </Text>
         </View>
       )}

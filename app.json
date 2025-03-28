@@ -2,7 +2,7 @@
   "expo": {
     "name": "ibe-mobile",
     "slug": "ibe-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1", // Public-facing version
     "orientation": "portrait",
     "icon": "./src/assets/icons/ibe-icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,19 +11,19 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ibe2023.ibemobile"
+      "bundleIdentifier": "com.ibe2023.ibemobile",
+      "buildNumber": "4" // Internal build number for iOS
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/icons/ibe-adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.ibe2023.ibemobile"
+      "package": "com.ibe2023.ibemobile",
+      "versionCode": 2 // Internal build number for Android
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
@@ -35,9 +35,6 @@
       }
     },
     "owner": "ibe-2023",
-    "plugins": [
-      "expo-localization",
-      "expo-secure-store"
-    ]
+    "plugins": ["expo-localization", "expo-secure-store"]
   }
 }

@@ -156,7 +156,7 @@ const setOrClearLock = async (
     console.log(
       `${
         action === "set" ? "Set" : "Clear"
-      } lock message of TimeConfirmation (${resourceId}): ${msg}`
+      } lock message of ${resourceCategory} (${resourceId}): ${msg}`
     );
   } catch (error) {
     // Handle errors that occur during the operation

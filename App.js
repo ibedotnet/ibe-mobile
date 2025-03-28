@@ -8,6 +8,7 @@ import * as Localization from "expo-localization";
 import i18n from "./src/i18n";
 import MainNavigator from "./src/navigation/MainNavigator";
 
+import { ApprovalUserInfoProvider } from "./context/ApprovalUserInfoContext";
 import { ClientPathsProvider } from "./context/ClientPathsContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
 import { LoggedInUserInfoProvider } from "./context/LoggedInUserInfoContext";
@@ -22,6 +23,7 @@ import {
   ExpenseSaveProvider,
   TimesheetSaveProvider,
 } from "./context/SaveContext";
+import { ThemeProvider } from "./src/theme/ThemeContext";
 
 import OfflineView from "./src/components/offline/OfflineView";
 
@@ -110,35 +112,41 @@ const App = () => {
 const Providers = ({ children }) => (
   <LoggedInUserInfoProvider>
     {/* Provides logged-in user information context */}
-    <ConnectivityProvider>
-      {/* Provides connectivity status context */}
-      <RequestQueueProvider>
-        {/* Manages request queue context */}
-        <TimesheetSaveProvider>
-          {/* Manages the save state related to the Timesheet module */}
-          <ExpenseSaveProvider>
-            {/* Manages the save state related to the Expense module */}
-            <AbsenceSaveProvider>
-              {/* Manages the save state related to the Absence module */}
-              <TimesheetForceRefreshProvider>
-                {/* Provides force refresh context for Timesheet */}
-                <ExpenseForceRefreshProvider>
-                  {/* Provides force refresh context for Expense */}
-                  <AbsenceForceRefreshProvider>
-                    {/* Provides force refresh context for Absence */}
-                    <ClientPathsProvider>
-                      {/* Provides context for managing client paths */}
-                      {children}
-                      {/* Render child components within the context providers */}
-                    </ClientPathsProvider>
-                  </AbsenceForceRefreshProvider>
-                </ExpenseForceRefreshProvider>
-              </TimesheetForceRefreshProvider>
-            </AbsenceSaveProvider>
-          </ExpenseSaveProvider>
-        </TimesheetSaveProvider>
-      </RequestQueueProvider>
-    </ConnectivityProvider>
+    <ApprovalUserInfoProvider>
+      {/* Provides approval-related user information context.*/}
+      <ConnectivityProvider>
+        {/* Provides connectivity status context */}
+        <RequestQueueProvider>
+          {/* Manages request queue context */}
+          <TimesheetSaveProvider>
+            {/* Manages the save state related to the Timesheet module */}
+            <ExpenseSaveProvider>
+              {/* Manages the save state related to the Expense module */}
+              <AbsenceSaveProvider>
+                {/* Manages the save state related to the Absence module */}
+                <TimesheetForceRefreshProvider>
+                  {/* Provides force refresh context for Timesheet */}
+                  <ExpenseForceRefreshProvider>
+                    {/* Provides force refresh context for Expense */}
+                    <AbsenceForceRefreshProvider>
+                      {/* Provides force refresh context for Absence */}
+                      <ClientPathsProvider>
+                        {/* Provides context for managing client paths */}
+                        <ThemeProvider>
+                          {/* Provides theme context */}
+                          {children}
+                          {/* Render child components within the context providers */}
+                        </ThemeProvider>
+                      </ClientPathsProvider>
+                    </AbsenceForceRefreshProvider>
+                  </ExpenseForceRefreshProvider>
+                </TimesheetForceRefreshProvider>
+              </AbsenceSaveProvider>
+            </ExpenseSaveProvider>
+          </TimesheetSaveProvider>
+        </RequestQueueProvider>
+      </ConnectivityProvider>
+    </ApprovalUserInfoProvider>
   </LoggedInUserInfoProvider>
 );
 

@@ -56,7 +56,102 @@ const timesheetFilters = [
     fieldName: "TimeConfirmation-extStatus-processTemplateID",
     fieldValue: "",
   },
-  // Add other filters as needed
+];
+
+/**
+ * Represents the filters available for absences.
+ * Each filter object contains an id, label, type, fieldName, and fieldValue.
+ * - id: Unique identifier for the filter.
+ * - label: Display label for the filter.
+ * - type: Type of the filter (e.g., text, number, date).
+ * - fieldName: Field name corresponding to the filter in the data.
+ * - fieldValue: Field value to filter with.
+ * - units (optional): Array of units for duration type filter (e.g., hours, days).
+ * - convertToMillisecondsEnabled (optional): Boolean indicating whether duration should be converted to milliseconds.
+ */
+const absenceFilters = [
+  {
+    id: "fromDate",
+    label: "start",
+    type: "date",
+    fieldName: "Absence-start",
+    fieldValue: "",
+  },
+  {
+    id: "toDate",
+    label: "end",
+    type: "date",
+    fieldName: "Absence-end",
+    fieldValue: "",
+  },
+  {
+    id: "workflowStatus",
+    label: "status",
+    type: "status",
+    fieldName: "Absence-extStatus-processTemplateID",
+    fieldValue: "",
+  },
+  {
+    id: "absenceType",
+    label: "absence_type",
+    type: "picker",
+    fieldName: "Absence-type",
+    fieldValue: "",
+    option: "absenceTypeOptions",
+  },
+  {
+    id: "adjustments",
+    label: "adjustment",
+    type: "picker",
+    fieldName: "Absence-adjustAbsence",
+    fieldValue: "",
+    option: "booleanOptions",
+  },
+  {
+    id: "reason",
+    label: "reason",
+    type: "text",
+    fieldName: "Absence-remark-text",
+    fieldValue: "",
+  },
+];
+
+/**
+ * Represents the filters available for MessageLog.
+ * Each filter object contains an id, label, type, fieldName, fieldValue, and option.
+ * - id: Unique identifier for the filter.
+ * - label: Display label for the filter.
+ * - type: Type of the filter (e.g., picker, text, number, date, status).
+ * - fieldName: Field name corresponding to the filter in the data.
+ * - fieldValue: Field value to filter with.
+ * - option: The key representing the corresponding options for the filter.
+ *   This will be the property name (e.g., "messageTypeOptions", "documentCategoryOptions", "messageWithinOptions")
+ */
+const messageLogFilters = [
+  {
+    id: "documentCategory",
+    label: "document_category",
+    type: "picker",
+    fieldName: "MessageLog-busObjCat",
+    fieldValue: "",
+    option: "documentCategoryOptions",
+  },
+  {
+    id: "messageType",
+    label: "message_type",
+    type: "picker",
+    fieldName: "MessageLog-type",
+    fieldValue: "",
+    option: "messageTypeOptions",
+  },
+  {
+    id: "messageWithin",
+    label: "message_within",
+    type: "picker",
+    fieldName: "MessageLog-publishedOn",
+    fieldValue: "",
+    option: "messageWithinOptions",
+  },
 ];
 
 /**
@@ -64,6 +159,8 @@ const timesheetFilters = [
  */
 const filtersMap = {
   [BUSOBJCAT.TIMESHEET]: timesheetFilters,
+  [BUSOBJCAT.ABSENCE]: absenceFilters,
+  [BUSOBJCAT.MESSAGELOG]: messageLogFilters,
 };
 
 /**
@@ -93,6 +190,12 @@ const convertFiltersToOrConditions = (
           // Implement duration filter handling if needed
           break;
         case "date":
+          // Implement date filter handling if needed
+          break;
+        case "picker":
+          // Implement date filter handling if needed
+          break;
+        case "boolean":
           // Implement date filter handling if needed
           break;
         case "status":
@@ -138,6 +241,7 @@ const convertFiltersToOrConditions = (
  * Converts applied filters into a where condition suitable for fetching data.
  * @param {Object} appliedFilters - The applied filters object containing key-value pairs of filter ids and values.
  * @param {Array} busObjCatFilter - The array of filter objects defining the filters available for the bus object category.
+ * @param {Array} busObjCat - The array of business object categories.
  * @returns {Array} - The where condition array based on the applied filters.
  */
 const convertFiltersToWhereConditions = (
@@ -201,8 +305,23 @@ const convertFiltersToWhereConditions = (
             }
           }
           break;
-        // Add cases for other types of filters if needed
-
+        case "picker":
+          // For picker filters, add to where condition if the value is an array or a single value
+          const pickerValue = appliedFilters[filterId];
+          if (Array.isArray(pickerValue) && pickerValue.length > 0) {
+            whereConditions.push({
+              fieldName: filter.fieldName,
+              operator: "in", // Use IN operator for arrays
+              value: pickerValue, // Add the array as the value
+            });
+          } else if (pickerValue) {
+            whereConditions.push({
+              fieldName: filter.fieldName,
+              operator: "=",
+              value: pickerValue, // Single string value
+            });
+          }
+          break;
         default:
           break;
       }
@@ -278,6 +397,10 @@ const convertToFilterScreenFormat = (
             break;
           case "status":
             // For status filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
+          case "picker":
+            // For picker filters, directly assign the value
             formattedFilters[key] = appliedFilterValue;
             break;
           default:
@@ -357,6 +480,10 @@ const convertToBusObjCatFormat = (
             break;
           case "status":
             // For status filters, directly assign the value
+            formattedFilters[key] = appliedFilterValue;
+            break;
+          case "picker":
+            // For picker filters, directly assign the selected value
             formattedFilters[key] = appliedFilterValue;
             break;
           default:
@@ -492,6 +619,57 @@ const handleDateFilter = (
 };
 
 /**
+ * Handles changes to a picker filter (dropdown or selector).
+ *
+ * @param {string} filterId - The identifier for the filter.
+ * @param {string|null} value - The selected value for the filter.
+ * @param {Object} initialFilters - The initial set of filters.
+ * @param {Object} appliedFilters - The currently applied filters.
+ * @param {Function} setAppliedFilters - Function to update the applied filters.
+ * @param {Function} setUnsavedChanges - Function to update the unsaved changes state.
+ */
+const handlePickerFilter = (
+  filterId,
+  value,
+  initialFilters,
+  appliedFilters,
+  setAppliedFilters,
+  setUnsavedChanges
+) => {
+  // Ensure appliedFilters is an object
+  const currentAppliedFilters = appliedFilters || {};
+
+  if (value !== null) {
+    // Update the appliedFilters object with the selected value for this filter
+    setAppliedFilters((prevAppliedFilters) => ({
+      ...prevAppliedFilters,
+      [filterId]: value,
+    }));
+  } else {
+    // If value is null, remove the filter from appliedFilters
+    const { [filterId]: omit, ...remainingFilters } = currentAppliedFilters;
+    setAppliedFilters(remainingFilters);
+  }
+
+  // Check if the value has changed by comparing the current value with the initial one
+  const filterChanged = !isEqual(initialFilters[filterId] || {}, value || {});
+
+  // Log the update process
+  console.log(
+    `Inside handlePickerFilter, the initial filters are: ${JSON.stringify(
+      initialFilters
+    )}. The selected value for the filter is: ${JSON.stringify({ value })}. ` +
+      `Has the filter value changed? ${filterChanged}.`
+  );
+
+  // Update unsaved changes state
+  setUnsavedChanges((prevUnsavedChanges) => ({
+    ...prevUnsavedChanges,
+    [filterId]: filterChanged,
+  }));
+};
+
+/**
  * Handles changes to the status filter.
  *
  * @param {string} filterId - The identifier for the filter.
@@ -605,6 +783,7 @@ export {
   filtersMap,
   handleDateFilter,
   handleDurationFilter,
+  handlePickerFilter,
   handleStatusFilter,
   handleTextFilter,
   validateAppliedFilters,

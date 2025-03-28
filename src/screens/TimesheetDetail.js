@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -32,10 +26,11 @@ import History from "./History";
 import {
   fetchBusObjCatData,
   fetchData,
-  getAppName,
+  getAppNameByCategory,
   isDoNotReplaceAnyList,
 } from "../utils/APIUtils";
 import {
+  changeDateToAPIFormat,
   convertToDateFNSFormat,
   getRemarkText,
   isEqual,
@@ -52,8 +47,9 @@ import CustomBackButton from "../components/CustomBackButton";
 import Loader from "../components/Loader";
 
 import { useTimesheetForceRefresh } from "../../context/ForceRefreshContext";
-import { LoggedInUserInfoContext } from "../../context/LoggedInUserInfoContext";
 import { useTimesheetSave } from "../../context/SaveContext";
+import useEmployeeInfo from "../hooks/useEmployeeInfo";
+
 import { format } from "date-fns";
 
 const Tab = createMaterialTopTabNavigator();
@@ -61,8 +57,6 @@ const Tab = createMaterialTopTabNavigator();
 const TimesheetDetail = ({ route, navigation }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-
-  const { loggedInUserInfo } = useContext(LoggedInUserInfoContext);
 
   const { updateForceRefresh } = useTimesheetForceRefresh();
 
@@ -72,6 +66,7 @@ const TimesheetDetail = ({ route, navigation }) => {
 
   const statusTemplateExtId = route?.params?.statusTemplateExtId;
   const selectedDate = route?.params?.selectedDate;
+  const openedFromApproval = route?.params?.openedFromApproval;
 
   const [timesheetId, setTimesheetId] = useState(route?.params?.timesheetId);
   // Determine if the component is in edit mode (if a timesheet ID is provided)
@@ -100,7 +95,6 @@ const TimesheetDetail = ({ route, navigation }) => {
   const [timesheetEmployeeId, setTimesheetEmployeeId] = useState("");
   const [leaveDates, setLeaveDates] = useState([]);
   const [absenceDateHoursMap, setAbsenceDateHoursMap] = useState({});
-
   const [timesheetTypeDetails, setTimesheetTypeDetails] = useState({
     defaultAsHomeDefault: "",
     defaultInputDays: "",
@@ -114,15 +108,33 @@ const TimesheetDetail = ({ route, navigation }) => {
     minTimeIncrement: "",
   });
 
+  // Use custom hook to get the employeeInfo based on openedFromApproval flag
+  const employeeInfo = useEmployeeInfo(openedFromApproval);
+
+  // Destructuring necessary properties from employeeInfo
   const {
-    loggedInUserInfo: {
-      patterns,
-      minWorkHours,
-      maxWorkHours,
-      workHoursInterval,
-      dailyStdHours,
-    },
-  } = useContext(LoggedInUserInfoContext);
+    timeConfirmationType,
+    startOfWeek,
+    workScheduleExtId,
+    companyId,
+    personId,
+    patterns,
+    minWorkHours,
+    maxWorkHours,
+    workHoursInterval,
+    dailyStdHours,
+    nonWorkingDates,
+  } = employeeInfo;
+
+  console.log(
+    `Employee Info Loaded in Timesheet Detail: ${
+      openedFromApproval ? "Approval User Info" : "Logged In User Info"
+    }`,
+    JSON.stringify({
+      ...employeeInfo,
+      nonWorkingDates: `Array of length ${nonWorkingDates.length}`,
+    })
+  );
 
   // Callback function to handle data from child component (timesheet general)
   const handleFindingLeaveDates = (leaveDates, absenceDateHoursMap) => {
@@ -563,6 +575,19 @@ const TimesheetDetail = ({ route, navigation }) => {
 
               // Return the valid period dates for the selected date
               return validPeriodForSelectedDate;
+            } else if (mostRecentPeriod && mostRecentPeriod.validFromDate) {
+              // If no period schedule but validFromDate exists, calculate a weekly period
+              console.log(
+                "No period schedule found, falling back to a weekly interval based on validFromDate."
+              );
+
+              return normalizePeriodToWeek(
+                {
+                  from: selectedDate,
+                  to: selectedDate,
+                },
+                startOfWeek
+              );
             } else {
               // If the most recent period does not exist or does not refer to a valid period schedule id
               console.log(
@@ -572,7 +597,7 @@ const TimesheetDetail = ({ route, navigation }) => {
               return;
             }
           } else {
-            // If no period schedules are found, log a debug message
+            // If no period schedules are found, log a message
             // Default to a weekly interval based on the selected date
 
             console.log(
@@ -584,7 +609,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                 from: selectedDate,
                 to: selectedDate,
               },
-              loggedInUserInfo.startOfWeek
+              startOfWeek
             );
           }
         } else {
@@ -763,7 +788,10 @@ const TimesheetDetail = ({ route, navigation }) => {
       toDate.setDate(toDate.getDate() + 6);
 
       // Return the normalized period
-      return { start: fromDate, end: toDate };
+      return {
+        start: changeDateToAPIFormat(normalizeDateToUTC(fromDate)),
+        end: changeDateToAPIFormat(normalizeDateToUTC(toDate)),
+      };
     }
   };
 
@@ -853,7 +881,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the start date is required
       Alert.alert(
         t("validation_error"), // Title of the alert
-        t("timesheet_start_required_message"), // Message of the alert
+        t("start_required_message"), // Message of the alert
         [{ text: t("ok"), style: "cancel" }], // Button configuration
         { cancelable: false } // Prevents closing the alert by tapping outside
       );
@@ -865,7 +893,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the end date is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_end_required_message"),
+        t("end_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -877,7 +905,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the company ID is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_company_required_message"),
+        t("company_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -889,7 +917,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       // Show an alert indicating that the employee ID is required
       Alert.alert(
         t("validation_error"),
-        t("timesheet_employee_required_message"),
+        t("employee_required_message"),
         [{ text: t("ok"), style: "cancel" }],
         { cancelable: false }
       );
@@ -1022,6 +1050,11 @@ const TimesheetDetail = ({ route, navigation }) => {
 
   const handleSave = async () => {
     try {
+      if (timesheetTasks.length === 0) {
+        showToast(t("timesheet_cannot_be_saved_without_items"), "error");
+        return;
+      }
+
       const isValidTimesheet = validateTimesheetOnSave();
 
       if (isValidTimesheet) {
@@ -1032,15 +1065,23 @@ const TimesheetDetail = ({ route, navigation }) => {
     }
   };
 
+  /**
+   * Updates the timesheet with the provided updated values.
+   * This function sends a request to update the timesheet fields with the new values.
+   * It handles the response, updates the state, and shows appropriate messages based on the result.
+   *
+   * @param {Object} updatedValues - The updated values for the timesheet fields.
+   */
   const updateTimesheet = async (updatedValues = {}) => {
     try {
+      // Prefix the updated values with the timesheet category prefix
       const prefixedUpdatedValues = {};
       for (const key in updatedValues) {
         prefixedUpdatedValues[`${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-${key}`] =
           updatedValues[key];
       }
 
-      // Add the prefixed updated values to the formData
+      // Prepare the form data with the prefixed updated values
       const formData = {
         data: {
           [`${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-id`]: timesheetId,
@@ -1048,6 +1089,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         },
       };
 
+      // Define query string parameters for the update request
       const queryStringParams = {
         userID: APP.LOGIN_USER_ID,
         client: APP.LOGIN_USER_CLIENT,
@@ -1055,45 +1097,66 @@ const TimesheetDetail = ({ route, navigation }) => {
         testMode: TEST_MODE,
         component: "platform",
         doNotReplaceAnyList: isDoNotReplaceAnyList(BUSOBJCAT.TIMESHEET),
-        appName: JSON.stringify(getAppName(BUSOBJCAT.TIMESHEET)),
+        appName: JSON.stringify(getAppNameByCategory(BUSOBJCAT.TIMESHEET)),
       };
 
+      // Send the update request and handle the response
       const updateResponse = await updateFields(formData, queryStringParams);
 
-      // Check if update was successful
-      if (updateResponse.success) {
-        // Extract the new ID from the response
-        const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
-        if (newId) {
-          setTimesheetId(newId); // Update the timesheetId with the new ID
-          setIsEditMode(true);
-        }
-
-        // Clear updatedValuesRef.current and updatedValues state
-        updatedValuesRef.current = {};
-        setUpdatedValues({});
-
-        handleReload(); // Call handleReload after saving
-
-        // force refresh timhseet data on list screen
-        updateForceRefresh(true);
-
-        // Notify that save was clicked
-        notifySave();
-
-        if (lang !== "en") {
-          showToast(t("update_success"));
-        }
-
-        updateForceRefresh(true);
-
-        if (updateResponse.message) {
-          showToast(updateResponse.message);
-        }
-      } else {
+      // If the update response indicates failure, show an error message and exit
+      if (!updateResponse.success) {
         showToast(t("update_failure"), "error");
+        return;
+      }
+
+      // Check if any detail object in the response has success: false
+      const details = updateResponse?.response?.details || [];
+      const hasFailure = details.some((detail) => detail.success === false);
+
+      if (hasFailure) {
+        // Extract and show the first error message from the response
+        const errorMessages = details.flatMap(
+          (detail) =>
+            detail.messages?.filter((msg) => msg.message_type === "error") || []
+        );
+
+        if (errorMessages.length > 0) {
+          // Not showing toast message here as it has been done centrally in fetchData
+          return;
+        }
+      }
+
+      // Extract the new ID from the response and update the timesheetId state
+      const newId = updateResponse.response?.details[0]?.data?.ids?.[0];
+      if (newId) {
+        setTimesheetId(newId);
+        setIsEditMode(true);
+      }
+
+      // Clear the updated values reference and state
+      updatedValuesRef.current = {};
+      setUpdatedValues({});
+
+      // Reload the timesheet data after saving
+      handleReload();
+
+      // Force refresh the timesheet data on the list screen
+      updateForceRefresh(true);
+
+      // Notify that the save action was clicked
+      notifySave();
+
+      // Show a success message if the language is not English
+      if (lang !== "en") {
+        showToast(t("update_success"));
+      }
+
+      // Show the header response message if available
+      if (updateResponse.message) {
+        showToast(updateResponse.message);
       }
     } catch (error) {
+      // Handle any errors that occur during the update process
       console.error("Error in updateTimesheet of TimesheetDetail", error);
       showToast(t("unexpected_error"), "error");
     }
@@ -1259,6 +1322,7 @@ const TimesheetDetail = ({ route, navigation }) => {
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-projectWbsID:ProjectWBS-extID`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID`,
     `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID:Task-text-text`,
+    `${BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]}-tasks-taskID:Task-extID`,
     `${
       BUSOBJCATMAP[BUSOBJCAT.TIMESHEET]
     }-tasks-taskID:Task-quantities-unitTime`,
@@ -1302,13 +1366,13 @@ const TimesheetDetail = ({ route, navigation }) => {
         return;
       }
 
-      if (!loggedInUserInfo.workScheduleExtId) {
+      if (!workScheduleExtId) {
         showToast(t("no_workschedule_assigned"), "error");
         return;
       }
 
       const validPeriodDates = await fetchSelectedDatePeriodFromTimesheetType(
-        loggedInUserInfo.timeConfirmationType
+        timeConfirmationType
       );
 
       if (
@@ -1324,10 +1388,12 @@ const TimesheetDetail = ({ route, navigation }) => {
         return;
       }
 
+      console.debug(validPeriodDates);
+
       if (validPeriodDates) {
         setTimesheetStart(validPeriodDates.start);
         setTimesheetEnd(validPeriodDates.end);
-        setTimesheetCompanyId(loggedInUserInfo.companyId);
+        setTimesheetCompanyId(companyId);
         setTimesheetEmployeeId(APP.LOGIN_USER_EMPLOYEE_ID);
 
         const defaultTimesheetRemark = `Timesheet from ${format(
@@ -1343,16 +1409,16 @@ const TimesheetDetail = ({ route, navigation }) => {
 
         // Set the timesheet type here to ensure all required settings (e.g., start and end dates) are correctly applied,
         // preventing rendering issues or errors from incomplete configuration.
-        setTimesheetType(loggedInUserInfo.timeConfirmationType);
+        setTimesheetType(timeConfirmationType);
 
         const updatedChanges = { ...updatedValues };
 
-        updatedChanges["type"] = loggedInUserInfo.timeConfirmationType;
-        updatedChanges["start"] = normalizeDateToUTC(validPeriodDates.start);
-        updatedChanges["end"] = normalizeDateToUTC(validPeriodDates.end);
-        updatedChanges["busUnitID"] = loggedInUserInfo.companyId;
+        updatedChanges["type"] = timeConfirmationType;
+        updatedChanges["start"] = validPeriodDates.start;
+        updatedChanges["end"] = validPeriodDates.end;
+        updatedChanges["busUnitID"] = companyId;
         updatedChanges["employeeID"] = APP.LOGIN_USER_EMPLOYEE_ID;
-        updatedChanges["responsible"] = loggedInUserInfo.personId;
+        updatedChanges["responsible"] = personId;
         updatedChanges["remark:text"] = defaultTimesheetRemark;
 
         // Update the ref
@@ -1370,7 +1436,7 @@ const TimesheetDetail = ({ route, navigation }) => {
         APP_ACTIVITY_ID.TIMESHEET,
         BUSOBJCATMAP[BUSOBJCAT.TIMESHEET],
         timesheetId,
-        loggedInUserInfo.timeConfirmationType,
+        timeConfirmationType,
         null, // Timesheet extStatus
         setCurrentStatus,
         setListOfNextStatus
@@ -1706,7 +1772,7 @@ const TimesheetDetail = ({ route, navigation }) => {
       ]);
     } catch (error) {
       console.error(
-        "Error in either loading timesheet details or absences: ",
+        "Error in loading timesheet details, absences or process template: ",
         error
       );
     } finally {
@@ -1783,10 +1849,7 @@ const TimesheetDetail = ({ route, navigation }) => {
             size: 24,
           }}
           disabled={
-            loading ||
-            isLocked ||
-            Object.keys(updatedValues).length === 0 ||
-            timesheetTasks.length === 0
+            loading || isLocked || Object.keys(updatedValues).length === 0
           }
         />
       </View>
@@ -1806,7 +1869,7 @@ const TimesheetDetail = ({ route, navigation }) => {
   }, [headerLeft, headerRight, navigation]);
 
   useEffect(() => {
-    if (!loggedInUserInfo.workScheduleExtId) {
+    if (!workScheduleExtId) {
       showToast(t("no_workschedule_assigned"), "error");
       return;
     }
@@ -1883,6 +1946,7 @@ const TimesheetDetail = ({ route, navigation }) => {
                       onTimesheetDetailChange={handleTimesheetDetailChange}
                       OnFindingLeaveDates={handleFindingLeaveDates}
                       timesheetTypeDetails={timesheetTypeDetails}
+                      employeeInfo={employeeInfo}
                       timesheetDetail={{
                         timesheetType,
                         timesheetExtStatus,

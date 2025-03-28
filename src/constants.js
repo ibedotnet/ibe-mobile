@@ -4,7 +4,7 @@
  * @returns {string} - The current environment (e.g., "development", "testing", "production").
  */
 const determineEnvironment = () => {
-  return "testing"; // Default environment for demonstration purposes
+  return "testing";
 };
 
 /**
@@ -28,8 +28,8 @@ const Environment = {
  */
 const BASE_URL = {
   [Environment.DEVELOPMENT]: "http:///172.17.0.117",
-  [Environment.TESTING]: "http://testserver.ibenv.net",
-  [Environment.PRODUCTION]: "http://appnew.ibenv.net",
+  [Environment.TESTING]: "https://testserver.ibenv.net",
+  [Environment.PRODUCTION]: "https://appnew.ibenv.net",
 };
 
 // Determine the current environment
@@ -80,22 +80,11 @@ const API_ENDPOINTS = {
 const API_TIMEOUT = 120000; // 2 minutes
 
 /**
- * Function to dynamically determine the application version.
- * This function could involve reading the version from a file, fetching it from a server, etc.
- * @returns {string} - The application version.
- */
-const getVersion = () => {
-  return "1.0.0"; // Default version for demonstration purposes
-};
-
-/**
  * Object containing application-related constants.
  * @constant
  * @type {Object}
  */
 const APP = {
-  /** The application version. */
-  VERSION: getVersion(),
   /** Client ID of the logged-in user. */
   LOGIN_USER_CLIENT: "",
   /** Date format for the logged-in user. */
@@ -121,7 +110,7 @@ const APP_ACTIVITY_ID = {
   /** Activity ID for absence module. */
   ABSENCE: "manage.absencemgt.myabsencerequest",
   /** Activity ID for inbox module. */
-  INBOX: "platform.bpm.inbox",
+  MESSAGELOG: "platform.bpm.inbox",
 };
 
 /**
@@ -153,7 +142,7 @@ const BUSOBJCAT = {
   /** Business object category for absence. */
   ABSENCE: "Absence",
   /** Business object category for inbox. */
-  INBOX: "Inbox",
+  MESSAGELOG: "Approval",
   /** Business object category for employee. */
   EMPLOYEE: "Employee",
 };
@@ -206,9 +195,9 @@ const INTSTATUS = {
  */
 const LOGIN_INPUTS_MAXLENGTH = {
   /** Maximum length for username field. */
-  USERNAME: 10,
+  USERNAME: 30,
   /** Maximum length for password field. */
-  PASSWORD: 20,
+  PASSWORD: 30,
   /** Maximum length for client ID field. */
   CLIENTID: 4,
 };

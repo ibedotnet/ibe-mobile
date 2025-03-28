@@ -1,5 +1,3 @@
-import { Alert } from "react-native";
-
 import { API_ENDPOINTS } from "../constants";
 
 import { convertToQueryString, fetchData } from "./APIUtils";

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { BUSOBJCATMAP } from "../../constants";
 import DateFilter from "./DateFilter";
 import DurationFilter from "./DurationFilter";
+import PickerFilter from "./PickerFilter";
 import StatusFilter from "./StatusFilter";
 import TextFilter from "./TextFilter";
 
@@ -22,6 +23,7 @@ import {
   filtersMap,
   handleDateFilter,
   handleDurationFilter,
+  handlePickerFilter,
   handleStatusFilter,
   handleTextFilter,
   validateAppliedFilters,
@@ -33,7 +35,12 @@ import CustomBackButton from "../CustomBackButton";
 import CustomButton from "../CustomButton";
 
 const Filters = ({ route, navigation }) => {
-  const { busObjCatFilters, busObjCat, initialFilters } = route.params;
+  const {
+    busObjCatFilters,
+    busObjCat,
+    initialFilters,
+    pickerOptions = {},
+  } = route.params;
 
   // Initialize useTranslation hook
   const { t } = useTranslation();
@@ -212,6 +219,29 @@ const Filters = ({ route, navigation }) => {
             }
             clearValue={clearFilterValue}
             busObjCat={BUSOBJCATMAP[busObjCat]}
+          />
+        );
+      case "picker":
+        // Get the corresponding picker options based on the filter's option field
+        const optionsForPicker = pickerOptions[filter.option] || [];
+
+        return (
+          <PickerFilter
+            key={filter.id}
+            label={translatedLabel}
+            initialValue={appliedFilters[filter.id]} // Pass initial value to pre-populate the filter
+            onFilter={(value) =>
+              handlePickerFilter(
+                filter.id,
+                value,
+                initialFilters,
+                appliedFilters,
+                setAppliedFilters,
+                setUnsavedChanges
+              )
+            }
+            clearValue={clearFilterValue}
+            pickerOptions={optionsForPicker}
           />
         );
       default:

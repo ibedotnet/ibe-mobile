@@ -1,20 +1,20 @@
 import React, { createContext, useState } from "react";
 
-// Creating the context to provide logged-in user information throughout the app
-export const LoggedInUserInfoContext = createContext();
+// Creating the context to provide approval user information throughout the app
+export const ApprovalUserInfoContext = createContext();
 
 /**
- * LoggedInUserInfoProvider component wraps the children components to provide
- * the logged-in user's information context.
+ * ApprovalUserInfoProvider component wraps the children components to provide
+ * the approval user's information context.
  *
  * @param {Object} props - React props
  * @param {React.ReactNode} props.children - Child components that will have access to the context
  *
  * @returns {JSX.Element} The provider component with children wrapped in context
  */
-export const LoggedInUserInfoProvider = ({ children }) => {
-  // State to hold logged-in user information
-  const [loggedInUserInfo, setLoggedInUserInfo] = useState({
+export const ApprovalUserInfoProvider = ({ children }) => {
+  // State to hold approval user information
+  const [approvalUserInfo, setApprovalUserInfo] = useState({
     userType: null,
     timeConfirmationType: "",
     hireDate: null,
@@ -35,13 +35,14 @@ export const LoggedInUserInfoProvider = ({ children }) => {
     maxWorkHours: null,
     workHoursInterval: null,
     patterns: null,
+    // Add more fields as needed for approval users
   });
 
   return (
-    <LoggedInUserInfoContext.Provider
-      value={{ loggedInUserInfo, setLoggedInUserInfo }}
+    <ApprovalUserInfoContext.Provider
+      value={{ approvalUserInfo, setApprovalUserInfo }}
     >
       {children}
-    </LoggedInUserInfoContext.Provider>
+    </ApprovalUserInfoContext.Provider>
   );
 };

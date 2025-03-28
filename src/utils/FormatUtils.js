@@ -305,36 +305,32 @@ const convertToMilliseconds = (number, unit) => {
 };
 
 /**
- * Convert planned leave unit to hours or days based on leave type.
- * @param {number} planned - The planned leave quantity.
- * @param {boolean} isHourly - Indicates whether the leave is hourly.
- * @param {boolean} isDisplayInHours - Indicates whether the leave is hourly.
- * @param {boolean} adjustAbsence - Indicates whether the leave is an adjustment.
- * @returns {Object} - An object with the formatted unit.
+ * Helper function to check if two dates represent the same calendar day.
+ *
+ * This function ensures that both inputs are valid `Date` objects
+ * and avoids runtime errors if invalid values are passed.
+ *
+ * @param {Date} date1 - The first date to compare.
+ * @param {Date} date2 - The second date to compare.
+ * @returns {boolean} - Returns `true` if the dates are the same calendar day, otherwise `false`.
  */
-const formatLeaveDuration = (
-  planned,
-  isHourly = false,
-  isDisplayInHours = false,
-  adjustAbsence = false
-) => {
-  let formattedUnit;
-
-  let displayPlanned = `${planned}`;
-
-  if (isHourly || isDisplayInHours) {
-    formattedUnit = "h";
-  } else {
-    formattedUnit = "d";
+const datesAreForSameDay = (date1, date2) => {
+  // Ensure both inputs are valid Date objects
+  if (
+    !(date1 instanceof Date) ||
+    isNaN(date1) ||
+    !(date2 instanceof Date) ||
+    isNaN(date2)
+  ) {
+    return false;
   }
 
-  displayPlanned = `${displayPlanned} ${formattedUnit}`;
-
-  if (adjustAbsence && planned > 0) {
-    displayPlanned = `+${displayPlanned}`;
-  }
-
-  return displayPlanned;
+  // Compare year, month, and day for equality
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
 };
 
 /**
@@ -470,7 +466,7 @@ const setRemarkText = (remarks = [], language = "en", newText) => {
 };
 
 /**
- * Recursively compares two values for equality, handling arrays, objects, and primitive types.
+ * Recursively compares two values for equality, handling arrays, objects, dates, and primitive types.
  * @param {*} value1 - The first value to compare.
  * @param {*} value2 - The second value to compare.
  * @returns {boolean} True if the values are equal, false otherwise.
@@ -479,6 +475,11 @@ const isEqual = (value1, value2) => {
   // Check for null or undefined values
   if (value1 === null || value2 === null) {
     return value1 === value2;
+  }
+
+  // Check if both values are Date objects
+  if (value1 instanceof Date && value2 instanceof Date) {
+    return value1.getTime() === value2.getTime();
   }
 
   // If both values are arrays
@@ -593,7 +594,7 @@ export {
   convertToDateFNSFormat,
   convertToDateObject,
   convertToMilliseconds,
-  formatLeaveDuration,
+  datesAreForSameDay,
   getRemarkText,
   normalizeDateToUTC,
   setRemarkText,
