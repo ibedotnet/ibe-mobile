@@ -38,6 +38,7 @@ const absenceTypeFields = [
   "AbsenceType-maxRequest",
   "AbsenceType-negativeDays",
   "AbsenceType-adjustAfterDays",
+  "AbsenceType-gender"
 ];
 
 /**
@@ -887,6 +888,7 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     "AbsenceType-maxRequest": absenceTypeMaxRequest = null,
     "AbsenceType-negativeDays": absenceTypeNegativeDays = 0,
     "AbsenceType-adjustAfterDays": absenceTypeAdjustAfterDays = 0,
+    "AbsenceType-gender": absenceTypeGender = "",
   } = absenceTypeRecord;
 
   console.log("Absence Type Record: ", {
@@ -904,6 +906,7 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
     absenceTypeMaxRequest,
     absenceTypeNegativeDays,
     absenceTypeAdjustAfterDays,
+    absenceTypeGender,
   });
 
   // Construct and return the updated absence type details
@@ -923,6 +926,7 @@ const handleAbsenceTypeUpdate = ({ absenceType, allAbsenceTypes }) => {
       absenceTypeMaxRequest,
       absenceTypeNegativeDays,
       absenceTypeAdjustAfterDays,
+      absenceTypeGender,
     },
   };
 };
@@ -1079,7 +1083,7 @@ const isTimeOffOnHoliday = (
   );
 
   if (validDaysCount <= 0) {
-    showToast(t("time_off_holiday_warning"), messageType);
+    showToast(t("time_off_holiday_error"), messageType);
     return false;
   }
   return true;

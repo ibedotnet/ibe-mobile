@@ -233,6 +233,7 @@ const Login = ({ navigation }) => {
     const newUserInfo = {
       personId: user["Person-id"] || "",
       userType: user["User-type"] || "",
+      gender: user["Resource-core-gender"] || null,
       hireDate: user["Resource-core-hireDate"] || null,
       termDate: user["Resource-core-termDate"] || null,
       confirmationDate: user["Resource-core-confirmationDate"] || null,
