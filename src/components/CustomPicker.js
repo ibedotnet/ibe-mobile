@@ -91,16 +91,21 @@ const CustomPicker = ({
   useEffect(() => {
     // If searchTerm is empty, reset filteredItems to the original items
     if (searchTerm.trim() === "") {
-      setFilteredItems(items);
-    } else {
-      // Filter items based on the search term
-      const filtered = items?.filter((item) =>
-        item.label.toLowerCase().includes(searchTerm.toLowerCase())
+      // Sort items alphabetically by label when there is no search term
+      setFilteredItems(
+        [...items].sort((a, b) => a.label.localeCompare(b.label))
       );
+    } else {
+      // Sort filtered items when searching
+      const filtered = items
+        ?.filter((item) =>
+          item.label.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => a.label.localeCompare(b.label));
 
       setFilteredItems(filtered);
     }
-  }, [searchTerm]);
+  }, [searchTerm, items]);
 
   useEffect(() => {
     console.log(
@@ -136,7 +141,7 @@ const CustomPicker = ({
 
     // If a matching item is found, set it as the selected value
     setSelectedValue(selectedItem ? selectedItem.value : initialValue);
-  }, [initialValue]);
+  }, [initialValue, items]);
 
   const toggleModal = () => {
     setModalVisible(!isModalVisible);

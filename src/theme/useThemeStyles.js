@@ -127,7 +127,7 @@ export const useThemeStyles = () => {
       sectionContainer: {
         marginVertical: "4%",
         padding: "4%",
-        backgroundColor: theme.primary,
+        backgroundColor: "#FFFFFF",
         borderRadius: 8,
         elevation: 5,
         shadowOffset: { width: 0, height: 2 },
@@ -168,6 +168,11 @@ export const useThemeStyles = () => {
         fontSize: 12,
         color: "#0000FF",
         marginTop: 10,
+      },
+      pickerLabel: {
+        fontSize: 14,
+        marginBottom: 5,
+        fontWeight: "bold",
       },
     },
   };

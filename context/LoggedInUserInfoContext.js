@@ -18,6 +18,7 @@ export const LoggedInUserInfoProvider = ({ children }) => {
     userType: null,
     timeConfirmationType: "",
     hireDate: null,
+    gender: null,
     termDate: null,
     confirmationDate: null,
     noticePeriod: null,
