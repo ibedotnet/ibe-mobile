@@ -1,12 +1,12 @@
 # Coding Standards – ibe-mobile (React Native, Expo)
 
-## ✨ JavaScript / React Native Style Guide
+## JavaScript / React Native Style Guide
 
 We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascript), with a few custom rules and preferences for React Native.
 
 ---
 
-### ✅ General Rules
+### General Rules
 
 - Use **ES6+** syntax (const/let, arrow functions, destructuring).
 - Prefer `const` over `let` when variables don’t change.
@@ -16,7 +16,7 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 
 ---
 
-### 🧱 Project Structure & Conventions
+### Project Structure & Conventions
 
 - Screens go in `/src/screens/`
 - Components go in `/src/components/`
@@ -25,7 +25,7 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 
 ---
 
-### 🔤 Naming Conventions
+### Naming Conventions
 
 | Entity     | Convention          | Example                  |
 |------------|---------------------|---------------------------|
@@ -38,7 +38,7 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 
 ---
 
-### 🎨 Styling
+### Styling
 
 - Use `StyleSheet.create()` — avoid inline styles.
 - Group style properties logically (layout → color → font).
@@ -46,7 +46,7 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 
 ---
 
-### 🔍 Imports
+### Imports
 
 - Use **absolute imports** with `babel-plugin-module-resolver`.
 - Import order:
