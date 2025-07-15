@@ -62,10 +62,11 @@ import Button from 'components/Button';
 import useAuth from 'hooks/useAuth';
 import { COLORS } from 'constants';
 import styles from './styles';
+```
 
 ---
 
-### 💬 Comments
+### Comments
 
 - Use comments only when necessary.
 - Prefer self-documenting code.
@@ -74,7 +75,7 @@ import styles from './styles';
 
 ---
 
-### 🧪 Testing
+### Testing
 
 - Place tests under `__tests__/` or next to the component.
 - Use `jest` and `@testing-library/react-native`.
@@ -82,15 +83,15 @@ import styles from './styles';
 
 ---
 
-### 🚫 Common Don'ts
+### Common Don'ts
 
-- ❌ No `console.log` in committed code
-- ❌ No commented-out unused code
-- ❌ No hardcoded magic strings or numbers — use constants
+- No `console.log` in committed code
+- No commented-out unused code
+- No hardcoded magic strings or numbers — use constants
 
 ---
 
-## 🔧 Tooling & Automation
+## Tooling & Automation
 
 We enforce code quality using:
 
@@ -108,7 +109,7 @@ These tools are configured in:
 
 ---
 
-## 👥 Contributor Checklist
+## Contributor Checklist
 
 Before creating a pull request:
 
