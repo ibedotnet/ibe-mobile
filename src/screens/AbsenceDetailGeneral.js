@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect} from "react";
 import { ScrollView, StyleSheet, View, Text, Switch } from "react-native";
 
 import { useTranslation } from "react-i18next";
@@ -362,6 +362,11 @@ const AbsenceDetailGeneral = ({
         setter: setLocalAbsenceTypeAdjustAfterDays,
         batchKey: "absenceTypeAdjustAfterDays",
       },
+      {
+        key: "absenceTypeGender",
+        setter: () => {},
+        batchKey: "absenceTypeGender",
+      }
     ];
 
     const batchedChanges = {};
@@ -465,6 +470,20 @@ const AbsenceDetailGeneral = ({
       allAbsenceTypes,
     });
 
+    if (
+        absenceTypeDetails.absenceTypeGender &&
+        employeeInfo.gender &&
+        absenceTypeDetails.absenceTypeGender.toLowerCase() !==
+          employeeInfo.gender.toLowerCase()
+      ) {
+      showToast(
+        t("gender_mismatch_error", {
+          gender: absenceTypeDetails.absenceTypeGender,
+        }),
+        "error"
+      );
+    }
+
     console.log(
       "Absence Type Change: Updated fields after selection of type:",
       {
@@ -497,25 +516,42 @@ const AbsenceDetailGeneral = ({
     );
   }, []);
 
-  const renderHolidayPicker = useCallback(() => {
-    if (!showHoliday || !nonWorkingDates.length) return null;
-
+  /**
+  * Memoized list of holiday options for the current year.
+  * Each item is shaped as { label: "dd/MM/yyyy - Holiday Name", value: "YYYY-MM-DD" }
+  */
+  const holidayOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    const holidayOptions = nonWorkingDates
+
+    return nonWorkingDates
       .filter((date) => new Date(date.date).getFullYear() === currentYear)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .map((date) => ({
-        label: format(new Date(date.date), "dd/MM/yyyy") + " - " + date.name,
+        label: `${format(new Date(date.date), "dd/MM/yyyy")} - ${date.name}`,
         value: date.date,
       }));
+  }, [nonWorkingDates]);
 
-    // Calculate initial value from the start date
-    const initialHolidayValue =
+  /**
+   * Initial selected value based on the absence start date.
+   * Used to pre-select the correct holiday when the picker is rendered.
+   */
+  const initialHolidayValue = useMemo(() => {
+    return (
       holidayOptions.find(
         (option) =>
           new Date(option.value).toDateString() ===
           new Date(localAbsenceStart).toDateString()
-      )?.value || null;
+      )?.value || null
+    );
+  }, [holidayOptions, localAbsenceStart]);
+
+  /**
+   * Renders the holiday picker UI conditionally.
+   * Uses useCallback to avoid unnecessary re-renders.
+  */
+  const renderHolidayPicker = useCallback(() => {
+    if (!showHoliday || !nonWorkingDates.length) return null;
 
     return (
       <View style={styles.detailItem}>
@@ -526,14 +562,23 @@ const AbsenceDetailGeneral = ({
           items={holidayOptions}
           initialValue={initialHolidayValue}
           onFilter={(itemValue) => {
-            const updatedFields = {
-              absenceStartDate: new Date(itemValue),
-              absenceEndDate: new Date(itemValue),
+            const selectedDate = new Date(itemValue);
+
+            const sameStart = selectedDate.toDateString() === new Date(localAbsenceStart).toDateString();
+            const sameEnd = selectedDate.toDateString() === new Date(localAbsenceEnd).toDateString();
+
+            if (sameStart && sameEnd) {
+              return;
+            }
+
+            setLocalAbsenceStart(selectedDate);
+            setLocalAbsenceEnd(selectedDate);
+
+            handleFieldChange({
+              absenceStartDate: selectedDate,
+              absenceEndDate: selectedDate,
               selectedHoliday: itemValue,
-            };
-            setLocalAbsenceStart(new Date(itemValue));
-            setLocalAbsenceEnd(new Date(itemValue));
-            handleFieldChange(updatedFields);
+            });
           }}
           hideSearchInput={true}
           disabled={isParentLocked}
@@ -543,7 +588,7 @@ const AbsenceDetailGeneral = ({
         />
       </View>
     );
-  }, [showHoliday, isParentLocked, nonWorkingDates, handleFieldChange]);
+  }, [showHoliday, isParentLocked, holidayOptions, initialHolidayValue, handleFieldChange, t]);
 
   /**
    * Handles changes to the start date of the absence.
@@ -583,7 +628,7 @@ const AbsenceDetailGeneral = ({
         handleFieldChange({
           absenceStartDate: value,
         });
-        showToast(t("non_working_day_start_date_warning"), "error");
+        showToast(t("non_working_day_start_date_error"), "error");
         return;
       }
 
@@ -634,6 +679,17 @@ const AbsenceDetailGeneral = ({
       }
 
       setLocalAbsenceEnd(value);
+
+      const endDate = new Date(value);
+      endDate.setHours(0, 0, 0, 0);
+
+      if (isNonWorkingDay(endDate, employeeInfo)) {
+        handleFieldChange({
+          absenceEndDate: value,
+        });
+        showToast(t("non_working_day_end_date_error"), "error");
+        return;
+      }
 
       // Calculate and update the duration based on the new end date and current start date
       if (localAbsenceStart) {
@@ -1035,6 +1091,10 @@ const AbsenceDetailGeneral = ({
         setNonWorkingDates(employeeInfo.nonWorkingDates || []);
       }
     };
+
+    if(!localAbsenceType) {
+      return;
+    }
 
     updateNonWorkingDates();
   }, [localAbsenceTypeFixedCalendar, employeeInfo.calendarExtId]);
@@ -1521,7 +1581,7 @@ const styles = StyleSheet.create({
   tileGroup: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "47%", // Slightly less than half for each group
+    width: "47%",
   },
   groupSeparator: {
     width: "4%",

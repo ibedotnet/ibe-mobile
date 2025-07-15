@@ -141,6 +141,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       absenceTypeDetails.absenceTypeHalfDaysNotAllowed || false,
     absenceTypeMinRequest: absenceTypeDetails.absenceTypeMinRequest || null,
     absenceTypeMaxRequest: absenceTypeDetails.absenceTypeMaxRequest || null,
+    absenceTypeGender: absenceTypeDetails.absenceTypeGender || "",
   });
   const [isAddToBalance, setIsAddToBalance] = useState(true);
   const [processTemplate, setProcessTemplate] = useState(null);
@@ -211,10 +212,11 @@ const AbsenceDetail = ({ route, navigation }) => {
    * Handles reloading the absence data.
    * Fetches the latest absence data if there are no unsaved changes.
    * Shows an alert to confirm discarding unsaved changes before fetching data.
+   * @param {string|null} idToReload - The specific ID to reload, bypassing the state.
    */
-  const handleReload = () => {
+  const handleReload = (idToReload = null) => {
     const reloadData = () => {
-      fetchAbsenceAndAuxiliaryData(true);
+      fetchAbsenceAndAuxiliaryData(true, idToReload);
     };
 
     hasUnsavedChanges() ? showUnsavedChangesAlert(reloadData) : reloadData();
@@ -431,8 +433,8 @@ const AbsenceDetail = ({ route, navigation }) => {
         showToast(updateResponse.message);
       }
 
-      // Reload the absence data after saving
-      handleReload();
+      // Reload the absence data after saving, passing the new ID to ensure fresh data is fetched.
+      handleReload(newId || absenceId);
     } catch (error) {
       // Handle any errors that occur during the update process
       console.error("Error in updateAbsence of AbsenceDetail", error);
@@ -589,6 +591,7 @@ const AbsenceDetail = ({ route, navigation }) => {
       "absenceTypeMaxRequest",
       "absenceTypeNegativeDays",
       "absenceTypeAdjustAfterDays",
+      "absenceTypeGender"
     ];
 
     behaviorFieldsKeys.forEach((field) => {
@@ -635,12 +638,25 @@ const AbsenceDetail = ({ route, navigation }) => {
       absenceTypeHalfDaysNotAllowed,
       absenceTypeMinRequest,
       absenceTypeMaxRequest,
+      absenceTypeGender,
       selectedHoliday,
     } = behaviorFields;
 
     // Check if the absence type is provided
     if (!absenceType) {
       showToast(t("type_required_message"), "error");
+      return { isValid: false };
+    }
+
+    if (
+      absenceTypeGender &&
+      employeeInfo.gender &&
+      absenceTypeGender.toLowerCase() !== employeeInfo.gender.toLowerCase()
+    ) {
+      showToast(
+        t("gender_mismatch_error", { gender: absenceTypeGender }),
+        "error"
+      );
       return { isValid: false };
     }
 
@@ -713,6 +729,9 @@ const AbsenceDetail = ({ route, navigation }) => {
         showToast(t("holiday_required_message"), "error");
         return { isValid: false };
       }
+
+      // All validations for fixed calendar absences have passed. Return true to bypass further checks.
+      return { isValid :  true };
     }
 
     // Check if the time-off request falls on holidays or non-working days
@@ -897,9 +916,11 @@ const AbsenceDetail = ({ route, navigation }) => {
 
   /**
    * Loads the details for an existing absence record.
+   * @param {string|null} idToLoad - The specific ID to load, bypassing the state.
    */
-  const loadAbsenceDetail = async () => {
-    if (!absenceId) {
+  const loadAbsenceDetail = async (idToLoad = null) => {
+    const idToFetch = idToLoad || absenceId;
+    if (!idToFetch) {
       return;
     }
 
@@ -910,7 +931,7 @@ const AbsenceDetail = ({ route, navigation }) => {
           {
             fieldName: `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-id`,
             operator: "=",
-            value: absenceId,
+            value: idToFetch,
           },
         ],
       };
@@ -1055,6 +1076,12 @@ const AbsenceDetail = ({ route, navigation }) => {
             data[
               `${BUSOBJCATMAP[BUSOBJCAT.ABSENCE]}-type:AbsenceType-negativeDays`
             ] || 0,
+          absenceTypeGender:
+            data[
+              `${
+                BUSOBJCATMAP[BUSOBJCAT.ABSENCE]
+              }-type:AbsenceType-gender`
+            ] || "",
           absenceTypeAdjustAfterDays:
             data[
               `${
@@ -1067,7 +1094,7 @@ const AbsenceDetail = ({ route, navigation }) => {
           t,
           APP_ACTIVITY_ID.ABSENCE,
           BUSOBJCATMAP[BUSOBJCAT.ABSENCE],
-          absenceId,
+          idToFetch,
           fetchedAbsenceType,
           fetchedAbsenceExtStatus,
           setCurrentStatus,
@@ -1080,7 +1107,7 @@ const AbsenceDetail = ({ route, navigation }) => {
           setOrClearLock(
             "set",
             BUSOBJCATMAP[BUSOBJCAT.ABSENCE],
-            absenceId,
+            idToFetch,
             setIsLocked,
             setLoading
           );
@@ -1100,17 +1127,19 @@ const AbsenceDetail = ({ route, navigation }) => {
    * since when this function is called from `handleReload`, it will always be in "edit" mode.
    *
    * @param {boolean} forceLoadAbsenceDetail - Ensures `loadAbsenceDetail` is always called when true,
+   * @param {string|null} idToLoad - The specific ID to load, bypassing the state.
    * especially when the function is triggered from `handleReload` in "edit" mode
    */
   const fetchAbsenceAndAuxiliaryData = async (
-    forceLoadAbsenceDetail = false
+    forceLoadAbsenceDetail = false,
+    idToLoad = null
   ) => {
     setLoading(true);
 
     try {
       if (isEditMode || forceLoadAbsenceDetail) {
         // If in edit mode or forceLoadAbsenceDetail is true, always load absence detail
-        await loadAbsenceDetail();
+        await loadAbsenceDetail(idToLoad);
         if (!employeeIDRef.current) {
           throw new Error("Employee ID not found after loading absence detail");
         }

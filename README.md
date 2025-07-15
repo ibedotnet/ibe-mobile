@@ -1,5 +1,10 @@
 # IBE Mobile Application
 
+![Expo](https://img.shields.io/badge/Expo-managed-blue)
+![Platform](https://img.shields.io/badge/platform-android%20%7C%20ios-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+
 A comprehensive mobile application built using **React native** for managing employee workflows. The app includes key features such as **timesheet management**, **absence tracking**, **expense reporting**, and **approvals**, providing a streamlined experience for employees and managers alike. Designed with a focus on efficiency and usability, this application enables users to easily submit, monitor, and approve various work-related activities from their mobile devices.
 
 ## Table of Contents
@@ -52,7 +57,7 @@ Before you begin, ensure you have the following tools installed:
 
 - [**Expo**](https://expo.dev/): Framework for building cross-platform applications.
 - [**React Native**](https://reactnative.dev/): Main framework for mobile UI.
-- **Internal APIs**: Used for managing authentication, data, and other functionalities (e.g., `app.ibe.net/endpoint`).
+- **Internal APIs**: Private to the IBE ecosystem. Contact the maintainers for access credentials or mock setup instructions. These APIs handle core functionalities such as authentication, data processing, and workflow integration (e.g., `app.ibe.net/endpoint`).
 
 ## Installation
 1. **Clone the repository**:
@@ -233,10 +238,12 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
 
 ### Contribution Guidelines
 
-- **Style Guide**: Follow best practices and maintain consistency with the existing codebase.
-- **Testing**: Ensure your changes are thoroughly tested before submitting a pull request.
-- **Documentation**: If your change involves a new feature or updates to an existing one, make sure to update or add documentation where necessary.
-- **Branch Naming**: Use meaningful branch names such as `feature/add-login` or `bugfix/fix-timesheet-calculation`.
+Before contributing, please review our [Coding Standards](./docs/coding-standards.md) to ensure consistency across the codebase.
+
+- **Style Guide**: Follow established conventions and write clean, readable code.
+- **Testing**: Thoroughly test your changes and include unit or integration tests where applicable.
+- **Documentation**: Update or add documentation for any new features or changes.
+- **Branch Naming**: Use descriptive branch names like `feature/add-login` or `bugfix/fix-timesheet-total`.
 
 ### Reporting Issues
 
@@ -245,6 +252,11 @@ If you encounter any issues or bugs, feel free to [open an issue](https://github
 - A clear title and description.
 - Steps to reproduce the issue.
 - Any relevant log files or screenshots.
+- 
+## Security
+
+If you discover a security vulnerability in this project, please report it responsibly by contacting the maintainers at [security@ibe.net](mailto:security@ibe.net).  
+Do not open public issues for security-related concerns.
 
 ## License
 

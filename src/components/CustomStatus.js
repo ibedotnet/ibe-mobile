@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import CustomButton from "./CustomButton";
+import EditDialog from "./dialogs/EditDialog";
 
 import {
   fetchData,
@@ -10,6 +12,7 @@ import {
 } from "../utils/APIUtils";
 import { showToast } from "../utils/MessageUtils";
 import updateFields from "../utils/UpdateUtils";
+import { hasContent } from "../utils/ApprovalUtils";
 
 import {
   API_ENDPOINTS,
@@ -55,6 +58,10 @@ const CustomStatus = ({
   loading,
   validate,
 }) => {
+  const { t } = useTranslation();
+  const [isCommentDialogVisible, setIsCommentDialogVisible] = useState(false);
+  const [statusForComment, setStatusForComment] = useState(null);
+
   // Check if both currentStatus and listOfNextStatus are empty
   const isEmpty =
     Object.keys(currentStatus).length === 0 && listOfNextStatus.length === 0;
@@ -90,8 +97,9 @@ const CustomStatus = ({
   /**
    * Updates the document status using the setDocStatus API call.
    * @param {string} nextStateId - The ID of the next status to transition to.
+   * @param {string} [remark=""] - An optional comment for the status change.
    */
-  const updateStatusWithSetDocStatusAPI = async (nextStateId) => {
+  const updateStatusWithSetDocStatusAPI = async (nextStateId, remark = "") => {
     // Prepare payload for API call
     const payload = {
       statusUIData: JSON.stringify({
@@ -108,7 +116,7 @@ const CustomStatus = ({
         openPreviousGateways: null,
         languageID: APP.LOGIN_USER_LANGUAGE,
         extStatus: { statusID: nextStateId },
-        remark: "",
+        remark: remark,
         messageLogID: "",
       }),
     };
@@ -185,16 +193,27 @@ const CustomStatus = ({
   };
 
   /**
-   * Handles the click event for changing the status.
-   * If the external status exists and nextStateId is provided and the parent is not locked,
-   * it updates the external status using the updateFields API; otherwise, it uses the setDocStatus API.
-   * @param {string} nextStateId - The ID of the next status to transition to.
+   * Handles the click event to change the document's status.
+   *
+   * - If the status has an external status (`extStatusID`) and the parent is not locked,
+   *   it updates the external status using the `updateFields` API.
+   * - If no external status is provided, it updates the status using the `setDocStatus` API.
+   * - If a comment is required for the status change, it opens a dialog instead of proceeding directly.
+   *
+   * @param {Object} status - The status object representing the next state to apply.
    */
-  const onClickStatus = async (nextStateId) => {
+
+  const onClickStatus = async (status) => {
     try {
       // Check if validation is required and fails
       if (validate && typeof validate === "function" && !validate()) {
         console.warn("Validation failed. Cannot proceed with status change.");
+        return;
+      }
+
+      if (status.comment) {
+        setStatusForComment(status);
+        setIsCommentDialogVisible(true);
         return;
       }
 
@@ -206,20 +225,43 @@ const CustomStatus = ({
       if (
         busObjExtStatus &&
         busObjExtStatus.hasOwnProperty("statusID") &&
-        nextStateId &&
+        status.extStatusID &&
         !isParentLocked // Not in display mode
       ) {
-        await updateStatusWithUpdateFieldsAPI(nextStateId);
+        await updateStatusWithUpdateFieldsAPI(status.extStatusID);
         return;
       }
 
-      await updateStatusWithSetDocStatusAPI(nextStateId);
+      await updateStatusWithSetDocStatusAPI(status.extStatusID);
     } catch (error) {
       console.error(
-        `Error in onClickStatus in step ${nextStateId}(${busObjId}): `,
+        `Error in onClickStatus in step ${status.extStatusID}(${busObjId}): `,
         error
       );
     }
+  };
+
+  /**
+   * Handles the confirmation of the comment dialog and triggers the status change.
+   * @param {Object} values - The values from the dialog.
+   */
+  const handleCommentDialogConfirm = async (values) => {
+    const comment = values.commentApproval || "";
+    setIsCommentDialogVisible(false);
+    await updateStatusWithSetDocStatusAPI(statusForComment.extStatusID, comment);
+  };
+
+  /**
+   * Validates the comment input.
+   * @param {string} comment - The comment to validate.
+   * @returns {string|null} - Returns `null` if valid, an error message if invalid.
+   */
+  const validateComment = (values) => {
+    const { commentApproval } = values || {};
+    if (commentApproval && hasContent(commentApproval)) {
+      return null;
+    }
+    return t("comment_required");
   };
 
   /**
@@ -245,7 +287,7 @@ const CustomStatus = ({
         {sortedNextStatuses.map((status, index) => (
           <CustomButton
             key={index}
-            onPress={() => onClickStatus(status.extStatusID)}
+            onPress={() => onClickStatus(status)}
             label={status.response}
             icon={{}}
             backgroundColor={false}
@@ -264,6 +306,20 @@ const CustomStatus = ({
           />
         ))}
       </View>
+      <EditDialog
+        isVisible={isCommentDialogVisible}
+        onClose={() => setIsCommentDialogVisible(false)}
+        onConfirm={handleCommentDialogConfirm}
+        title={t("add_comment")}
+        inputsConfigs={[
+          {
+            id: "commentApproval",
+            type: "richText",
+            initialValue: null,
+            validateInput: validateComment,
+          },
+        ]}
+      />
     </View>
   );
 };

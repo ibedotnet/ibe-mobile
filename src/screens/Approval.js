@@ -155,6 +155,7 @@ const Approval = ({ route, navigation }) => {
           userType: employeeDetails["Resource-userID:User-type"] || "",
           timeConfirmationType: employeeDetails.timeConfirmationType || "",
           hireDate: employeeDetails["Resource-core-hireDate"] || null,
+          gender: employeeDetails["Resource-core-gender"] || "",
           termDate: employeeDetails.termDate || null,
           personId: employeeDetails["Resource-personID"] || null,
           companyId: employeeDetails["Resource-companyID"] || null,

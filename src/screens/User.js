@@ -19,7 +19,6 @@ import CustomPicker from "../components/CustomPicker";
 import { fetchData } from "../utils/APIUtils";
 import { convertToDateFNSFormat } from "../utils/FormatUtils";
 import { showToast } from "../utils/MessageUtils";
-import { screenDimension } from "../utils/ScreenUtils";
 import { parseUserComms } from "../utils/UserUtils";
 
 import { API_ENDPOINTS, APP } from "../constants";
@@ -544,22 +543,36 @@ const User = ({ route, navigation }) => {
               accessibilityState={{ checked: isRequestQueueEnabled }}
             />
           </View>
+          <Text
+            style={styles.pickerLabel}
+            accessibilityLabel="Select theme"
+            accessibilityRole="text"
+          >
+            {t("user_select_theme")}
+          </Text>
           <CustomPicker
-            placeholder={t("user_select_theme")}
             items={themes}
             initialValue={selectedTheme}
             onFilter={handleThemeChange}
             useModalInIOS={false}
+            hideSearchInput={true}
             accessibilityLabel="Theme picker"
             accessibilityRole="dropdownlist"
             testID="theme-picker"
           />
+          <Text
+            style={styles.pickerLabel}
+            accessibilityLabel="Select language"
+            accessibilityRole="text"
+          >
+            {t("user_select_language")}
+          </Text>
           <CustomPicker
-            placeholder={t("user_select_language")}
             items={languages}
             initialValue={selectedLanguage}
             onFilter={handleLanguageChange}
             useModalInIOS={false}
+            hideSearchInput={true}
             accessibilityLabel="Language picker"
             accessibilityRole="dropdownlist"
             testID="language-picker"

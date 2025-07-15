@@ -289,6 +289,7 @@ const fetchEmployeeCoreDetails = async (employeeId) => {
       "Resource-companyID",
       "Resource-core-hireDate",
       "Resource-core-termDate",
+      "Resource-core-gender",
       "Resource-timeMgt-workScheduleID",
       "Resource-timeMgt-workScheduleID:WorkSchedule-id",
       "Resource-timeMgt-workScheduleID:WorkSchedule-name",
