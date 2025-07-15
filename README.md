@@ -239,6 +239,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
 ### Contribution Guidelines
 
 Before contributing, please review our [Coding Standards](./docs/coding-standards.md) to ensure consistency across the codebase.
+For details on how we manage branches and releases, see the [Deployment Guidelines](./docs/deployment-guidelines.md).
 
 - **Style Guide**: Follow established conventions and write clean, readable code.
 - **Testing**: Thoroughly test your changes and include unit or integration tests where applicable.
