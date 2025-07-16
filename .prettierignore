@@ -1,0 +1,9 @@
+# Ignore snapshot files – formatting can break Jest snapshots
+**/__snapshots__/*.snap
+
+# Skip test files for now (can be formatted later once tests are stabilized)
+**/__tests__/**
+**/*.test.js
+**/*.test.jsx
+**/*.test.ts
+**/*.test.tsx

@@ -28,25 +28,24 @@ A comprehensive mobile application built using **React native** for managing emp
 ## Prerequisites
 
 Before you begin, ensure you have the following tools installed:
+
 1. **Node.js**: The latest LTS version of Node.js is recommended. Download it from [here](https://nodejs.org/).
-   
 2. **npm or Yarn**: You can use either **npm** (comes with Node.js) or **Yarn** to manage project dependencies.
-   
    - To install Yarn, you can run:
      ```bash
      npm install --global yarn
      ```
-     
+
 3. **Expo CLI**: The Expo command-line interface is required to run the app. Install it globally with:
 
    ```bash
    npm install --global expo-cli
    ```
+
 4. **Expo Go App**: Install the **Expo Go** app on your mobile device to preview the app during development:
-   
    - [iOS](https://apps.apple.com/app/expo-go/id982107779)
    - [Android](https://play.google.com/store/apps/details?id=host.exp.exponent&hl=en&gl=US)
-     
+
 ### Optional (for advanced development):
 
 5. **Android Studio**: If you want to run the app on an Android emulator or need advanced Android development features, you can install Android Studio with the Android SDK.
@@ -60,26 +59,31 @@ Before you begin, ensure you have the following tools installed:
 - **Internal APIs**: Private to the IBE ecosystem. Contact the maintainers for access credentials or mock setup instructions. These APIs handle core functionalities such as authentication, data processing, and workflow integration (e.g., `app.ibe.net/endpoint`).
 
 ## Installation
+
 1. **Clone the repository**:
-   
+
    ```bash
    git clone https://github.com/ibedotnet/ibe-mobile.git
-   
+
+   ```
+
 2. **Navigate into the project directory**:
-   
+
    ```bash
    cd ibe-mobile
-  
+
+   ```
+
 3. **Running the App**
 
    Once the server is running, you can launch the app on:
-   
+
    ```bash
    npx expo start
    ```
 
-  - **iOS**: Scan the QR code with the Expo Go app (available in the App Store).
-  - **Android**: Scan the QR code with the Expo Go app (available in the Google Play Store) or use an Android emulator.
+- **iOS**: Scan the QR code with the Expo Go app (available in the App Store).
+- **Android**: Scan the QR code with the Expo Go app (available in the Google Play Store) or use an Android emulator.
 
 ## Running the App
 
@@ -94,7 +98,7 @@ Once you have the application set up and dependencies installed, you can run the
 
    This command will start the Expo development server, and you will see a QR code in the terminal or in your browser.
 
-2. **Open in Expo Go**:  
+2. **Open in Expo Go**:
    - **iOS**: Open the Expo Go app on your iPhone, and scan the QR code to preview the application.
    - **Android**: Open the Expo Go app on your Android device, or use an Android emulator, and scan the QR code.
 
@@ -107,10 +111,10 @@ Once you have the application set up and dependencies installed, you can run the
 4. **Hot Reloading**:  
    While developing, you can take advantage of hot reloading. If you make changes to your code, the app will automatically reload, allowing you to see updates in real-time without restarting the entire app.
 
-5. **Running on Emulators**:  
+5. **Running on Emulators**:
    - **Android**: If you have Android Studio set up, you can run the app on an emulator directly from the Expo CLI. Select the option for Android emulator from the web interface.
    - **iOS**: If you are on macOS and have Xcode installed, you can run the app in an iOS simulator by selecting the appropriate option in the Expo CLI interface.
-    
+
 ## Building the Application
 
 To build the application for release using Expo, you can use **Expo's build service**.
@@ -118,6 +122,7 @@ To build the application for release using Expo, you can use **Expo's build serv
 ### For iOS:
 
 To build the iOS app, run the following command:
+
 ```bash
 npx expo build:ios
 ```
@@ -165,36 +170,36 @@ ibe-mobile
 
 ### Root Directory
 
-* **tests/**: Contains test files for the project.
-* **.expo/**: Expo project configuration files.
-* **%ProgramData%/**: Windows-specific directory, likely used for storing application data.
-* **android/**: Contains Android-specific project files and resources.
-* **context/**: Possibly used for storing application context or state.
-* **node_modules/**: Stores dependencies and modules required by the project.
-* **src/**: Source code directory for the project.
+- **tests/**: Contains test files for the project.
+- **.expo/**: Expo project configuration files.
+- **%ProgramData%/**: Windows-specific directory, likely used for storing application data.
+- **android/**: Contains Android-specific project files and resources.
+- **context/**: Possibly used for storing application context or state.
+- **node_modules/**: Stores dependencies and modules required by the project.
+- **src/**: Source code directory for the project.
 
 ### src Directory
 
-* **assets/**: Stores static assets like images, fonts, and icons.
-* **components/**: Contains reusable UI components.
-* **hooks/**: Custom React hooks for managing state and side effects.
-* **locales/**: Stores language-specific localization files.
-* **navigation/**: Handles navigation between screens or pages.
-* **screens/**: Contains individual screens or views of the application.
-* **styles/**: Stylesheets for styling the UI elements.
-* **utils/**: Utility functions and helpers used throughout the project.
+- **assets/**: Stores static assets like images, fonts, and icons.
+- **components/**: Contains reusable UI components.
+- **hooks/**: Custom React hooks for managing state and side effects.
+- **locales/**: Stores language-specific localization files.
+- **navigation/**: Handles navigation between screens or pages.
+- **screens/**: Contains individual screens or views of the application.
+- **styles/**: Stylesheets for styling the UI elements.
+- **utils/**: Utility functions and helpers used throughout the project.
 
 ### Project Configuration Files
 
-* **constants.js**: Contains global constants or configuration values.
-* **i18n.js**: Handles internationalization and localization.
-* **.gitignore**: Specifies files or directories to be excluded from Git version control.
-* **App.js**: Main entry point of the React Native application.
-* **app.json**: Expo project configuration file.
-* **babel.config.js**: Babel configuration for transpiling JavaScript code.
-* **eas.json**: Expo build configuration file.
-* **package-lock.json**: Stores dependency versions used in the project.
-* **package.json**: Project metadata and dependency list.
+- **constants.js**: Contains global constants or configuration values.
+- **i18n.js**: Handles internationalization and localization.
+- **.gitignore**: Specifies files or directories to be excluded from Git version control.
+- **App.js**: Main entry point of the React Native application.
+- **app.json**: Expo project configuration file.
+- **babel.config.js**: Babel configuration for transpiling JavaScript code.
+- **eas.json**: Expo build configuration file.
+- **package-lock.json**: Stores dependency versions used in the project.
+- **package.json**: Project metadata and dependency list.
 
 ## Contributing
 
@@ -215,7 +220,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
    ```bash
    git checkout -b feature/your-feature-name
    ```
-   
+
 3. **Make your changes**:
    Implement your changes in the newly created branch. Make sure to test your changes locally before committing.
 
@@ -225,7 +230,7 @@ We welcome contributions to help improve the IBE Mobile Application! Here's how 
    ```bash
    git commit -m "Add your descriptive commit message here"
    ```
-   
+
 5. **Push to GitHub**:
    Push your changes to your GitHub fork:
 
@@ -253,7 +258,8 @@ If you encounter any issues or bugs, feel free to [open an issue](https://github
 - A clear title and description.
 - Steps to reproduce the issue.
 - Any relevant log files or screenshots.
-- 
+-
+
 ## Security
 
 If you discover a security vulnerability in this project, please report it responsibly by contacting the maintainers at [security@ibe.net](mailto:security@ibe.net).  
