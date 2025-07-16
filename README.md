@@ -166,36 +166,46 @@ ibe-mobile
 
 ### Root Directory
 
-- **tests/**: Contains test files for the project.
-- **.expo/**: Expo project configuration files.
-- **%ProgramData%/**: Windows-specific directory, likely used for storing application data.
-- **android/**: Contains Android-specific project files and resources.
-- **context/**: Possibly used for storing application context or state.
-- **node_modules/**: Stores dependencies and modules required by the project.
-- **src/**: Source code directory for the project.
+- **__tests__/**: Contains test files and mocks for unit testing.
+- **android/**: Android native code and Gradle configuration.
+- **context/**: React context providers for managing shared state.
+- **docs/**: Developer guides and documentation.
+- **src/**: Main application source code.
+- **node_modules/**: Auto-generated folder with project dependencies.
+- **.expo/**: Expo-specific configuration files.
+- **%ProgramData%/**: (Unusual) Possibly added by mistake — consider removing.
 
-### src Directory
+---
 
-- **assets/**: Stores static assets like images, fonts, and icons.
-- **components/**: Contains reusable UI components.
-- **hooks/**: Custom React hooks for managing state and side effects.
-- **locales/**: Stores language-specific localization files.
-- **navigation/**: Handles navigation between screens or pages.
-- **screens/**: Contains individual screens or views of the application.
-- **styles/**: Stylesheets for styling the UI elements.
-- **utils/**: Utility functions and helpers used throughout the project.
+### `src/` Directory
 
-### Project Configuration Files
+- **assets/**: Images, icons, fonts, and other static resources.
+- **components/**: Reusable UI components.
+- **hooks/**: Custom React hooks.
+- **locales/**: JSON files for internationalization (i18n).
+- **navigation/**: Screen stack and navigation logic.
+- **screens/**: Core application screens (e.g., Login, Home, Timesheet).
+- **styles/**: Global and shared style definitions.
+- **utils/**: Utility/helper functions.
+- **config/**: Environment or client-specific overrides.
+- **theme/**: Light/dark theme definitions and styling hooks.
 
-- **constants.js**: Contains global constants or configuration values.
-- **i18n.js**: Handles internationalization and localization.
-- **.gitignore**: Specifies files or directories to be excluded from Git version control.
-- **App.js**: Main entry point of the React Native application.
-- **app.json**: Expo project configuration file.
-- **babel.config.js**: Babel configuration for transpiling JavaScript code.
-- **eas.json**: Expo build configuration file.
-- **package-lock.json**: Stores dependency versions used in the project.
-- **package.json**: Project metadata and dependency list.
+---
+
+### Key Source Files
+
+- **App.js**: Entry point of the React Native app.
+- **constants.js**: Global constants used throughout the app.
+- **i18n.js**: Sets up localization using translation files.
+- **babel.config.js**: Babel setup for transpiling the app.
+- **eas.json**: Expo build setup for EAS services.
+- **app.json**: Core app configuration for Expo.
+- **package.json**: Project metadata and dependencies.
+- **package-lock.json**: Locked versions of npm packages.
+- **.gitignore**: Files/folders excluded from Git versioning.
+
+---
+
 
 ## Contributing
 
