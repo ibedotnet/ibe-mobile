@@ -141,29 +141,138 @@ This will generate an APK or AAB file that can be distributed to users or upload
 
 ```
 ibe-mobile
-├── tests
-├── .expo
-├── android
-├── context
-├── node_modules
-└── src
-    ├── assets
-    ├── components
-    ├── hooks
-    ├── locales
-    ├── navigation
-    ├── screens
-    ├── styles
-    └── utils
-        ├── constants.js
-        ├── i18n.js
-        └── .gitignore
+├── %ProgramData%
+│   └── Microsoft
+│       └── Windows
 ├── App.js
+├── README.md
+├── __tests__
+│   ├── App.test.js
+│   ├── Login.test.js
+│   ├── MainNavigator.test.js
+│   ├── User.test.js
+│   ├── __snapshots__
+│   │   ├── Login.test.js.snap
+│   │   └── MainNavigator.test.js.snap
+│   ├── components
+│   ├── config
+│   │   ├── setupTests.js
+│   │   └── testTranslations.js
+│   ├── mock
+│   │   ├── MockLoggedInUserInfoProvider.js
+│   │   ├── MockRequestQueueProvider.js
+│   │   └── mockNavigation.js
+│   └── utils
+├── android
+│   ├── app
+│   │   ├── build.gradle
+│   │   ├── debug.keystore
+│   │   ├── proguard-rules.pro
+│   │   └── src
+│   ├── build.gradle
+│   ├── gradle
+│   │   └── wrapper
+│   ├── gradle.properties
+│   ├── gradlew
+│   ├── gradlew.bat
+│   └── settings.gradle
 ├── app.json
 ├── babel.config.js
+├── context
+│   ├── ApprovalUserInfoContext.js
+│   ├── ClientPathsContext.js
+│   ├── ConnectivityContext.js
+│   ├── ForceRefreshContext.js
+│   ├── LoggedInUserInfoContext.js
+│   ├── RequestQueueContext.js
+│   └── SaveContext.js
+├── docs
+│   ├── coding-standards.md
+│   └── deployment-guidelines.md
 ├── eas.json
+├── eslint.config.js
 ├── package-lock.json
-└── package.json
+├── package.json
+├── src
+│   ├── assets
+│   │   ├── adaptive-icon.png
+│   │   ├── favicon.png
+│   │   ├── fonts
+│   │   ├── icon.png
+│   │   ├── icons
+│   │   ├── images
+│   │   ├── sounds
+│   │   └── splash.png
+│   ├── components
+│   │   ├── CollapsiblePanel.js
+│   │   ├── CustomBackButton.js
+│   │   ├── CustomButton.js
+│   │   ├── CustomDateTimePicker.js
+│   │   ├── CustomHeader.js
+│   │   ├── CustomImagePicker.js
+│   │   ├── CustomPicker.js
+│   │   ├── CustomRemotePicker.js
+│   │   ├── CustomStatus.js
+│   │   ├── CustomTextInput.js
+│   │   ├── CustomToast.js
+│   │   ├── Loader.js
+│   │   ├── SaveCancelBar.js
+│   │   ├── dialogs
+│   │   ├── filters
+│   │   └── offline
+│   ├── config
+│   │   └── clientOverrides.js
+│   ├── constants.js
+│   ├── hooks
+│   │   └── useEmployeeInfo.js
+│   ├── i18n
+│   ├── i18n.js
+│   ├── locales
+│   │   ├── en.json
+│   │   ├── es.json
+│   │   └── hi.json
+│   ├── navigation
+│   │   └── MainNavigator.js
+│   ├── screens
+│   │   ├── Absence.js
+│   │   ├── AbsenceDetail.js
+│   │   ├── AbsenceDetailGeneral.js
+│   │   ├── Approval.js
+│   │   ├── Comment.js
+│   │   ├── Expense.js
+│   │   ├── File.js
+│   │   ├── Header.js
+│   │   ├── Help.js
+│   │   ├── History.js
+│   │   ├── Home.js
+│   │   ├── Login.js
+│   │   ├── Timesheet.js
+│   │   ├── TimesheetDetail.js
+│   │   ├── TimesheetDetailGeneral.js
+│   │   ├── TimesheetDetailItemEditor.js
+│   │   └── User.js
+│   ├── styles
+│   │   └── common.js
+│   ├── theme
+│   │   ├── ThemeContext.js
+│   │   ├── themes.js
+│   │   └── useThemeStyles.js
+│   └── utils
+│       ├── APIUtils.js
+│       ├── AbsenceUtils.js
+│       ├── ApprovalUtils.js
+│       ├── FileUtils.js
+│       ├── FilterUtils.js
+│       ├── FormatUtils.js
+│       ├── LockUtils.js
+│       ├── MessageUtils.js
+│       ├── OfflineUtils.js
+│       ├── ScreenUtils.js
+│       ├── TimesheetUtils.js
+│       ├── UpdateUtils.js
+│       ├── UserUtils.js
+│       └── WorkflowUtils.js
+└── structure.txt
 ```
 
 ### Project Directory: ibe-mobile
