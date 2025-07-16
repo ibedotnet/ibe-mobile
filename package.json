@@ -92,7 +92,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "eslint",
-      "prettier --write --ignore-path .prettierignore"
+      "prettier --check --ignore-path .prettierignore"
     ]
   },
   "private": true

@@ -336,7 +336,7 @@ const Login = ({ navigation }) => {
         try {
           await SecureStore.setItemAsync("username", username);
           await SecureStore.setItemAsync("clientId", clientId);
-          await SecureStore.setItemAsync("password", password)
+          await SecureStore.setItemAsync("password", password);
         } catch (error) {
           console.error("Error storing credentials:", error);
         }

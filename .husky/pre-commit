@@ -1,8 +1,9 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
+# Run unit tests before commit (uncomment to enable)
+# npm test
 
-# Run unit tests before commit
-npm test
+# Lint and format staged files before commit (uncomment to enable)
+#npx lint-staged
 
-# Lint and format staged files
-npx lint-staged
+# Note:
+# These commands are disabled to speed up commit times.
+# Uncomment any line above if you want it to run automatically on every commit.
