@@ -292,6 +292,11 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "ExpenseClaim-amountBU",
           "ExpenseClaim-date",
           "ExpenseClaim-extStatus-processTemplateID:ProcessTemplate-steps",
+          "ExpenseClaim-busUnitID:BusUnit-id",
+          "ExpenseClaim-busUnitID:BusUnit-name",
+          "ExpenseClaim-busUnitID:BusUnit-name-text",
+          "ExpenseClaim-extStatus-processTemplateID",
+          "ExpenseClaim-extStatus-statusID",
           ...extraFields,
         ],
         where: [

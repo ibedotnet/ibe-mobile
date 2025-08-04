@@ -27,6 +27,10 @@ const changeDateToAPIFormat = (date) => {
 const convertAmountToDisplayFormat = (amountObj) => {
   const { amount, currency } = amountObj;
 
+  if (!currency) {
+    return "-Nil-";
+  }
+
   const formattedAmount = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
