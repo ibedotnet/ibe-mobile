@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect} from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { ScrollView, StyleSheet, View, Text, Switch } from "react-native";
 
 import { useTranslation } from "react-i18next";
@@ -366,7 +366,7 @@ const AbsenceDetailGeneral = ({
         key: "absenceTypeGender",
         setter: () => {},
         batchKey: "absenceTypeGender",
-      }
+      },
     ];
 
     const batchedChanges = {};
@@ -471,11 +471,11 @@ const AbsenceDetailGeneral = ({
     });
 
     if (
-        absenceTypeDetails.absenceTypeGender &&
-        employeeInfo.gender &&
-        absenceTypeDetails.absenceTypeGender.toLowerCase() !==
-          employeeInfo.gender.toLowerCase()
-      ) {
+      absenceTypeDetails.absenceTypeGender &&
+      employeeInfo.gender &&
+      absenceTypeDetails.absenceTypeGender.toLowerCase() !==
+        employeeInfo.gender.toLowerCase()
+    ) {
       showToast(
         t("gender_mismatch_error", {
           gender: absenceTypeDetails.absenceTypeGender,
@@ -517,9 +517,9 @@ const AbsenceDetailGeneral = ({
   }, []);
 
   /**
-  * Memoized list of holiday options for the current year.
-  * Each item is shaped as { label: "dd/MM/yyyy - Holiday Name", value: "YYYY-MM-DD" }
-  */
+   * Memoized list of holiday options for the current year.
+   * Each item is shaped as { label: "dd/MM/yyyy - Holiday Name", value: "YYYY-MM-DD" }
+   */
   const holidayOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
 
@@ -549,7 +549,7 @@ const AbsenceDetailGeneral = ({
   /**
    * Renders the holiday picker UI conditionally.
    * Uses useCallback to avoid unnecessary re-renders.
-  */
+   */
   const renderHolidayPicker = useCallback(() => {
     if (!showHoliday || !nonWorkingDates.length) return null;
 
@@ -564,8 +564,12 @@ const AbsenceDetailGeneral = ({
           onFilter={(itemValue) => {
             const selectedDate = new Date(itemValue);
 
-            const sameStart = selectedDate.toDateString() === new Date(localAbsenceStart).toDateString();
-            const sameEnd = selectedDate.toDateString() === new Date(localAbsenceEnd).toDateString();
+            const sameStart =
+              selectedDate.toDateString() ===
+              new Date(localAbsenceStart).toDateString();
+            const sameEnd =
+              selectedDate.toDateString() ===
+              new Date(localAbsenceEnd).toDateString();
 
             if (sameStart && sameEnd) {
               return;
@@ -588,7 +592,14 @@ const AbsenceDetailGeneral = ({
         />
       </View>
     );
-  }, [showHoliday, isParentLocked, holidayOptions, initialHolidayValue, handleFieldChange, t]);
+  }, [
+    showHoliday,
+    isParentLocked,
+    holidayOptions,
+    initialHolidayValue,
+    handleFieldChange,
+    t,
+  ]);
 
   /**
    * Handles changes to the start date of the absence.
@@ -1092,7 +1103,7 @@ const AbsenceDetailGeneral = ({
       }
     };
 
-    if(!localAbsenceType) {
+    if (!localAbsenceType) {
       return;
     }
 
@@ -1159,7 +1170,8 @@ const AbsenceDetailGeneral = ({
                   processTemplate,
                   currentStatus,
                   localAbsenceTypeAdjustAfterDays,
-                  localAbsenceEnd
+                  localAbsenceEnd,
+                  t
                 )
               }
             />
@@ -1456,8 +1468,8 @@ const AbsenceDetailGeneral = ({
                       isParentLocked
                         ? "#bcbcbc" // Greyed out when disabled
                         : isAddToBalance
-                        ? "#ffffff"
-                        : "#a0a0a0"
+                          ? "#ffffff"
+                          : "#a0a0a0"
                     }
                     ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAddToBalance}
@@ -1475,8 +1487,8 @@ const AbsenceDetailGeneral = ({
                       isParentLocked
                         ? "#bcbcbc" // Greyed out when disabled
                         : isAddToBalance
-                        ? "#ffffff"
-                        : "#a0a0a0"
+                          ? "#ffffff"
+                          : "#a0a0a0"
                     }
                     ios_backgroundColor="#d3d3d3"
                     onValueChange={toggleAdjustTaken}

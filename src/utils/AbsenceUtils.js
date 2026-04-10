@@ -38,7 +38,7 @@ const absenceTypeFields = [
   "AbsenceType-maxRequest",
   "AbsenceType-negativeDays",
   "AbsenceType-adjustAfterDays",
-  "AbsenceType-gender"
+  "AbsenceType-gender",
 ];
 
 /**
@@ -95,8 +95,8 @@ const calculateDuration = (
   endDayFraction = datesAreForSameDay(startDate, endDate)
     ? null
     : endDayFraction !== null && !isNaN(parseFloat(endDayFraction))
-    ? Math.min(Math.max(parseFloat(endDayFraction), 0), 1)
-    : null;
+      ? Math.min(Math.max(parseFloat(endDayFraction), 0), 1)
+      : null;
 
   if (!(startDate instanceof Date) || isNaN(startDate)) {
     console.error("Invalid startDate. Expected a valid Date object.");
@@ -320,9 +320,10 @@ const calculateValidDaysCount = (startDate, endDate, employeeInfo) => {
  *
  * @param {number} maxCancellationDays - The number of days after which leave cancellation is restricted.
  * @param {Date|null} leaveEndDate - The end date of the absence.
+ * @param {function} t - The translation function from `useTranslation()`
  * @returns {boolean} - Returns true if cancellation is allowed, otherwise false.
  */
-const canCancelLeave = (maxCancellationDays, leaveEndDate) => {
+const canCancelLeave = (maxCancellationDays, leaveEndDate, t) => {
   if (maxCancellationDays <= 0 || !leaveEndDate) {
     return true;
   }
@@ -1507,13 +1508,15 @@ const validateDuration = (
  * @param {Object} currentStatus - The current status of the absence.
  * @param {number} maxCancellationDays - The configured number of days after which leave adjustment is restricted.
  * @param {Date} endDate - The end date of the absence.
+ * @param {function} t - The translation function from `useTranslation()`
  * @returns {boolean} - Returns true if the status change is valid, otherwise false.
  */
 const validateStatusChange = (
   processTemplate,
   currentStatus,
   maxCancellationDays,
-  endDate
+  endDate,
+  t
 ) => {
   if (!processTemplate || !currentStatus) {
     return true;
@@ -1534,7 +1537,7 @@ const validateStatusChange = (
 
   // Validate if the current status is one of the cancellation steps
   if (submissionCancelledStepIds.includes(currentStatus.statusID)) {
-    return canCancelLeave(maxCancellationDays, endDate);
+    return canCancelLeave(maxCancellationDays, endDate, t);
   }
 
   return true;

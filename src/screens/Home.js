@@ -247,7 +247,6 @@ const Home = ({ route, navigation }) => {
           <TouchableOpacity
             onPress={onPressExpenses}
             accessibilityLabel={t("navigate_to_expenses")}
-            disabled={true}
           >
             <View style={styles.card}>
               <FontAwesome name="credit-card" size={24} color="black" />

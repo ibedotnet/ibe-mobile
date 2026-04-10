@@ -1,4 +1,4 @@
-# Coding Standards – ibe-mobile (React Native, Expo)
+# Coding Standards – `ibe-mobile` (React Native + Expo)
 
 ## JavaScript / React Native Style Guide
 
@@ -14,6 +14,17 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 - Use **trailing commas** in multi-line objects/arrays.
 - Always use **single quotes** (`'`) for strings.
 
+```js
+const user = {
+  name: "Amit",
+  role: "Developer",
+};
+
+function greet(name) {
+  console.log(`Hello, ${name}`);
+}
+```
+
 ---
 
 ### Project Structure & Conventions
@@ -27,14 +38,14 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
 
 ### Naming Conventions
 
-| Entity     | Convention          | Example                  |
-|------------|---------------------|---------------------------|
+| Entity     | Convention                     | Example                              |
+| ---------- | ------------------------------ | ------------------------------------ |
 | Files      | `camelCase` or `PascalCase.js` | `loginScreen.js` or `LoginScreen.js` |
-| Components | `PascalCase`        | `LoginForm`, `UserCard`  |
-| Hooks      | `useCamelCase`      | `useAuth`, `useFetch`    |
-| Constants  | `UPPER_SNAKE_CASE`  | `MAX_ATTEMPTS`           |
-| Variables  | `camelCase`         | `userName`               |
-| Functions  | `camelCase`         | `handleSubmit`           |
+| Components | `PascalCase`                   | `LoginForm`, `UserCard`              |
+| Hooks      | `useCamelCase`                 | `useAuth`, `useFetch`                |
+| Constants  | `UPPER_SNAKE_CASE`             | `MAX_ATTEMPTS`                       |
+| Variables  | `camelCase`                    | `userName`                           |
+| Functions  | `camelCase`                    | `handleSubmit`                       |
 
 ---
 
@@ -56,12 +67,12 @@ We follow the [Airbnb JavaScript Style Guide](https://github.com/airbnb/javascri
   4. Relative imports
 
 ```js
-import React from 'react';
-import { View } from 'react-native';
-import Button from 'components/Button';
-import useAuth from 'hooks/useAuth';
-import { COLORS } from 'constants';
-import styles from './styles';
+import React from "react";
+import { View } from "react-native";
+import Button from "components/Button";
+import useAuth from "hooks/useAuth";
+import { COLORS } from "constants";
+import styles from "./styles";
 ```
 
 ---
@@ -70,8 +81,12 @@ import styles from './styles';
 
 - Use comments only when necessary.
 - Prefer self-documenting code.
-- For TODOs, use:  
-  `// TODO (your-name): explain what needs to be done`
+- For TODOs, use the following format:
+
+```js
+// TODO (your-name): explain what needs to be done
+// TODO (Jane Doe): Handle edge case when user is offline
+```
 
 ---
 
@@ -95,25 +110,28 @@ import styles from './styles';
 
 We enforce code quality using:
 
-- [ESLint](https://eslint.org/)
-- [Prettier](https://prettier.io/)
-- [Husky](https://typicode.github.io/husky/)
-- [lint-staged](https://github.com/okonet/lint-staged)
+- [ESLint](https://eslint.org/) — for identifying and fixing linting issues
+- [Prettier](https://prettier.io/) — for consistent code formatting
+- [Husky](https://typicode.github.io/husky/) — to run Git hooks (e.g., pre-commit)
+- [lint-staged](https://github.com/okonet/lint-staged) — to lint only staged files
+
+### Configuration
 
 These tools are configured in:
 
-- `.eslintrc.js`
-- `.prettierrc`
-- `.husky/pre-commit`
-- `package.json`
+- `.eslint.config.js` — ESLint rules and plugins
+- `.prettierrc.js` — Prettier formatting rules
+- `.husky/pre-commit` — Git hook that runs `lint-staged` before each commit
+- `package.json` — Scripts and `lint-staged` settings
 
 ---
 
 ## Contributor Checklist
 
-Before creating a pull request:
+Before opening a pull request:
 
-- [ ] Run `npm run lint` and fix any errors
-- [ ] Run `npm run format` to apply Prettier
-- [ ] Ensure tests cover your changes
-- [ ] Remove all debug logs and commented-out code
+- [ ] Run `npm run lint` to check for lint errors
+- [ ] Run `npm run format` to auto-format code with Prettier
+- [ ] Ensure all changes are covered by tests (if applicable)
+- [ ] Remove all `console.log`, commented-out code, or debug artifacts
+- [ ] Verify Git hooks (e.g., `pre-commit`) ran correctly
