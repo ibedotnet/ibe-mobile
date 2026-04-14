@@ -403,7 +403,7 @@ const Login = ({ navigation }) => {
             <Ionicons
               name={showPassword ? "eye-off" : "eye"}
               size={24}
-              color="black"
+              color="#00000033"
             />
           </TouchableOpacity>
         </View>
@@ -454,8 +454,9 @@ const Login = ({ navigation }) => {
 const styles = StyleSheet.create({
   header: {
     flex: 2,
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
+    paddingBottom: 20,
   },
   main: {
     flex: 3,
@@ -463,24 +464,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   input: {
-    borderWidth: 2,
-    borderRadius: 30,
-    paddingVertical: "4%",
+    width: "100%",
+    height: 51.28,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+    borderRadius: 10,
     paddingHorizontal: "5%",
     marginBottom: "4%",
+    marginTop: 2,
+    opacity: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   passwordContainer: {
     width: "100%",
+    height: 51.28,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 2,
-    borderRadius: 30,
-    paddingVertical: "4%",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+    borderRadius: 10,
     paddingHorizontal: "5%",
     marginBottom: "4%",
+    marginTop: 2,
+    opacity: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   password: {
     flex: 1,
+    height: "100%",
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -491,16 +512,19 @@ const styles = StyleSheet.create({
   checkbox: {
     borderColor: "#000",
     marginRight: 5,
+    transform: [{ scale: isSmallDevice ? 0.6 : isMediumDevice ? 0.8 : 1 }],
   },
   checkboxText: {
-    fontSize: isSmallDevice ? 8 : isMediumDevice ? 16 : 24,
+    fontSize: isSmallDevice ? 8 : isMediumDevice ? 12 : 18,
   },
   loginButton: {
+    width: "100%",
+    height: 51.28,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: "5%",
-    borderRadius: 30,
+    borderRadius: 8.94,
     backgroundColor: "#005eb8",
+    opacity: 1,
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

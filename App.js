@@ -43,7 +43,9 @@ const getInitialLanguage = async () => {
       return preferredLanguage;
     } else {
       // Use expo-localization to get the device's locale
-      const locale = Localization.locale.split("-")[0];
+      // const locale = Localization.locale.split("-")[0];
+      const locale =
+        Localization.getLocales()?.[0]?.languageCode || "en";
       console.log(`Device locale: ${locale}`);
 
       // Return the language if available, otherwise fallback to English
