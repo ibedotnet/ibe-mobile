@@ -29,7 +29,7 @@ i18n
       es: { translation: es }, // Provide translation resources for Spanish
       hi: { translation: hi }, // Provide translation resources for Hindi
     },
-    lng: Localization.locale.split("-")[0], // Set language based on device's locale
+    lng: Localization.getLocales()?.[0]?.languageCode || "en", // Set language based on device's locale
     fallbackLng: "en", // Fallback language if translation for the device's locale is not available
     interpolation: {
       escapeValue: false, // React already escapes strings by default
