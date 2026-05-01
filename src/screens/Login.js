@@ -358,7 +358,7 @@ const Login = ({ navigation }) => {
   return (
     <KeyboardAvoidingView
       style={common.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       testID="login-screen"
     >
       {!isKeyboardVisible && (
@@ -403,7 +403,7 @@ const Login = ({ navigation }) => {
             <Ionicons
               name={showPassword ? "eye-off" : "eye"}
               size={24}
-              color="#00000033"
+              color="black"
             />
           </TouchableOpacity>
         </View>
