@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   API_ENDPOINTS,
   API_TIMEOUT,
@@ -292,6 +292,11 @@ const getQueryFields = (busObjCat, extraFields = []) => {
           "ExpenseClaim-amountBU",
           "ExpenseClaim-date",
           "ExpenseClaim-extStatus-processTemplateID:ProcessTemplate-steps",
+          "ExpenseClaim-busUnitID:BusUnit-id",
+          "ExpenseClaim-busUnitID:BusUnit-name",
+          "ExpenseClaim-busUnitID:BusUnit-name-text",
+          "ExpenseClaim-extStatus-processTemplateID",
+          "ExpenseClaim-extStatus-statusID",
           ...extraFields,
         ],
         where: [
@@ -747,6 +752,10 @@ const uploadBinaryResource = async (
 
     const binaryResource = {
       attachmentId: uploadResourceResponse.id,
+      resourceId:
+        uploadResourceResponse.resourceID ||
+        uploadResourceResponse.resourceId ||
+        uploadResourceResponse.id,
       thumbId: uploadResourceResponse.thumbID,
     };
 

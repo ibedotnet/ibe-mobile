@@ -59,6 +59,34 @@ const timesheetFilters = [
 ];
 
 /**
+ * Represents the filters available for expenses.
+ * Each filter object contains an id, label, type, fieldName, and fieldValue.
+ */
+const expenseFilters = [
+  {
+    id: "date",
+    label: "Date",
+    type: "date",
+    fieldName: "ExpenseClaim-date",
+    fieldValue: "",
+  },
+  {
+    id: "remark",
+    label: "Remark",
+    type: "text",
+    fieldName: "ExpenseClaim-remark-text",
+    fieldValue: "",
+  },
+  {
+    id: "workflowStatus",
+    label: "status",
+    type: "status",
+    fieldName: "ExpenseClaim-extStatus-processTemplateID",
+    fieldValue: "",
+  }
+];
+
+/**
  * Represents the filters available for absences.
  * Each filter object contains an id, label, type, fieldName, and fieldValue.
  * - id: Unique identifier for the filter.
@@ -159,6 +187,7 @@ const messageLogFilters = [
  */
 const filtersMap = {
   [BUSOBJCAT.TIMESHEET]: timesheetFilters,
+  [BUSOBJCAT.EXPENSE]: expenseFilters,
   [BUSOBJCAT.ABSENCE]: absenceFilters,
   [BUSOBJCAT.MESSAGELOG]: messageLogFilters,
 };

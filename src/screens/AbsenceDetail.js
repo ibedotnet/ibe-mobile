@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useContext, useEffect, useState, useRef } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -29,6 +29,7 @@ import useEmployeeInfo from "../hooks/useEmployeeInfo";
 
 import { useAbsenceForceRefresh } from "../../context/ForceRefreshContext";
 import { useAbsenceSave } from "../../context/SaveContext";
+import { ThemeContext } from "../theme/ThemeContext";
 
 import {
   fetchData,
@@ -80,6 +81,7 @@ const Tab = createMaterialTopTabNavigator();
 const AbsenceDetail = ({ route, navigation }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
+  const { theme } = useContext(ThemeContext);
 
   const { updateForceRefresh } = useAbsenceForceRefresh();
 
@@ -910,7 +912,6 @@ const AbsenceDetail = ({ route, navigation }) => {
       );
     } catch (error) {
       console.error("Error in loading absence create detail: ", error);
-    } finally {
     }
   };
 
@@ -1350,7 +1351,15 @@ const AbsenceDetail = ({ route, navigation }) => {
         (isEditMode ? absenceType : true) &&
         itemStatusIDMap && (
           <>
-            <Tab.Navigator screenOptions={{ swipeEnabled: false }}>
+            <Tab.Navigator
+              screenOptions={{
+                swipeEnabled: false,
+                tabBarActiveTintColor: theme.secondary,
+                tabBarInactiveTintColor: theme.contrastOnPrimary,
+                tabBarIndicatorStyle: { backgroundColor: theme.secondary },
+                tabBarStyle: { backgroundColor: theme.primary },
+              }}
+            >
               <Tab.Screen
                 name={t("general")}
                 options={{
