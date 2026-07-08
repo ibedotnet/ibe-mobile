@@ -29,6 +29,7 @@ import {
 import { screenDimension } from "../utils/ScreenUtils";
 
 import { useClientPaths } from "../../context/ClientPathsContext";
+import ScreenHeader from "../components/ScreenHeader";
 import { useThemeStyles } from "../theme/useThemeStyles";
 
 const Home = ({ route, navigation }) => {
@@ -182,54 +183,61 @@ const Home = ({ route, navigation }) => {
       : require("../assets/images/client-logo-placeholder_500.png"); // Placeholder if no logo is available
   }, [clientPaths.clientLogoPath]);
 
-  /**
-   * Sets custom header options for the screen, including a user photo, username, and help icon.
-   * The header includes navigation links to the photo upload screen and user profile screen.
-   */
-  useEffect(() => {
-    navigation.setOptions({
-      headerTitle: "",
-      headerLeft: () => (
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={navigateToUploadPhoto}
-            accessibilityLabel={t("navigate_to_photo_upload")}
+  const headerLeft = useCallback(
+    () => (
+      <View style={styles.headerLeft}>
+        <TouchableOpacity
+          onPress={navigateToUploadPhoto}
+          accessibilityLabel={t("navigate_to_photo_upload")}
+        >
+          <Image
+            style={styles.userPhoto}
+            source={getUserImageSource}
+            onError={(error) =>
+              console.error("Error loading user photo:", error)
+            }
+            contentFit="contain"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={navigateToUserScreen}
+          accessibilityLabel={t("navigate_to_user_screen")}
+        >
+          <Text
+            style={styles.userName}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            <Image
-              style={styles.userPhoto}
-              source={getUserImageSource}
-              onError={(error) =>
-                console.error("Error loading user photo:", error)
-              }
-              contentFit="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={navigateToUserScreen}
-            accessibilityLabel={t("navigate_to_user_screen")}
-          >
-            <Text
-              style={styles.userName}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {userName}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ),
-      headerRight: () => (
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate("Help")}
-            accessibilityLabel={t("navigate_to_help")}
-          >
-            <Ionicons name="help-circle-outline" size={30} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-  }, [getUserImageSource, navigateToUploadPhoto, navigateToUserScreen]);
+            {userName}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    ),
+    [
+      getUserImageSource,
+      navigateToUploadPhoto,
+      navigateToUserScreen,
+      styles.headerLeft,
+      styles.userName,
+      styles.userPhoto,
+      t,
+      userName,
+    ]
+  );
+
+  const headerRight = useCallback(
+    () => (
+      <View style={styles.headerRight}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Help")}
+          accessibilityLabel={t("navigate_to_help")}
+        >
+          <Ionicons name="help-circle-outline" size={30} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    ),
+    [navigation, styles.headerRight, t]
+  );
 
   const onPressTimesheets = () => navigation.navigate("Timesheet");
   const onPressExpenses = () => navigation.navigate("Expense");
@@ -244,6 +252,7 @@ const Home = ({ route, navigation }) => {
     accessibilityLabel,
     icon,
     showNewBadge = false,
+    showBetaBadge = false,
     count,
   }) => (
     <Pressable
@@ -263,13 +272,20 @@ const Home = ({ route, navigation }) => {
             {icon(pressed)}
           </View>
           <View style={styles.cardContent}>
-            <Text
-              style={[styles.cardText, pressed && styles.pressedCardText]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {title}
-            </Text>
+            <View style={styles.cardTitleRow}>
+              <Text
+                style={[styles.cardText, pressed && styles.pressedCardText]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {title}
+              </Text>
+              {showBetaBadge && (
+                <View style={styles.betaBadge}>
+                  <Text style={styles.betaBadgeText}>Beta</Text>
+                </View>
+              )}
+            </View>
             <Text
               style={styles.cardDescription}
               numberOfLines={2}
@@ -299,7 +315,9 @@ const Home = ({ route, navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} testID="home-screen">
+    <View style={styles.container} testID="home-screen">
+      <ScreenHeader left={headerLeft()} right={headerRight()} />
+      <SafeAreaView style={styles.container} edges={["right", "bottom", "left"]}>
       {/**
       * Renders the client logo or a placeholder if the logo path is unavailable. 
       * `clientPaths.clientLogoPath` is fetched dynamically, while the local placeholder 
@@ -396,9 +414,11 @@ const Home = ({ route, navigation }) => {
               />
             ),
             count: fieldEngineerTaskCount,
+            showBetaBadge: true,
           })}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
